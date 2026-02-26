@@ -1,0 +1,2696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>BOM Calculator - Manufacturing Cost ERP</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .calculator-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .calculator-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 15px;
+    }
+
+    .calculator-header h1 {
+      margin: 0;
+      color: #1e3a8a;
+      font-size: 2em;
+    }
+
+    .back-link {
+      padding: 8px 16px;
+      background: #e0e0e0;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #333;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+
+    .back-link:hover {
+      background: #d0d0d0;
+    }
+
+    .section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .section h2 {
+      color: #667eea;
+      margin-bottom: 15px;
+      font-size: 1.3em;
+      border-bottom: 2px solid #e0e0e0;
+      padding-bottom: 10px;
+    }
+
+    .input-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .section.description-section .input-group {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .section.description-section .input-field {
+      margin-bottom: 0;
+    }
+
+    .section.description-section .input-field label {
+      margin-bottom: 3px;
+      font-size: 0.85em;
+    }
+
+    .section.description-section .input-field input,
+    .section.description-section .input-field select {
+      padding: 6px;
+      font-size: 0.85em;
+      background-color: #e3f2fd;
+    }
+
+    .section.production-target-section .input-field input,
+    .section.production-target-section .input-field select {
+      background-color: #e3f2fd;
+    }
+
+    .input-field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .input-field label {
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #333;
+      font-size: 0.9em;
+    }
+
+    .input-field input,
+    .input-field select {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.9em;
+    }
+
+    .input-field input:focus,
+    .input-field select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+    }
+
+    .beam-config-populated {
+      background-color: #e3f2fd !important;
+    }
+
+    .beam-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    .beam-table th,
+    .beam-table td {
+      padding: 4px 3px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+
+    .beam-table th {
+      background: #667eea;
+      color: white;
+      font-weight: 600;
+    }
+
+    .beam-table input {
+      width: 60px;
+      padding: 4px 2px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 12px;
+    }
+
+    .beam-table select {
+      padding: 4px 2px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .material-row-selector {
+      width: 100%;
+      padding: 4px 3px;
+      font-weight: 600;
+      font-size: 11px;
+      background: #f0f4ff;
+      border: 2px solid #667eea;
+      border-radius: 4px;
+    }
+
+    .material-input {
+      width: 100%;
+      padding: 3px 2px;
+      margin: 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 11px;
+      box-sizing: border-box;
+    }
+
+    .calculated-field {
+      background: #e8f5e9;
+      border: 1px solid #4caf50;
+      color: #2e7d32;
+      font-weight: 600;
+      cursor: not-allowed;
+    }
+
+    #materialSelectionRow td {
+      vertical-align: middle;
+      padding: 4px 3px;
+      min-width: 60px;
+    }
+
+    /* Make sub-header cells smaller */
+    .beam-table thead tr:nth-child(2) th {
+      font-size: 10px;
+      padding: 3px 2px;
+      background: #7c8ff0;
+    }
+
+    .material-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 15px;
+    }
+
+    #surfactantList {
+      grid-template-columns: repeat(3, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    @media (max-width: 900px) {
+      #surfactantList {
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+      }
+    }
+
+    @media (max-width: 600px) {
+      #surfactantList {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .material-item {
+      display: grid;
+      grid-template-columns: 100px 1fr 100px;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+    }
+
+    .surfactant-item {
+      grid-template-columns: 180px 70px 60px 60px;
+      gap: 6px;
+      padding: 8px;
+    }
+
+    .material-item label {
+      font-weight: 600;
+      color: #555;
+      font-size: 0.9em;
+    }
+
+    .surfactant-item label {
+      font-size: 0.8em;
+    }
+
+    .material-item select,
+    .material-item input {
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    .surfactant-item select,
+    .surfactant-item input {
+      padding: 4px;
+      font-size: 0.8em;
+    }
+
+    .delete-surfactant-btn {
+      padding: 4px 8px;
+      background: #f44336;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      height: fit-content;
+    }
+
+    .delete-surfactant-btn:hover {
+      background: #d32f2f;
+    }
+
+    .reset-row-btn {
+      padding: 6px 12px;
+      background: #9e9e9e;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .reset-row-btn:hover {
+      background: #757575;
+    }
+
+    .reset-row-btn:active {
+      background: #616161;
+    }
+
+    .column-disabled {
+      background: #e0e0e0 !important;
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+
+    .column-disabled input {
+      background: #e0e0e0 !important;
+      color: #999 !important;
+    }
+    
+    .net-polymer-calc {
+      font-size: 11px;
+      color: #0066cc;
+      margin-top: 2px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .polymer-mismatch {
+      color: #d00000 !important;
+      font-weight: 700;
+    }
+
+    .warning-banner {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #ffe6e6;
+      border: 1px solid #d00000;
+      color: #8a0000;
+      font-weight: 700;
+      border-radius: 6px;
+      display: none;
+      text-align: center;
+    }
+
+    .material-missing {
+      background: #ffebee !important;
+    }
+
+    .warning-flash {
+      animation: warningFlash 0.8s ease-in-out 2;
+    }
+
+    @keyframes warningFlash {
+      0% { opacity: 1; }
+      50% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+
+    .add-surfactant-btn {
+      margin-top: 12px;
+      padding: 8px 12px;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .add-surfactant-btn:hover {
+      background: #43a047;
+    }
+
+    .calculate-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1em;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    .calculate-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    .results-table th,
+    .results-table td {
+      padding: 12px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+
+    .results-table th {
+      background: #2b6cb0;
+      color: white;
+      font-weight: 600;
+    }
+
+    .results-table tr:hover {
+      background: #f5f5f5;
+    }
+
+    .total-row {
+      background: #e8eaf6 !important;
+      font-weight: 700;
+    }
+
+    /* Save/Load Modal Styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      max-width: 700px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      color: #667eea;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #999;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+    }
+
+    .modal-close:hover {
+      color: #333;
+    }
+
+    .save-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .save-actions button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c82333;
+    }
+
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #218838;
+    }
+
+    .dataset-list {
+      margin-top: 20px;
+    }
+
+    .dataset-item {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: #f8f9fa;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .dataset-item:hover {
+      background: #e9ecef;
+      border-color: #667eea;
+    }
+
+    .dataset-item.selected {
+      border-color: #667eea;
+      background: #e8eaf6;
+    }
+
+    .dataset-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 8px;
+    }
+
+    .dataset-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 1.1em;
+    }
+
+    .dataset-date {
+      color: #666;
+      font-size: 0.85em;
+    }
+
+    .dataset-preview {
+      font-size: 0.9em;
+      color: #555;
+      line-height: 1.4;
+    }
+
+    .dataset-preview-row {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 5px;
+      margin-bottom: 3px;
+    }
+
+    .dataset-preview-label {
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .dataset-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .dataset-btn {
+      padding: 5px 12px;
+      font-size: 0.85em;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .input-field.save-name {
+      margin-bottom: 15px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.95em;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container calculator-container">
+    <header class="calculator-header">
+      <h1>BOM Calculator</h1>
+      <button class="back-link" onclick="window.location.href='index.html'">← Back to Dashboard</button>
+    </header>
+
+    <!-- Toolbar for Save/Load Actions -->
+    <div class="toolbar">
+      <button class="btn-success" onclick="openSaveModal()">💾 Save WIP</button>
+      <button class="btn-primary" onclick="openLoadModal()">📂 Load WIP</button>
+      <button class="btn-secondary" onclick="exportCompleted()">📤 Export Completed</button>
+      <button class="btn-secondary" onclick="importCompleted()">📥 Import Recipe</button>
+    </div>
+
+    <!-- Description -->
+    <div class="section description-section">
+      <h2>Description</h2>
+      <div class="input-group">
+        <div class="input-field">
+          <label for="pdId">PD ID</label>
+          <input type="text" id="pdId" placeholder="Enter PD ID" />
+        </div>
+        <div class="input-field">
+          <label for="sapId">SAP ID</label>
+          <input type="text" id="sapId" placeholder="Enter SAP ID" />
+        </div>
+        <div class="input-field">
+          <label for="sapIdSimilar">SAP ID (similar material)</label>
+          <input type="text" id="sapIdSimilar" placeholder="Enter SAP ID" />
+        </div>
+        <div class="input-field">
+          <label for="customer">Customer</label>
+          <select id="customer"></select>
+        </div>
+        <div class="input-field">
+          <label for="marketSegment">Market Segment</label>
+          <select id="marketSegment"></select>
+        </div>
+        <div class="input-field">
+          <label for="application">Application</label>
+          <select id="application"></select>
+        </div>
+        <div class="input-field">
+          <label for="smms">S/SMS</label>
+          <select id="smms"></select>
+        </div>
+        <div class="input-field">
+          <label for="monoBico">Mono/Bico</label>
+          <select id="monoBico"></select>
+        </div>
+        <div class="input-field">
+          <label for="structure">Structure</label>
+          <select id="structure"></select>
+        </div>
+        <div class="input-field">
+          <label for="mainRawMat">Main RawMat</label>
+          <select id="mainRawMat"></select>
+        </div>
+        <div class="input-field">
+          <label for="bonding">Bonding</label>
+          <select id="bonding"></select>
+        </div>
+        <div class="input-field">
+          <label for="totalGSM">Customer BW</label>
+          <input type="number" id="totalGSM" placeholder="Customer BW" step="0.1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="beltBW">Belt BW</label>
+          <input type="number" id="beltBW" placeholder="Belt BW" step="0.1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="mbGrams">MB grams</label>
+          <input type="number" id="mbGrams" placeholder="MB grams" step="0.1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="bicoRatioDesc">Bico Ratio</label>
+          <select id="bicoRatioDesc"></select>
+        </div>
+        <div class="input-field">
+          <label for="treatment">Treatment</label>
+          <select id="treatment"></select>
+        </div>
+        <div class="input-field">
+          <label for="color">Color</label>
+          <select id="color"></select>
+        </div>
+        <div class="input-field">
+          <label for="cores">Cores</label>
+          <select id="cores"></select>
+        </div>
+        <div class="input-field">
+          <label for="slitWidth">Slit Width (mm)</label>
+          <input type="number" id="slitWidth" placeholder="Slit Width (mm)" step="1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="lengthMeters">Length (m)</label>
+          <input type="number" id="lengthMeters" placeholder="Length (m)" step="1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="rollDiameter">Roll Diameter (mm)</label>
+          <input type="number" id="rollDiameter" placeholder="Roll Diameter (mm)" step="1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="sikoPercent">Siko (%)</label>
+          <input type="number" id="sikoPercent" placeholder="Siko (%)" step="0.1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="reproPercent">Repro (%)</label>
+          <input type="number" id="reproPercent" placeholder="Repro (%)" step="0.1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="line">Line</label>
+          <select id="line"></select>
+        </div>
+        <div class="input-field">
+          <label for="beltSpeed">Belt Speed (m/min)</label>
+          <input type="number" id="beltSpeed" placeholder="Belt Speed (m/min)" step="0.1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="maxUsableWidth">Max usable width (brutto)</label>
+          <input type="number" id="maxUsableWidth" placeholder="Max usable width (brutto)" step="1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="usableWidth">Usable width (netto)</label>
+          <input type="number" id="usableWidth" placeholder="Usable width (netto)" step="1" min="0" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Production Target -->
+    <div class="section production-target-section">
+      <h2>Production Target</h2>
+      <div class="input-group">
+        <div class="input-field">
+          <label for="targetProduction">Minimum batch size</label>
+          <input type="number" id="targetProduction" placeholder="Enter minimum allowed batch volume" step="1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="targetUnit">Unit</label>
+          <select id="targetUnit">
+            <option value="kg">kg NW</option>
+            <option value="tons" selected>tons NW</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Beam Configuration -->
+    <div class="section">
+      <h2>Beam Configuration</h2>
+      <table class="beam-table" id="beamTable">
+        <thead>
+          <tr>
+            <th rowspan="2">Head</th>
+            <th colspan="2">SB</th>
+            <th colspan="2">SB</th>
+            <th>MB</th>
+            <th>MB</th>
+            <th>MB</th>
+            <th>MB</th>
+            <th colspan="2">SB</th>
+            <th colspan="2">SB</th>
+          </tr>
+          <tr>
+            <th>A</th>
+            <th>B</th>
+            <th>A</th>
+            <th>B</th>
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
+            <th>A</th>
+            <th>B</th>
+            <th>A</th>
+            <th>B</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr id="gsmRow">
+            <td><strong>GSM</strong></td>
+            <td colspan="2"><input type="number" id="beamGSM_1" placeholder="0" step="0.1" min="0" /></td>
+            <td colspan="2"><input type="number" id="beamGSM_2" placeholder="0" step="0.1" min="0" /></td>
+            <td><input type="number" id="beamGSM_3" placeholder="0" step="0.1" min="0" /></td>
+            <td><input type="number" id="beamGSM_4" placeholder="0" step="0.1" min="0" /></td>
+            <td><input type="number" id="beamGSM_5" placeholder="0" step="0.1" min="0" /></td>
+            <td><input type="number" id="beamGSM_6" placeholder="0" step="0.1" min="0" /></td>
+            <td colspan="2"><input type="number" id="beamGSM_7" placeholder="0" step="0.1" min="0" /></td>
+            <td colspan="2"><input type="number" id="beamGSM_8" placeholder="0" step="0.1" min="0" /></td>
+          </tr>
+          <tr id="bicoRatioRow">
+            <td><strong>BICO ratio %</strong></td>
+            <td><input type="number" id="beamBico_1_A" placeholder="%" class="material-input calculated-field" readonly min="0" /></td>
+            <td><input type="number" id="beamBico_1_B" placeholder="%" class="material-input" step="0.1" min="0" max="100" /></td>
+            <td><input type="number" id="beamBico_2_A" placeholder="%" class="material-input calculated-field" readonly min="0" /></td>
+            <td><input type="number" id="beamBico_2_B" placeholder="%" class="material-input" step="0.1" min="0" max="100" /></td>
+            <td><input type="number" id="beamBico_3" value="100" class="material-input calculated-field" readonly min="0" /></td>
+            <td><input type="number" id="beamBico_4" value="100" class="material-input calculated-field" readonly min="0" /></td>
+            <td><input type="number" id="beamBico_5" value="100" class="material-input calculated-field" readonly min="0" /></td>
+            <td><input type="number" id="beamBico_6" value="100" class="material-input calculated-field" readonly min="0" /></td>
+            <td><input type="number" id="beamBico_7_A" placeholder="%" class="material-input calculated-field" readonly min="0" /></td>
+            <td><input type="number" id="beamBico_7_B" placeholder="%" class="material-input" step="0.1" min="0" max="100" /></td>
+            <td><input type="number" id="beamBico_8_A" placeholder="%" class="material-input calculated-field" readonly min="0" /></td>
+            <td><input type="number" id="beamBico_8_B" placeholder="%" class="material-input" step="0.1" min="0" max="100" /></td>
+          </tr>
+          <tr id="materialTypeRow">
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select id="materialTypeSelector" class="material-row-selector material-type-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select id="materialNameSelector" class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td data-column-type="SB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="SB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="SB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="SB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="MB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="MB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="MB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="MB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="SB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="SB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="SB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td data-column-type="SB"><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select class="material-row-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select class="material-row-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select class="material-row-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select class="material-row-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select class="material-row-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select class="material-row-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select class="material-row-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select class="material-row-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; padding: 3px 2px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <select class="material-row-selector" style="margin-bottom: 2px;">
+                  <option value="">- Select Type -</option>
+                  <option value="SB">SB</option>
+                  <option value="MB">MB</option>
+                  <option value="Pigment">Pigment</option>
+                  <option value="Additive">Additive</option>
+                </select>
+                <select class="material-row-selector">
+                  <option value="">- Select Material -</option>
+                </select>
+              </div>
+            </td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td><input type="text" placeholder="%" class="material-input" /></td>
+            <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Surfactants -->
+    <div class="section" id="surfactantsSection">
+      <h2>Surfactants</h2>
+      <div class="material-section" id="surfactantList"></div>
+      <button type="button" class="add-surfactant-btn" id="addSurfactantBtn">Add surfactant</button>
+    </div>
+
+    <!-- Calculate Button -->
+    <button class="calculate-btn" onclick="calculateBOM()">Calculate BOM</button>
+    <div id="polymerWarning" class="warning-banner">Polymers do not add up to 100%</div>
+    <div id="materialWarning" class="warning-banner">Material selection missing for a chosen type</div>
+
+    <!-- Results -->
+    <div class="section" id="resultsSection" style="display: none;">
+      <h2>Calculation Results</h2>
+      <table class="results-table" id="resultsTable">
+        <thead>
+          <tr>
+            <th>Material</th>
+            <th>Name</th>
+            <th id="consumptionHeader">Consumption (kg)</th>
+            <th>Percentage (%)</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let materialLists = {
+      list_sb: [],
+      list_mb: [],
+      list_pigment: [],
+      list_additive: [],
+      list_surfactant: [],
+      surfactant_conc_map: {}
+    };
+
+    // Initialize column type attributes and event listeners
+    function initializeColumnTypes() {
+      const materialRows = document.querySelectorAll('#beamTable tbody tr');
+      
+      materialRows.forEach(row => {
+        const typeSelector = row.querySelector('.material-row-selector');
+        
+        // Only process rows that have a type selector (material rows, not GSM/BICO rows)
+        if (typeSelector && typeSelector.querySelector('option[value="SB"]')) {
+          // Get all input cells (skip the first td with selectors and last td with reset button)
+          const allCells = Array.from(row.querySelectorAll('td'));
+          const inputCells = allCells.slice(1, -1); // Remove first and last td
+          
+          // Add data-column-type attributes based on position
+          // Positions: 0-3: SB, 4-7: MB, 8-11: SB
+          inputCells.forEach((cell, index) => {
+            if (index >= 0 && index <= 3) {
+              cell.setAttribute('data-column-type', 'SB');
+            } else if (index >= 4 && index <= 7) {
+              cell.setAttribute('data-column-type', 'MB');
+            } else if (index >= 8 && index <= 11) {
+              cell.setAttribute('data-column-type', 'SB');
+            }
+          });
+          
+          // Add event listener to type selector
+          typeSelector.addEventListener('change', function() {
+            handleTypeSelection(row, this.value);
+          });
+        }
+      });
+    }
+
+    function validatePolymerSums() {
+      const warning = document.getElementById('polymerWarning');
+      const materialRows = document.querySelectorAll('#beamTable tbody tr');
+      const columnTypes = ['SB', 'SB', 'SB', 'SB', 'MB', 'MB', 'MB', 'MB', 'SB', 'SB', 'SB', 'SB'];
+      const tolerance = 0.01;
+
+      document.querySelectorAll('input.material-input.polymer-mismatch').forEach(input => {
+        input.classList.remove('polymer-mismatch');
+      });
+
+      let hasMismatch = false;
+
+      for (let colIndex = 0; colIndex < columnTypes.length; colIndex++) {
+        const columnType = columnTypes[colIndex];
+        let sum = 0;
+        let hasEntry = false;
+        const columnInputs = [];
+
+        materialRows.forEach(row => {
+          const selects = row.querySelectorAll('select.material-row-selector');
+          if (selects.length !== 2) return;
+
+          const typeValue = selects[0].value;
+          if (typeValue !== columnType) return;
+
+          const inputs = row.querySelectorAll('input.material-input');
+          const input = inputs[colIndex];
+          if (!input || input.disabled) return;
+
+          const value = parseFloat(input.value) || 0;
+          if (value > 0) {
+            hasEntry = true;
+          }
+
+          sum += value;
+          columnInputs.push(input);
+        });
+
+        if (!hasEntry) continue;
+
+        if (Math.abs(sum - 100) > tolerance) {
+          hasMismatch = true;
+          columnInputs.forEach(input => input.classList.add('polymer-mismatch'));
+        }
+      }
+
+      if (warning) {
+        warning.style.display = hasMismatch ? 'block' : 'none';
+      }
+
+      return hasMismatch;
+    }
+
+    function validateMaterialSelections() {
+      const warning = document.getElementById('materialWarning');
+      const materialRows = document.querySelectorAll('#beamTable tbody tr');
+      let hasMissing = false;
+
+      materialRows.forEach(row => {
+        row.classList.remove('material-missing');
+      });
+
+      materialRows.forEach(row => {
+        const selects = row.querySelectorAll('select.material-row-selector');
+        if (selects.length !== 2) return;
+
+        const typeValue = selects[0].value;
+        const nameValue = selects[1].value;
+
+        if (typeValue && !nameValue) {
+          row.classList.add('material-missing');
+          hasMissing = true;
+        }
+      });
+
+      if (warning) {
+        warning.style.display = hasMissing ? 'block' : 'none';
+        warning.classList.remove('warning-flash');
+        if (hasMissing) {
+          void warning.offsetWidth;
+          warning.classList.add('warning-flash');
+        }
+      }
+
+      return hasMissing;
+    }
+
+    // Handle type selection to enable/disable appropriate columns
+    function handleTypeSelection(row, selectedType) {
+      const allCells = Array.from(row.querySelectorAll('td'));
+      const inputCells = allCells.slice(1, -1); // Remove first and last td
+      
+      inputCells.forEach(cell => {
+        const columnType = cell.getAttribute('data-column-type');
+        const input = cell.querySelector('input');
+        
+        if (selectedType === 'SB') {
+          // If SB is selected, disable MB columns
+          if (columnType === 'MB') {
+            cell.classList.add('column-disabled');
+            if (input) {
+              input.disabled = true;
+              input.value = '';
+              input.placeholder = '';
+            }
+          } else {
+            cell.classList.remove('column-disabled');
+            if (input) {
+              input.disabled = false;
+              input.placeholder = '%';
+            }
+          }
+        } else if (selectedType === 'MB') {
+          // If MB is selected, disable SB columns
+          if (columnType === 'SB') {
+            cell.classList.add('column-disabled');
+            if (input) {
+              input.disabled = true;
+              input.value = '';
+              input.placeholder = '';
+            }
+          } else {
+            cell.classList.remove('column-disabled');
+            if (input) {
+              input.disabled = false;
+              input.placeholder = '%';
+            }
+          }
+        } else {
+          // If Pigment, Additive, or nothing is selected, enable all columns
+          cell.classList.remove('column-disabled');
+          if (input) {
+            input.disabled = false;
+            input.placeholder = '%';
+          }
+        }
+      });
+    }
+
+    function initializeSurfactantSection() {
+      const addButton = document.getElementById('addSurfactantBtn');
+      const listContainer = document.getElementById('surfactantList');
+
+      if (!addButton || !listContainer) return;
+
+      addButton.addEventListener('click', () => {
+        addSurfactantRow(listContainer);
+      });
+    }
+
+    function addSurfactantRow(listContainer) {
+      const index = listContainer.children.length + 1;
+
+      const row = document.createElement('div');
+      row.className = 'material-item surfactant-item';
+
+      const select = document.createElement('select');
+      select.className = 'surfactant-select';
+      select.innerHTML = '<option value="">Select surfactant</option>';
+      populateSurfactantOptions(select);
+
+      const concInput = document.createElement('input');
+      concInput.type = 'text';
+      concInput.className = 'surfactant-conc calculated-field';
+      concInput.placeholder = 'Conc. %';
+      concInput.readOnly = true;
+
+      const opuInput = document.createElement('input');
+      opuInput.type = 'number';
+      opuInput.className = 'surfactant-opu';
+      opuInput.placeholder = 'OPU';
+      opuInput.step = '0.1';
+      opuInput.min = '0';
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-surfactant-btn';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', () => {
+        row.remove();
+      });
+
+      select.addEventListener('change', () => {
+        updateSurfactantConcentration(select, concInput);
+      });
+
+      row.appendChild(select);
+      row.appendChild(concInput);
+      row.appendChild(opuInput);
+      row.appendChild(deleteBtn);
+
+      listContainer.appendChild(row);
+    }
+
+    function populateSurfactantOptions(select) {
+      if (!materialLists.list_surfactant) return;
+
+      materialLists.list_surfactant.forEach(surfactant => {
+        const option = document.createElement('option');
+        option.value = surfactant;
+        option.textContent = surfactant;
+        select.appendChild(option);
+      });
+    }
+
+    function updateSurfactantConcentration(select, concInput) {
+      const surfactantName = select.value;
+      const concValue = materialLists.surfactant_conc_map[surfactantName];
+
+      if (surfactantName && concValue !== undefined && concValue !== '') {
+        const displayValue = Math.round(parseFloat(concValue) * 100);
+        concInput.value = `${displayValue}%`;
+        concInput.dataset.value = concValue;
+      } else {
+        concInput.value = '';
+        concInput.dataset.value = '';
+      }
+    }
+
+    // Load material lists from backend
+    async function loadMaterialLists() {
+      try {
+        const response = await fetch('/api/bom/lists');
+        if (!response.ok) {
+          throw new Error('Failed to load material lists');
+        }
+        
+        materialLists = await response.json();
+        
+        // Initialize material type dropdown after lists are loaded
+        initializeMaterialTypeDropdown();
+        // Initialize column types and event listeners
+        initializeColumnTypes();
+        // Initialize surfactant section
+        initializeSurfactantSection();
+        
+        console.log('Material lists loaded successfully');
+      } catch (error) {
+        console.error('Error loading material lists:', error);
+        alert('Failed to load material lists from server. Please check if the server is running.');
+      }
+    }
+
+    function initializeBeamConfigColorTracking() {
+      // Add color tracking for BICO ratio B inputs (1B, 2B, 7B, 8B) - editable fields only
+      const bicoBInputIds = ['beamBico_1_B', 'beamBico_2_B', 'beamBico_7_B', 'beamBico_8_B'];
+      bicoBInputIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+          // Set initial state
+          updateBeamInputBackground(element);
+          // Add input listener
+          element.addEventListener('input', function() {
+            updateBeamInputBackground(this);
+          });
+        }
+      });
+
+      // Add color tracking for raw material input fields
+      const materialRows = document.querySelectorAll('#beamTable tbody tr');
+      materialRows.forEach(row => {
+        const inputs = row.querySelectorAll('input.material-input');
+        inputs.forEach(input => {
+          // Skip calculated fields (readonly)
+          if (input.classList.contains('calculated-field')) {
+            return;
+          }
+          // Set initial state
+          updateBeamInputBackground(input);
+          // Add input listener
+          input.addEventListener('input', function() {
+            updateBeamInputBackground(this);
+          });
+        });
+      });
+    }
+
+    function updateBeamInputBackground(element) {
+      // Check if element has a value that's not empty and not zero
+      const value = element.value;
+      const isPopulated = value !== '' && value !== '0' && value !== 0;
+      
+      if (isPopulated) {
+        element.classList.add('beam-config-populated');
+      } else {
+        element.classList.remove('beam-config-populated');
+      }
+    }
+
+    function calculateBOM() {
+      validatePolymerSums();
+      validateMaterialSelections();
+
+      const targetProductionInput = parseFloat(document.getElementById("targetProduction").value) || 0;
+      const totalGSM = parseFloat(document.getElementById("totalGSM").value) || 0;
+      const unit = document.getElementById('targetUnit').value;
+      const sikoPercent = parseFloat(document.getElementById("sikoPercent").value) || 0;
+      const reproPercent = parseFloat(document.getElementById("reproPercent").value) || 0;
+      
+      // Convert to kg for internal calculations
+      const targetProduction = unit === 'tons' ? targetProductionInput * 1000 : targetProductionInput;
+
+      if (targetProductionInput <= 0) {
+        alert('Please enter a valid production target');
+        return;
+      }
+
+      // Get beam GSM values
+      const beamGSMs = [];
+      for (let i = 1; i <= 8; i++) {
+        const gsm = parseFloat(document.getElementById(`beamGSM_${i}`).value) || 0;
+        beamGSMs.push(gsm);
+      }
+
+      const calculatedTotalGSM = beamGSMs.reduce((sum, gsm) => sum + gsm, 0);
+
+      // Calculate material consumption
+      const materials = {};
+
+      const totalGSMWeight = calculatedTotalGSM;
+      const columnMap = [
+        { head: 1, side: 'A' },
+        { head: 1, side: 'B' },
+        { head: 2, side: 'A' },
+        { head: 2, side: 'B' },
+        { head: 3, side: null },
+        { head: 4, side: null },
+        { head: 5, side: null },
+        { head: 6, side: null },
+        { head: 7, side: 'A' },
+        { head: 7, side: 'B' },
+        { head: 8, side: 'A' },
+        { head: 8, side: 'B' }
+      ];
+
+      const bicoRatios = {};
+      [1, 2, 7, 8].forEach(head => {
+        const aValue = parseFloat(document.getElementById(`beamBico_${head}_A`).value) || 0;
+        const bValue = parseFloat(document.getElementById(`beamBico_${head}_B`).value) || 0;
+        bicoRatios[head] = { A: aValue, B: bValue };
+      });
+
+      const materialRows = document.querySelectorAll('#beamTable tbody tr');
+      const columnTypes = ['SB', 'SB', 'SB', 'SB', 'MB', 'MB', 'MB', 'MB', 'SB', 'SB', 'SB', 'SB'];
+      const firstPolymerRowByCol = new Array(columnTypes.length).fill(null);
+
+      for (let colIndex = 0; colIndex < columnTypes.length; colIndex++) {
+        const columnType = columnTypes[colIndex];
+
+        for (const row of materialRows) {
+          const selects = row.querySelectorAll('select.material-row-selector');
+          if (selects.length !== 2) continue;
+          if (selects[0].value !== columnType) continue;
+
+          const inputs = row.querySelectorAll('input.material-input');
+          const input = inputs[colIndex];
+          if (!input || input.disabled) continue;
+
+          const value = parseFloat(input.value) || 0;
+          if (value <= 0) continue;
+
+          firstPolymerRowByCol[colIndex] = row;
+          break;
+        }
+      }
+
+      materialRows.forEach(row => {
+        const selects = row.querySelectorAll('select.material-row-selector');
+        if (selects.length !== 2) return;
+
+        const typeSelector = selects[0];
+        const nameSelector = selects[1];
+        const materialName = nameSelector.value;
+        if (!materialName) return;
+
+        const inputs = row.querySelectorAll('input.material-input');
+        if (inputs.length < columnMap.length) return;
+        
+        let gsmContribution = 0;
+
+        columnMap.forEach((column, index) => {
+          let inputValue = 0;
+          
+          const isFirstPolymerInColumn = firstPolymerRowByCol[index] === row;
+          if (isFirstPolymerInColumn) {
+            const baseValue = parseFloat(inputs[index].value) || 0;
+            let pigmentSum = 0;
+            let additiveSum = 0;
+
+            materialRows.forEach(otherRow => {
+              const selects = otherRow.querySelectorAll('select.material-row-selector');
+              if (selects.length !== 2) return;
+
+              const typeValue = selects[0].value;
+              const otherInputs = otherRow.querySelectorAll('input.material-input');
+              const otherValue = parseFloat(otherInputs[index]?.value) || 0;
+
+              if (typeValue === 'Pigment') {
+                pigmentSum += otherValue;
+              } else if (typeValue === 'Additive') {
+                additiveSum += otherValue;
+              }
+            });
+
+            inputValue = baseValue - pigmentSum - additiveSum;
+          } else {
+            inputValue = parseFloat(inputs[index].value) || 0;
+          }
+          
+          if (inputValue <= 0) return;
+
+          const headGsm = beamGSMs[column.head - 1] || 0;
+          if (headGsm <= 0) return;
+
+          let headFactor = 1;
+          if (column.side) {
+            const ratio = bicoRatios[column.head]?.[column.side] || 0;
+            headFactor = ratio / 100;
+          }
+
+          const contribution = (inputValue / 100) * headGsm * headFactor;
+
+          gsmContribution += contribution;
+        });
+
+        if (gsmContribution <= 0 || totalGSMWeight <= 0) return;
+
+        const percentage = (gsmContribution / totalGSMWeight) * 100;
+        const consumption = targetProduction * (percentage / 100);
+
+        let materialLabel = materialName;
+        if (typeSelector.value === 'SB') {
+          materialLabel = 'Spunbond polymer';
+        } else if (typeSelector.value === 'MB') {
+          materialLabel = 'Meltblown polymer';
+        } else if (typeSelector.value === 'Pigment') {
+          materialLabel = 'Pigment';
+        } else if (typeSelector.value === 'Additive') {
+          materialLabel = 'Additive';
+        }
+
+        if (!materials[materialName]) {
+          materials[materialName] = {
+            name: materialName,
+            materialLabel,
+            consumption: 0,
+            percentage: 0
+          };
+        } else if (materials[materialName].materialLabel !== materialLabel) {
+          materials[materialName].materialLabel = materialLabel;
+        }
+
+        materials[materialName].consumption += consumption;
+        materials[materialName].percentage += percentage;
+      });
+
+      // Process surfactants from dynamic list
+      const surfactantRows = document.querySelectorAll('#surfactantList .surfactant-item');
+      surfactantRows.forEach((row, index) => {
+        const select = row.querySelector('.surfactant-select');
+        const concInput = row.querySelector('.surfactant-conc');
+        const opuInput = row.querySelector('.surfactant-opu');
+
+        if (!select || !concInput || !opuInput) return;
+
+        const matName = select.value;
+        const concValue = parseFloat(concInput.dataset.value || concInput.value) || 0;
+        const opuPercent = parseFloat(opuInput.value) || 0;
+
+        if (matName && concValue > 0 && opuPercent > 0) {
+          const surfactantFraction = concValue * (opuPercent / 100);
+          const consumption = targetProduction * surfactantFraction;
+          const label = `Surfactant ${index + 1}`;
+          materials[label] = {
+            name: matName,
+            materialLabel: 'Surfactant',
+            consumption,
+            percentage: surfactantFraction * 100
+          };
+        }
+      });
+
+      // Add Siko and Repro to materials if nonzero
+      if (sikoPercent > 0) {
+        const sikoConsumption = targetProduction * (sikoPercent / 100);
+        materials['siko'] = {
+          name: 'Siko',
+          materialLabel: 'Recyclate',
+          consumption: sikoConsumption,
+          percentage: sikoPercent
+        };
+      }
+
+      if (reproPercent > 0) {
+        const reproConsumption = targetProduction * (reproPercent / 100);
+        materials['repro'] = {
+          name: 'Repro',
+          materialLabel: 'Regranulate',
+          consumption: reproConsumption,
+          percentage: reproPercent
+        };
+      }
+
+      // Display results
+      displayResults(materials, targetProduction, calculatedTotalGSM);
+    }
+
+    function displayResults(materials, total, totalGSM) {
+      const resultsBody = document.getElementById('resultsBody');
+      resultsBody.innerHTML = '';
+      
+      // Get selected unit
+      const unit = document.getElementById('targetUnit').value;
+      const conversionFactor = unit === 'tons' ? 1000 : 1;
+      const unitLabel = unit === 'tons' ? 'tons' : 'kg';
+      
+      // Update table header
+      const consumptionHeader = document.getElementById('consumptionHeader');
+      if (consumptionHeader) {
+        consumptionHeader.textContent = `Consumption (${unitLabel})`;
+      }
+
+      let totalConsumption = 0;
+      let totalPercentageSum = 0;
+      let firstSBPolymerSeen = false;
+      const sikoPercent = parseFloat(document.getElementById("sikoPercent").value) || 0;
+      const reproPercent = parseFloat(document.getElementById("reproPercent").value) || 0;
+
+      const orderMap = {
+        'Spunbond polymer': 1,
+        'Meltblown polymer': 2,
+        'Recyclate': 2.5,
+        'Regranulate': 2.6,
+        'Pigment': 3,
+        'Additive': 4,
+        'Surfactant': 5
+      };
+
+      const materialEntries = Object.keys(materials)
+        .map(matType => ({ key: matType, value: materials[matType] }))
+        .sort((a, b) => {
+          const labelA = a.value.materialLabel || a.key;
+          const labelB = b.value.materialLabel || b.key;
+          const orderA = orderMap[labelA] || 99;
+          const orderB = orderMap[labelB] || 99;
+          if (orderA !== orderB) return orderA - orderB;
+          // Secondary sort by consumption (descending)
+          if (a.value.consumption !== b.value.consumption) {
+            return b.value.consumption - a.value.consumption;
+          }
+          return labelA.localeCompare(labelB);
+        });
+
+      materialEntries.forEach(entry => {
+        const matType = entry.key;
+        const mat = entry.value;
+        let finalConsumption = mat.consumption;
+        let isAdjustedSBPolymer = false;
+        
+        // Subtract Siko and Repro from first SB polymer only
+        if (mat.materialLabel === 'Spunbond polymer' && !firstSBPolymerSeen && (sikoPercent > 0 || reproPercent > 0)) {
+          finalConsumption -= (total * ((sikoPercent + reproPercent) / 100));
+          firstSBPolymerSeen = true;
+          isAdjustedSBPolymer = true;
+        }
+        
+        totalConsumption += finalConsumption;
+
+        // For adjusted SB polymer, recalculate percentage based on new consumption
+        let percentageValue;
+        if (isAdjustedSBPolymer) {
+          percentageValue = total > 0 ? (finalConsumption / total * 100) : 0;
+        } else {
+          percentageValue = mat.percentage !== undefined
+            ? mat.percentage
+            : (total > 0 ? (finalConsumption / total * 100) : 0);
+        }
+        
+        const displayConsumption = finalConsumption / conversionFactor;
+        totalPercentageSum += percentageValue;
+        
+        const row = document.createElement('tr');
+        const materialLabel = mat.materialLabel || matType;
+        row.innerHTML = `
+          <td><strong>${materialLabel}</strong></td>
+          <td>${mat.name}</td>
+          <td>${displayConsumption.toFixed(2)} ${unitLabel}</td>
+          <td>${percentageValue.toFixed(4)}%</td>
+        `;
+        resultsBody.appendChild(row);
+      });
+
+      // Add total row
+      const displayTotal = totalConsumption / conversionFactor;
+      const totalRow = document.createElement('tr');
+      totalRow.className = 'total-row';
+      totalRow.innerHTML = `
+        <td colspan="2"><strong>TOTAL</strong></td>
+        <td><strong>${displayTotal.toFixed(2)} ${unitLabel}</strong></td>
+        <td><strong>${totalPercentageSum.toFixed(2)}%</strong></td>
+      `;
+      resultsBody.appendChild(totalRow);
+
+      // Add GSM info
+      const infoRow = document.createElement('tr');
+      infoRow.innerHTML = `
+        <td colspan="4" style="text-align: center; background: #f0f4ff; font-weight: 600;">
+          Total GSM from beams: ${totalGSM.toFixed(2)}
+        </td>
+      `;
+      resultsBody.appendChild(infoRow);
+
+      document.getElementById('resultsSection').style.display = 'block';
+      
+      // Scroll to results
+      document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // BICO ratio calculation functions
+    function updateBicoRatioA(beamNumber) {
+      const inputA = document.getElementById(`beamBico_${beamNumber}_A`);
+      const inputB = document.getElementById(`beamBico_${beamNumber}_B`);
+      
+      const valueB = parseFloat(inputB.value) || 0;
+      const valueA = 100 - valueB;
+      
+      inputA.value = valueA.toFixed(1);
+    }
+
+    function initializeBicoCalculations() {
+      // SB beams: 1, 2, 7, 8
+      const sbBeams = [1, 2, 7, 8];
+      
+      sbBeams.forEach(beamNum => {
+        const inputB = document.getElementById(`beamBico_${beamNum}_B`);
+        
+        // Add event listener for when B value changes
+        inputB.addEventListener('input', () => {
+          updateBicoRatioA(beamNum);
+        });
+        
+        // Initialize the A value
+        updateBicoRatioA(beamNum);
+      });
+    }
+
+    // GSM validation and highlighting
+    function validateGSM() {
+      const targetGSM = parseFloat(document.getElementById('totalGSM').value) || 0;
+      
+      // Calculate sum of beam GSM values
+      let sumGSM = 0;
+      for (let i = 1; i <= 8; i++) {
+        const gsmValue = parseFloat(document.getElementById(`beamGSM_${i}`).value) || 0;
+        sumGSM += gsmValue;
+      }
+      
+      // Update row background based on match
+      const gsmRow = document.getElementById('gsmRow');
+      if (!gsmRow) {
+        console.error('GSM row element not found');
+        return;
+      }
+      
+      const difference = Math.abs(sumGSM - targetGSM);
+      console.log(`validateGSM: targetGSM=${targetGSM}, sumGSM=${sumGSM}, difference=${difference.toFixed(2)}`);
+      
+      // Apply color to all cells in the row
+      const cells = gsmRow.querySelectorAll('td');
+      let backgroundColor = '';
+      
+      if (difference < 0.01) { // Allow small floating point differences
+        backgroundColor = '#e3f2fd'; // Light blue
+        console.log('GSM validation: MATCH (blue)');
+      } else {
+        backgroundColor = '#ffebee'; // Light red
+        console.log('GSM validation: MISMATCH (red)');
+      }
+      
+      cells.forEach(cell => {
+        cell.style.setProperty('background-color', backgroundColor, 'important');
+      });
+    }
+
+    function initializeGSMValidation() {
+      // Add event listener to Total GSM field
+      document.getElementById('totalGSM').addEventListener('input', validateGSM);
+      
+      // Add event listeners to all beam GSM inputs
+      for (let i = 1; i <= 8; i++) {
+        document.getElementById(`beamGSM_${i}`).addEventListener('input', validateGSM);
+      }
+      
+      // Initial validation
+      validateGSM();
+    }
+
+    // BICO Ratio validation and highlighting
+    function validateBICORatio() {
+      // Check each beam position
+      let allBICOFilled = true;
+      
+      for (let i = 1; i <= 8; i++) {
+        const gsmValue = parseFloat(document.getElementById(`beamGSM_${i}`).value) || 0;
+        
+        // If GSM has a value, check if corresponding BICO is filled
+        if (gsmValue > 0) {
+          let bicoValue = null;
+          
+          // For SB positions (1, 2, 7, 8), check the A value
+          if (i === 1 || i === 2 || i === 7 || i === 8) {
+            bicoValue = parseFloat(document.getElementById(`beamBico_${i}_A`).value) || null;
+          } 
+          // For MB positions (3, 4, 5, 6), check the ratio field
+          else {
+            bicoValue = document.getElementById(`beamBico_${i}`).value;
+          }
+          
+          // If BICO is empty while GSM has value, mark as incomplete
+          if (bicoValue === null || bicoValue === '') {
+            allBICOFilled = false;
+            break;
+          }
+        }
+      }
+      
+      // Update row background based on validation
+      const bicoRow = document.getElementById('bicoRatioRow');
+      if (allBICOFilled) {
+        bicoRow.style.backgroundColor = '#e3f2fd'; // Light blue
+      } else {
+        bicoRow.style.backgroundColor = '#ffebee'; // Light red
+      }
+    }
+
+    function initializeBICORatioValidation() {
+      // Add event listeners to all beam GSM inputs
+      for (let i = 1; i <= 8; i++) {
+        document.getElementById(`beamGSM_${i}`).addEventListener('input', validateBICORatio);
+      }
+      
+      // Add event listeners to all BICO A inputs and MB ratio inputs
+      for (let i = 1; i <= 2; i++) {
+        document.getElementById(`beamBico_${i}_A`).addEventListener('input', validateBICORatio);
+      }
+      for (let i = 3; i <= 6; i++) {
+        document.getElementById(`beamBico_${i}`).addEventListener('input', validateBICORatio);
+      }
+      for (let i = 7; i <= 8; i++) {
+        document.getElementById(`beamBico_${i}_A`).addEventListener('input', validateBICORatio);
+      }
+      
+      // Initial validation
+      validateBICORatio();
+    }
+
+    // Validate material row: check if dropdowns are used, then validate sum = 100%
+    function validateMaterialRow(row) {
+      const selects = row.querySelectorAll('select.material-row-selector');
+      if (selects.length !== 2) return;
+      
+      const typeSelector = selects[0];
+      const nameSelector = selects[1];
+      
+      // Check if dropdowns have values selected
+      const typeHasValue = typeSelector.value !== '';
+      const nameHasValue = nameSelector.value !== '';
+      const dropsdownsUsed = typeHasValue || nameHasValue;
+      const bothFilled = typeHasValue && nameHasValue;
+      
+      // Get all input fields in this row (skip the first cell with dropdowns)
+      const inputs = row.querySelectorAll('input.material-input');
+      let sum = 0;
+      
+      for (let input of inputs) {
+        const value = parseFloat(input.value) || 0;
+        sum += value;
+      }
+      
+      // Background color changes removed per user request
+    }
+
+    // Reset all data in a material row
+    function resetMaterialRow(button) {
+      const row = button.closest('tr');
+      if (!row) return;
+      
+      // Clear all select elements in the first cell
+      const selects = row.querySelectorAll('select.material-row-selector');
+      selects.forEach(select => {
+        select.value = '';
+      });
+      
+      // Clear all input fields
+      const inputs = row.querySelectorAll('input.material-input');
+      inputs.forEach(input => {
+        input.value = '';
+        input.disabled = false; // Re-enable all inputs
+        input.placeholder = '%'; // Restore placeholder
+      });
+      
+      // Remove column-disabled class from all cells
+      const allCells = Array.from(row.querySelectorAll('td'));
+      allCells.forEach(cell => {
+        cell.classList.remove('column-disabled');
+      });
+      
+      // Reset row background
+      row.style.backgroundColor = '';
+      
+      // Re-run validation in case this affects other row validations
+      validateMaterialRow(row);
+      
+      // Update net polymer calculation
+      calculateNetPolymer();
+    }
+
+    // Calculate Net Polymer: Base material % - Pigment % - Additive %
+    function calculateNetPolymer() {
+      const materialRows = document.querySelectorAll('#beamTable tbody tr');
+      const columnTypes = ['SB', 'SB', 'SB', 'SB', 'MB', 'MB', 'MB', 'MB', 'SB', 'SB', 'SB', 'SB'];
+
+      // First, hide all existing calculated displays
+      materialRows.forEach(row => {
+        const calcDisplays = row.querySelectorAll('.net-polymer-calc');
+        calcDisplays.forEach(display => {
+          display.style.display = 'none';
+          display.textContent = '';
+        });
+      });
+
+      for (let colIndex = 0; colIndex < columnTypes.length; colIndex++) {
+        const columnType = columnTypes[colIndex];
+        let firstPolymerRow = null;
+        let firstPolymerInput = null;
+        let baseValue = 0;
+
+        for (const row of materialRows) {
+          const selects = row.querySelectorAll('select.material-row-selector');
+          if (selects.length !== 2) continue;
+
+          if (selects[0].value !== columnType) continue;
+
+          const inputs = row.querySelectorAll('input.material-input');
+          const input = inputs[colIndex];
+          if (!input || input.disabled) continue;
+
+          const value = parseFloat(input.value) || 0;
+          if (value <= 0) continue;
+
+          firstPolymerRow = row;
+          firstPolymerInput = input;
+          baseValue = value;
+          break;
+        }
+
+        if (!firstPolymerRow || !firstPolymerInput) continue;
+
+        let pigmentSum = 0;
+        let additiveSum = 0;
+
+        materialRows.forEach(otherRow => {
+          const selects = otherRow.querySelectorAll('select.material-row-selector');
+          if (selects.length !== 2) return;
+
+          const typeValue = selects[0].value;
+          const inputs = otherRow.querySelectorAll('input.material-input');
+          const inputValue = parseFloat(inputs[colIndex]?.value) || 0;
+
+          if (typeValue === 'Pigment') {
+            pigmentSum += inputValue;
+          } else if (typeValue === 'Additive') {
+            additiveSum += inputValue;
+          }
+        });
+
+        const netPolymer = baseValue - pigmentSum - additiveSum;
+        const cell = firstPolymerInput.closest('td');
+        if (!cell) continue;
+
+        let calcDisplay = cell.querySelector('.net-polymer-calc');
+        if (!calcDisplay) {
+          calcDisplay = document.createElement('div');
+          calcDisplay.className = 'net-polymer-calc';
+          cell.appendChild(calcDisplay);
+        }
+
+        calcDisplay.textContent = `Net: ${netPolymer.toFixed(2)}%`;
+        calcDisplay.style.display = 'block';
+      }
+    }
+
+    // Material type and name dependent dropdown handler
+    function initializeMaterialTypeDropdown() {
+      // Find the main selector first (the one that was originally with IDs)
+      const mainTypeSelector = document.getElementById('materialTypeSelector');
+      const mainNameSelector = document.getElementById('materialNameSelector');
+      
+      if (mainTypeSelector && mainNameSelector) {
+        mainTypeSelector.addEventListener('change', () => {
+          updateMaterialOptions(mainTypeSelector, mainNameSelector);
+        });
+      }
+      
+      // Now handle all other dropdown pairs in the table rows
+      const tableRows = document.querySelectorAll('#beamTable tbody tr');
+      const materialTypeRows = [];
+      
+      // Find rows that contain the dropdown selectors
+      tableRows.forEach((row, index) => {
+        const selects = row.querySelectorAll('select.material-row-selector');
+        if (selects.length === 2) {
+          // This row has two dropdown selectors
+          materialTypeRows.push({ row, typeSelect: selects[0], nameSelect: selects[1] });
+          
+          // Add change events to dropdowns
+          selects[0].addEventListener('change', () => {
+            updateMaterialOptions(selects[0], selects[1]);
+            validateMaterialRow(row);
+            calculateNetPolymer();
+          });
+          
+          selects[1].addEventListener('change', () => {
+            validateMaterialRow(row);
+            calculateNetPolymer();
+          });
+          
+          // Add change events to all input fields in this row
+          const inputs = row.querySelectorAll('input.material-input');
+          inputs.forEach(input => {
+            input.addEventListener('input', () => {
+              validateMaterialRow(row);
+              calculateNetPolymer();
+            });
+          });
+          
+          // Initial validation
+          validateMaterialRow(row);
+        }
+      });
+    }
+    
+    function updateMaterialOptions(typeSelector, nameSelector) {
+      const selectedType = typeSelector.value;
+      nameSelector.innerHTML = '<option value="">- Select Material -</option>';
+      
+      console.log('Selected type:', selectedType);
+      console.log('MaterialLists:', materialLists);
+      
+      if (selectedType === 'SB' && materialLists.list_sb) {
+        console.log('Populating SB list:', materialLists.list_sb.length, 'items');
+        materialLists.list_sb.forEach(material => {
+          const option = document.createElement('option');
+          option.value = material;
+          option.textContent = material;
+          nameSelector.appendChild(option);
+        });
+      } else if (selectedType === 'MB' && materialLists.list_mb) {
+        console.log('Populating MB list:', materialLists.list_mb.length, 'items');
+        materialLists.list_mb.forEach(material => {
+          const option = document.createElement('option');
+          option.value = material;
+          option.textContent = material;
+          nameSelector.appendChild(option);
+        });
+      } else if (selectedType === 'Pigment' && materialLists.list_pigment) {
+        console.log('Populating Pigment list:', materialLists.list_pigment.length, 'items');
+        materialLists.list_pigment.forEach(material => {
+          const option = document.createElement('option');
+          option.value = material;
+          option.textContent = material;
+          nameSelector.appendChild(option);
+        });
+      } else if (selectedType === 'Additive' && materialLists.list_additive) {
+        console.log('Populating Additive list:', materialLists.list_additive.length, 'items');
+        materialLists.list_additive.forEach(material => {
+          const option = document.createElement('option');
+          option.value = material;
+          option.textContent = material;
+          nameSelector.appendChild(option);
+        });
+      }
+    }
+
+    // Load description dropdown lists from Sources.xlsx
+    async function loadDescriptionLists() {
+      try {
+        const response = await fetch('/data/Sources.xlsx');
+        if (!response.ok) {
+          console.error('Failed to fetch Sources.xlsx:', response.status, response.statusText);
+          return;
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        
+        const listsSheet = workbook.Sheets['Lists'];
+        if (!listsSheet) {
+          console.warn('Lists sheet not found in Sources.xlsx');
+          return;
+        }
+
+        // Read all data from the Lists sheet
+        const data = XLSX.utils.sheet_to_json(listsSheet, { header: 1 });
+        console.log('Description lists data loaded:', data.length, 'rows');
+        
+        // Extract field names from the first row (header)
+        const headers = data[0] || [];
+        console.log('Headers found:', headers);
+        
+        const fieldMap = {
+          'Customer': 'customer',
+          'Segment': 'marketSegment',
+          'Application': 'application',
+          'S/SMS': 'smms',
+          'Mono/Bico': 'monoBico',
+          'Structure': 'structure',
+          'Main RawMat': 'mainRawMat',
+          'Bonding': 'bonding',
+          'BICO_ratio': 'bicoRatioDesc',
+          'Treatment': 'treatment',
+          'Color': 'color',
+          'Cores': 'cores',
+          'Line': 'line'
+        };
+
+        // Process each field
+        for (const [fieldName, fieldId] of Object.entries(fieldMap)) {
+          const columnIndex = headers.indexOf(fieldName);
+          if (columnIndex === -1) {
+            console.warn('Column not found:', fieldName);
+            continue;
+          }
+
+          // Extract values from this column (skip header row)
+          const values = [];
+          for (let i = 1; i < data.length; i++) {
+            const value = data[i][columnIndex];
+            if (value && value.toString().trim() !== '') {
+              values.push(value.toString().trim());
+            }
+          }
+
+          // Remove duplicates while preserving source order
+          const uniqueValues = [...new Set(values)];
+          console.log(`Field '${fieldName}': ${uniqueValues.length} unique values`);
+
+          // Populate the dropdown
+          const selectElement = document.getElementById(fieldId);
+          if (selectElement) {
+            selectElement.innerHTML = '<option value="">-- Select --</option>';
+            uniqueValues.forEach(value => {
+              const option = document.createElement('option');
+              option.value = value;
+              option.textContent = value;
+              selectElement.appendChild(option);
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading description lists:', error);
+      }
+    }
+
+    // Initialize on page load
+    window.addEventListener('load', () => {
+      // Ensure XLSX is loaded before calling loadDescriptionLists
+      if (typeof XLSX !== 'undefined') {
+        loadDescriptionLists();
+      } else {
+        console.warn('XLSX library not loaded, waiting...');
+        // Try again after a short delay
+        setTimeout(() => {
+          if (typeof XLSX !== 'undefined') {
+            loadDescriptionLists();
+          } else {
+            console.error('XLSX library failed to load');
+          }
+        }, 1000);
+      }
+      
+      loadMaterialLists();
+      initializeBeamConfigColorTracking();
+      initializeBicoCalculations();
+      initializeGSMValidation();
+      initializeBICORatioValidation();
+      calculateNetPolymer();
+    });
+
+    // ===== SAVE/LOAD FUNCTIONALITY =====
+    
+    function gatherCurrentData() {
+      const data = {
+        timestamp: new Date().toISOString(),
+        description: {},
+        productionTarget: {},
+        beamConfiguration: {},
+        materials: [],
+        surfactants: []
+      };
+
+      // Gather Description section
+      const descriptionFields = [
+        'pdId', 'sapId', 'sapIdSimilar', 'customer', 'marketSegment', 'application',
+        'sOrSms', 'monoOrBico', 'structure', 'mainRawMat', 'bonding', 'bicoRatioDesc',
+        'treatment', 'color', 'cores', 'line', 'slitWidth', 'customerBW', 'beltBW',
+        'mbGrams', 'length', 'rollDiameter', 'sikoPercent', 'reproPercent',
+        'beltSpeed', 'maxUsableWidth', 'usableWidthNetto'
+      ];
+      
+      descriptionFields.forEach(field => {
+        const element = document.getElementById(field);
+        if (element) {
+          data.description[field] = element.value;
+        }
+      });
+
+      // Gather Production Target
+      data.productionTarget.targetProduction = document.getElementById('targetProduction')?.value || '';
+      data.productionTarget.targetUnit = document.getElementById('targetUnit')?.value || 'kg';
+      data.productionTarget.totalGSM = document.getElementById('totalGSM')?.value || '';
+
+      // Gather Beam Configuration
+      for (let i = 1; i <= 8; i++) {
+        data.beamConfiguration[`gsm_${i}`] = document.getElementById(`beamGSM_${i}`)?.value || '';
+      }
+      
+      // BICO ratios
+      data.beamConfiguration.bico_1_B = document.getElementById('beamBico_1_B')?.value || '';
+      data.beamConfiguration.bico_2_B = document.getElementById('beamBico_2_B')?.value || '';
+      data.beamConfiguration.bico_7_B = document.getElementById('beamBico_7_B')?.value || '';
+      data.beamConfiguration.bico_8_B = document.getElementById('beamBico_8_B')?.value || '';
+
+      // Gather Material rows (skip GSM and BICO rows)
+      const allRows = document.querySelectorAll('#beamTable tbody tr');
+      const materialRows = Array.from(allRows).filter(row => {
+        // Only include rows that have material-row-selector selects
+        return row.querySelectorAll('select.material-row-selector').length === 2;
+      });
+      
+      materialRows.forEach(row => {
+        const selects = row.querySelectorAll('select.material-row-selector');
+        const materialType = selects[0].value;
+        const materialName = selects[1].value;
+        
+        if (materialType && materialName) {
+          const inputs = row.querySelectorAll('input.material-input:not(.calculated-field)');
+          const values = [];
+          inputs.forEach(input => values.push(input.value));
+          
+          data.materials.push({
+            type: materialType,
+            name: materialName,
+            values: values
+          });
+        }
+      });
+
+      // Gather Surfactants
+      const surfactantItems = document.querySelectorAll('.surfactant-item');
+      surfactantItems.forEach(item => {
+        const select = item.querySelector('select');
+        const concInput = item.querySelector('.surfactant-conc');
+        const opuInput = item.querySelector('.surfactant-opu');
+        
+        if (select && select.value) {
+          data.surfactants.push({
+            name: select.value,
+            concentration: concInput?.value || '',
+            opu: opuInput?.value || ''
+          });
+        }
+      });
+
+      return data;
+    }
+
+    function loadDataIntoForm(data) {
+      if (!data) return;
+
+      // Load Description section
+      if (data.description) {
+        Object.keys(data.description).forEach(field => {
+          const element = document.getElementById(field);
+          if (element) {
+            element.value = data.description[field] || '';
+          }
+        });
+      }
+
+      // Load Production Target
+      if (data.productionTarget) {
+        if (data.productionTarget.targetProduction) {
+          document.getElementById('targetProduction').value = data.productionTarget.targetProduction;
+        }
+        if (data.productionTarget.targetUnit) {
+          document.getElementById('targetUnit').value = data.productionTarget.targetUnit;
+        }
+        if (data.productionTarget.totalGSM) {
+          document.getElementById('totalGSM').value = data.productionTarget.totalGSM;
+        }
+      }
+
+      // Load Beam Configuration
+      if (data.beamConfiguration) {
+        for (let i = 1; i <= 8; i++) {
+          const gsm = data.beamConfiguration[`gsm_${i}`];
+          if (gsm !== undefined) {
+            document.getElementById(`beamGSM_${i}`).value = gsm;
+          }
+        }
+        
+        if (data.beamConfiguration.bico_1_B) {
+          document.getElementById('beamBico_1_B').value = data.beamConfiguration.bico_1_B;
+        }
+        if (data.beamConfiguration.bico_2_B) {
+          document.getElementById('beamBico_2_B').value = data.beamConfiguration.bico_2_B;
+        }
+        if (data.beamConfiguration.bico_7_B) {
+          document.getElementById('beamBico_7_B').value = data.beamConfiguration.bico_7_B;
+        }
+        if (data.beamConfiguration.bico_8_B) {
+          document.getElementById('beamBico_8_B').value = data.beamConfiguration.bico_8_B;
+        }
+      }
+
+      // Recalculate BICO A values
+      [1, 2, 7, 8].forEach(beamNum => {
+        updateBicoRatioA(beamNum);
+      });
+
+      // Load Materials (need to reset rows first)
+      const allRows = document.querySelectorAll('#beamTable tbody tr');
+      const materialRows = Array.from(allRows).filter(row => {
+        // Only include rows that have material-row-selector selects
+        return row.querySelectorAll('select.material-row-selector').length === 2;
+      });
+      
+      // Clear all material rows first
+      materialRows.forEach(row => {
+        const selects = row.querySelectorAll('select.material-row-selector');
+        selects[0].value = '';
+        selects[1].value = '';
+        const inputs = row.querySelectorAll('input.material-input:not(.calculated-field)');
+        inputs.forEach(input => input.value = '');
+      });
+
+      if (data.materials && data.materials.length > 0) {
+        data.materials.forEach((material, index) => {
+          if (index < materialRows.length) {
+            const row = materialRows[index];
+            const selects = row.querySelectorAll('select.material-row-selector');
+            const inputs = row.querySelectorAll('input.material-input:not(.calculated-field)');
+            
+            selects[0].value = material.type;
+            // Trigger change to populate material names
+            const event = new Event('change');
+            selects[0].dispatchEvent(event);
+            
+            setTimeout(() => {
+              selects[1].value = material.name;
+              
+              material.values.forEach((value, i) => {
+                if (inputs[i]) {
+                  inputs[i].value = value;
+                }
+              });
+            }, 100);
+          }
+        });
+      }
+
+      // Load Surfactants (clear existing first)
+      const surfactantList = document.getElementById('surfactantList');
+      surfactantList.innerHTML = '';
+      
+      if (data.surfactants && data.surfactants.length > 0) {
+        data.surfactants.forEach(surfactant => {
+          addSurfactantRow();
+          const lastItem = surfactantList.lastElementChild;
+          const select = lastItem.querySelector('select');
+          const concInput = lastItem.querySelector('.surfactant-conc');
+          const opuInput = lastItem.querySelector('.surfactant-opu');
+          
+          if (select) select.value = surfactant.name;
+          if (concInput) concInput.value = surfactant.concentration;
+          if (opuInput) opuInput.value = surfactant.opu;
+        });
+      }
+
+      // Recalculate validations
+      validateGSM();
+      validateBICORatio();
+      calculateNetPolymer();
+      
+      alert('Data loaded successfully!');
+    }
+
+    function openSaveModal() {
+      document.getElementById('saveModal').classList.add('active');
+      const nameInput = document.getElementById('datasetName');
+      // Suggest name: Customer Market Segment S/SMS Application basis weight bonding color
+      const customer = document.getElementById('customer')?.value || '';
+      const marketSegment = document.getElementById('marketSegment')?.value || '';
+      const sOrSms = document.getElementById('sOrSms')?.value || '';
+      const application = document.getElementById('application')?.value || '';
+      let basisWeight = document.getElementById('totalGSM')?.value || '';
+      const bonding = document.getElementById('bonding')?.value || '';
+      const color = document.getElementById('color')?.value || '';
+      
+      // Add "gsm" suffix to basis weight
+      if (basisWeight) {
+        basisWeight = basisWeight + 'gsm';
+      }
+      
+      // Filter out empty values and "n.a." values
+      const nameParts = [customer, marketSegment, sOrSms, application, basisWeight, bonding, color]
+        .filter(part => part && part.toLowerCase() !== 'n.a.');
+      nameInput.value = nameParts.join(' ');
+    }
+
+    function closeSaveModal() {
+      document.getElementById('saveModal').classList.remove('active');
+    }
+
+    function saveWIP() {
+      const name = document.getElementById('datasetName').value.trim();
+      if (!name) {
+        alert('Please enter a name for this dataset');
+        return;
+      }
+
+      const data = gatherCurrentData();
+      data.name = name;
+
+      // Get existing WIP datasets
+      const wipData = JSON.parse(localStorage.getItem('bomCalculatorWIP') || '[]');
+      
+      // Check if name already exists
+      const existingIndex = wipData.findIndex(d => d.name === name);
+      if (existingIndex >= 0) {
+        if (!confirm(`A dataset named "${name}" already exists. Overwrite?`)) {
+          return;
+        }
+        wipData[existingIndex] = data;
+      } else {
+        wipData.push(data);
+      }
+
+      localStorage.setItem('bomCalculatorWIP', JSON.stringify(wipData));
+      alert(`Dataset "${name}" saved successfully!`);
+      closeSaveModal();
+    }
+
+    function openLoadModal() {
+      const wipData = JSON.parse(localStorage.getItem('bomCalculatorWIP') || '[]');
+      
+      if (wipData.length === 0) {
+        alert('No saved WIP datasets found.');
+        return;
+      }
+
+      const listContainer = document.getElementById('datasetListContainer');
+      listContainer.innerHTML = '';
+
+      wipData.forEach((dataset, index) => {
+        const item = document.createElement('div');
+        item.className = 'dataset-item';
+        item.innerHTML = `
+          <div class="dataset-header">
+            <div class="dataset-name">${dataset.name}</div>
+            <div class="dataset-date">${new Date(dataset.timestamp).toLocaleString()}</div>
+          </div>
+          <div class="dataset-preview">
+            <div class="dataset-preview-row">
+              <span class="dataset-preview-label">Customer:</span>
+              <span>${dataset.description?.customer || 'N/A'}</span>
+            </div>
+            <div class="dataset-preview-row">
+              <span class="dataset-preview-label">Application:</span>
+              <span>${dataset.description?.application || 'N/A'}</span>
+            </div>
+            <div class="dataset-preview-row">
+              <span class="dataset-preview-label">Materials:</span>
+              <span>${dataset.materials?.length || 0} items</span>
+            </div>
+            <div class="dataset-preview-row">
+              <span class="dataset-preview-label">GSM:</span>
+              <span>${dataset.productionTarget?.totalGSM || 'N/A'}</span>
+            </div>
+          </div>
+          <div class="dataset-actions">
+            <button class="dataset-btn btn-primary" onclick="loadWIPDataset(${index})">Load</button>
+            <button class="dataset-btn btn-danger" onclick="deleteWIPDataset(${index})">Delete</button>
+          </div>
+        `;
+        listContainer.appendChild(item);
+      });
+
+      document.getElementById('loadModal').classList.add('active');
+    }
+
+    function closeLoadModal() {
+      document.getElementById('loadModal').classList.remove('active');
+    }
+
+    function loadWIPDataset(index) {
+      const wipData = JSON.parse(localStorage.getItem('bomCalculatorWIP') || '[]');
+      if (wipData[index]) {
+        loadDataIntoForm(wipData[index]);
+        closeLoadModal();
+      }
+    }
+
+    function deleteWIPDataset(index) {
+      const wipData = JSON.parse(localStorage.getItem('bomCalculatorWIP') || '[]');
+      const dataset = wipData[index];
+      
+      if (confirm(`Delete dataset "${dataset.name}"?`)) {
+        wipData.splice(index, 1);
+        localStorage.setItem('bomCalculatorWIP', JSON.stringify(wipData));
+        openLoadModal(); // Refresh the list
+      }
+    }
+
+    function exportCompleted() {
+      const name = prompt('Enter a name for this completed recipe:');
+      if (!name) return;
+
+      const data = gatherCurrentData();
+      data.name = name;
+      data.status = 'completed';
+
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `BOM_${name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      alert(`Recipe "${name}" exported successfully!`);
+    }
+
+    function importCompleted() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = JSON.parse(event.target.result);
+            loadDataIntoForm(data);
+          } catch (error) {
+            alert('Error loading file: ' + error.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+  </script>
+
+  <!-- Save Modal -->
+  <div id="saveModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Save Work-in-Progress</h2>
+        <button class="modal-close" onclick="closeSaveModal()">&times;</button>
+      </div>
+      <div class="input-field save-name">
+        <label for="datasetName">Dataset Name:</label>
+        <input type="text" id="datasetName" placeholder="Enter a name for this dataset" />
+      </div>
+      <div class="save-actions">
+        <button class="btn-success" onclick="saveWIP()">Save</button>
+        <button class="btn-secondary" onclick="closeSaveModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load Modal -->
+  <div id="loadModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Load Work-in-Progress Dataset</h2>
+        <button class="modal-close" onclick="closeLoadModal()">&times;</button>
+      </div>
+      <div class="dataset-list" id="datasetListContainer">
+        <!-- Datasets will be populated here -->
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

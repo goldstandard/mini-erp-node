@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manufacturing Cost ERP</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+
+  <div class="container">
+    <header>
+      <img src="/data/PFN_logo.png" alt="PFNonwovens" class="company-logo" />
+      <div>
+        <h1>Manufacturing Cost ERP Dashboard</h1>
+        <p class="subtitle">Product costing, materials, and line analysis</p>
+      </div>
+      <img src="/data/PFN_logo.png" alt="PFNonwovens" class="company-logo company-logo-right" />
+    </header>
+
+    <!-- CONTROL PANEL -->
+    <section class="control-panel">
+      <div class="control-top">
+        <div class="control-top-left">
+          <div class="control-group">
+            <label for="currencySelect">Display Currency:</label>
+            <select id="currencySelect">
+              <option value="USD">USD</option>
+              <option value="CZK">CZK</option>
+              <option value="EUR">EUR</option>
+              <option value="ZAR">ZAR</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label for="viewToggle">View Mode:</label>
+            <select id="viewToggle">
+              <option value="aggregated">Aggregated (Summary)</option>
+              <option value="detailed">Detailed (Full Breakdown)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="control-buttons">
+          <button onclick="window.location.href='products-editor.html'" class="btn-secondary" title="Edit product data">Edit Products</button>
+          <button onclick="window.location.href='bom-calculator.html'" class="btn-secondary" title="BOM Design Calculator">BOM Calculator</button>
+          <button id="compactToggle" class="btn-secondary compact-toggle" title="Toggle compact view">Compact</button>
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <h3>Filters</h3>
+        <div class="filter-row">
+          <div class="filter-item">
+            <label for="filterSapId">SAP ID:</label>
+            <select id="filterSapId" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterPfnId">PFN ID:</label>
+            <select id="filterPfnId" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterCustomer">Customer:</label>
+            <select id="filterCustomer" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterMarketSegment">Market Segment:</label>
+            <select id="filterMarketSegment" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterApplication">Application:</label>
+            <select id="filterApplication" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterSSMS">S/SMS:</label>
+            <select id="filterSSMS" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterBonding">Bonding:</label>
+            <select id="filterBonding" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterBasisWeight">Basis Weight:</label>
+            <select id="filterBasisWeight" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterSlitWidth">Slit Width:</label>
+            <select id="filterSlitWidth" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterTreatment">Treatment:</label>
+            <select id="filterTreatment" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterAuthor">Author:</label>
+            <select id="filterAuthor" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterLine">Line:</label>
+            <select id="filterLine" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterCountry">Country:</label>
+            <select id="filterCountry" multiple size="1"></select>
+          </div>
+          <div class="filter-item">
+            <label for="filterOverconsumption">Overconsumption:</label>
+            <select id="filterOverconsumption" multiple size="1"></select>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button id="loadBtn" onclick="loadCosts()" class="btn-primary">Load Costs</button>
+          <button onclick="clearFilters()" class="btn-secondary">Clear Filters</button>
+          <button onclick="exportCosts()" class="btn-secondary">Export CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SUMMARY STATS -->
+    <section id="summaryStats" class="summary-stats" style="display: none;">
+      <div class="stat-card">
+        <h4>Total Records</h4>
+        <p id="statRecords">0</p>
+      </div>
+      <div class="stat-card">
+        <h4>Avg Material Cost</h4>
+        <p id="statAvgMaterial">0</p>
+      </div>
+      <div class="stat-card">
+        <h4>Avg Process Cost</h4>
+        <p id="statAvgProcess">0</p>
+      </div>
+      <div class="stat-card">
+        <h4>Avg Total Cost</h4>
+        <p id="statAvgTotal">0</p>
+      </div>
+    </section>
+
+    <!-- AGGREGATED VIEW TABLE -->
+    <section id="aggregatedView" class="view-section" style="display: none;">
+      <h2>Cost Summary</h2>
+      <div class="table-scroll-top" id="tableScrollTop"><div id="tableScrollInner"></div></div>
+      <div class="table-wrapper">
+        <table id="costTable">
+          <thead>
+            <tr>
+              <th>SAP ID</th>
+              <th>PFN ID</th>
+              <th>Customer</th>
+              <th>Market Segment</th>
+              <th>Application</th>
+              <th>S/SMS</th>
+              <th>Bonding</th>
+              <th>Basis Weight</th>
+              <th>Slit Width</th>
+              <th>Treatment</th>
+              <th>Author</th>
+              <th>Gross Yield %</th>
+              <th>Throughput</th>
+              <th>Line</th>
+              <th>Country</th>
+              <th>Material Cost</th>
+              <th>Process Cost</th>
+              <th>Total Cost</th>
+              <th>Currency</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- DETAILED VIEW TABLE -->
+    <section id="detailedView" class="view-section" style="display: none;">
+      <h2>Detailed Cost Breakdown</h2>
+      <div id="detailedContent"></div>
+    </section>
+
+    <!-- DETAIL PANEL -->
+    <section id="detailPanel" class="detail-panel" style="display: none;">
+      <button onclick="closeDetails()" class="btn-close">✕</button>
+      <div id="detailContent"></div>
+    </section>
+
+    <!-- LOADING SPINNER -->
+    <div id="loadingSpinner" class="spinner" style="display: none;">
+      <p>Loading data...</p>
+    </div>
+
+    <!-- ERROR MESSAGE -->
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
