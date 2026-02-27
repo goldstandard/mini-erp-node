@@ -16,7 +16,20 @@ This document details every change, addition, and enhancement made to the Manufa
   - Main RawMat, Bonding, Bico Ratio, Treatment, Color, Cores, Line
 - **Numeric Input Fields**: Slit Width (mm), Length (m), Roll Diameter (mm), Siko (%), Repro (%)
 - **Performance Inputs**: Belt Speed (m/min), Max usable width (brutto), Usable width (netto)
-- **Styling**: Light blue background (#e3f2fd) for all input/dropdown fields
+- **Line Width & Configuration**: Auto-populated Width (m), Adjusted effective width (m), and Configuration from Line_parameters.xlsx
+- **Throughput Outputs**: 
+  - SB Throughput (kg/h/m/beam) = (Belt BW - MB grams) × Belt Speed × 60 / 1000 / S Beams
+  - MB Throughput (kg/h/m/beam) = MB grams × Belt Speed × 60 / 1000 / M Beams
+  - Total Throughput (kg/h) = (SB Throughput × S Beams × Adjusted effective width) + (MB Throughput × M Beams × Adjusted effective width)
+   - Production Time (hrs/t) = 1000 / (Gross Yield × Throughput)
+   - Batch Production Time (including overconsumption) = (1 + overconsumption) × minimum batch size (tons) × production time, displayed as days/hours/minutes
+  - All throughput values displayed as whole numbers (no decimals)
+- **Required Field Color System**:
+  - Light red background (#ffe6e6) for mandatory fields when empty (Customer, Market Segment, Application, S/SMS, Mono/Bico, Structure, Main RawMat, Bonding, Customer BW, Belt BW, MB grams, Bico Ratio A, Treatment, Color, Siko, Repro, Line, Belt Speed, Max usable width, Usable Width, Web loss, Changeover loss, Minimum batch size)
+  - Light yellow background (#fff8d6) for optional fields when empty (PD ID, SAP ID, SAP ID similar, Cores, Slit Width, Length, Roll Diameter, Other Scrap, Overconsumption %)
+  - Light blue background (#e3f2fd) when fields are populated
+  - Inline legend in toolbar showing color meanings
+- **Styling**: Dynamic background colors based on field status and requirement level
 - **Responsive Grid**: 4-column layout with reduced padding for compact display
 
 ### Sources.xlsx Integration

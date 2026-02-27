@@ -232,6 +232,13 @@ Successfully implemented a comprehensive manufacturing cost ERP system with adva
   - BICO (A/B component) ratio splitting per head
   - Dynamic BICO ratio field population from dropdown selection
   - Real-time configuration visualization with responsive grid
+  - Line_parameters.xlsx integration for Width, Adjusted effective width, Configuration, and line beam counts
+  - Throughput calculations (whole numbers only):
+    * SB Throughput (kg/h/m/beam) = (Belt BW - MB grams) × Belt Speed × 60 / 1000 / S Beams
+    * MB Throughput (kg/h/m/beam) = MB grams × Belt Speed × 60 / 1000 / M Beams  
+    * Total Throughput (kg/h) = (SB × S Beams × Adjusted width) + (MB × M Beams × Adjusted width)
+      * Production Time (hrs/t) = 1000 / (Gross Yield × Throughput)
+      * Batch Production Time (including overconsumption) = (1 + overconsumption) × minimum batch size (tons) × production time
 
 - **Material Recycling Integration**:
   - Siko (scrap %) and Repro (regranulate %) controls
@@ -246,10 +253,15 @@ Successfully implemented a comprehensive manufacturing cost ERP system with adva
   - Compact styling for multiple entries per row
 
 - **Visual Feedback System**:
-  - Light blue background (#e3f2fd) for all populated input fields
-  - Dynamic class toggling (.beam-config-populated) on user input
+  - Required field highlighting with three-tier color system:
+    * Light red (#ffe6e6) for empty mandatory fields
+    * Light yellow (#fff8d6) for empty optional fields
+    * Light blue (#e3f2fd) when populated
+  - Beam configuration input tracking with .beam-config-populated class
+  - Dynamic class toggling on user input and load operations
   - Real-time background color changes when fields cleared
-  - Immediate visual indication of active configuration
+  - Inline legend showing color meanings (mandatory/optional/completed)
+  - Immediate visual indication of active configuration and required data
 
 - **BOM Results Processing**:
   - Multi-level sorting: category order + consumption volume
@@ -338,24 +350,37 @@ Successfully implemented a comprehensive manufacturing cost ERP system with adva
 
 **Key Functions**:
 - `loadDescriptionLists()` — Fetches Sources.xlsx, parses Lists sheet, populates 13 dropdown fields
+- `loadLineParameters()` — Fetches Line_parameters.xlsx, extracts line specifications (width, configuration, beams)
+- `populateLineParameters()` — Auto-fills line width, adjusted width, configuration when line selected
+- `calculateScrapPercentages()` — Computes edge trim, total scrap, and gross yield percentages
+- `calculateThroughput()` — Computes SB/MB/Total throughput from Belt BW, MB grams, Belt Speed, Beams, and Adjusted width
+- `calculateProductionTime()` — Computes Production Time (hrs/t) from Gross Yield and Total Throughput
 - `calculateBOM()` — Reads all inputs, computes material consumption across 12 columns with BICO splitting
-- `displayResults()` — Formats output, applies Siko/Repro reduction to first SB, sorts by category + consumption
+- `displayResults()` — Formats output, applies Siko/Repro reduction to first SB, sorts by category + consumption, and adds batch production time
 - `addSurfactantRow()` — Creates dynamic row div with select, concentration, OPU, delete button
-- `initializeBeamConfigColorTracking()` — Attaches input listeners to GSM and BICO B fields
+- `initializeBeamConfigColorTracking()` — Attaches input listeners to GSM and BICO B fields for blue highlighting
+- `initializeRequiredFieldTracking()` — Attaches input/change listeners to required fields for red/yellow/blue color system
 - `updateBeamInputBackground()` — Toggles .beam-config-populated class based on field value
+- `updateRequiredFieldBackground()` — Toggles required field color classes (red/yellow/blue) based on empty/populated state
+- `refreshAllCalculations()` — Master refresh function: line params → BICO → GSM → scrap → throughput → net polymer → colors
+- `refreshRequiredFieldColors()` — Re-applies required field color system after load operations
 
 **CSS Classes**:
 - `.beam-config-populated` — Light blue background (#e3f2fd) for populated fields
+- `.required-populated` — Light blue background (#e3f2fd) for completed required/optional fields
+- `.required-empty-red` — Light red background (#ffe6e6) for empty mandatory fields
+- `.required-empty-yellow` — Light yellow background (#fff8d6) for empty optional fields
 - `.surfactant-item` — Grid layout 180px/70px/60px/60px for select/conc/opu/delete
 - `.section.description-section` — 4-column responsive grid for product metadata
 - `#surfactantList` — 3-column responsive grid with media queries (3 cols >900px, 2 cols >600px, 1 col <600px)
+- `.field-legend` — Inline legend showing field color meanings (mandatory/optional/completed)
 
 **Field Definitions** (from Sources.xlsx):
 | Category | Fields | Input Type |
 |----------|--------|-----------|
 | Dropdowns | Customer, Segment, Application, S/SMS, Mono/Bico, Structure, Main RawMat, Bonding, BICO_ratio, Treatment, Color, Cores, Line | Select (Excel-sourced) |
 | Keyboard | PD ID, SAP ID, SAP ID (similar) | Text input |
-| Specifications | Slit Width, Length, Roll Diameter, Siko %, Repro %, Belt Speed, Max usable width, Usable width netto | Number input (min=0) |
+| Specifications | Slit Width, Length, Roll Diameter, Siko %, Repro %, Belt Speed, Max usable width, Usable width netto, Width (m), Adjusted effective width (m), SB Throughput (kg/h/m/beam), MB Throughput (kg/h/m/beam), Total Throughput (kg/h), Production Time (hrs/t) | Number input (min=0) |
 
 
 ## Testing & Validation

@@ -39,6 +39,7 @@ A fully functional, professionally documented Manufacturing Cost ERP system has 
 - **Detail modal** for cost breakdown inspection
 - **Autocomplete suggestions** for all filters
 - **CSV export button** for data analysis
+- **BOM calculator** with line parameters, width/adjusted width, SB/MB/Total throughput calculations (whole numbers), production time and batch production time (including overconsumption), and visual required field system (red/yellow/blue backgrounds with legend)
 - **Mobile-responsive** design
 - **Loading states** and error messages
 

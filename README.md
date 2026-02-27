@@ -21,8 +21,12 @@ A comprehensive Node.js + Express + Vanilla JavaScript ERP system for analyzing 
  - **Clear Filters**: Reset all filters to default. `Clear Filters` also resets the currency selector to `USD` and the view mode to the aggregated view.
 
 ### BOM Calculator
- - **Description Section**: Comprehensive product metadata with 13 dropdown selection fields (Customer, Market Segment, Application, S/SMS, Mono/Bico, Structure, Main RawMat, Bonding, Bico Ratio, Treatment, Color, Cores, Line) plus keyboard input fields (PD ID, SAP ID) and performance parameters (Slit Width, Length, Roll Diameter)
+ - **Description Section**: Comprehensive product metadata with dropdown fields (Customer, Market Segment, Application, S/SMS, Mono/Bico, Structure, Main RawMat, Bonding, Bico Ratio A/D, Treatment, Color, Cores, Line) plus keyboard input fields (PD ID, SAP ID) and performance parameters (Slit Width, Length, Roll Diameter)
  - **Dynamic Field Population**: Dropdown fields automatically populated from Sources.xlsx Lists sheet, preserving source file order
+ - **Line Parameters & Width**: Line_parameters.xlsx provides line width, configuration, beams, and throughput limits; width and adjusted effective width are auto-calculated
+ - **Throughput Calculations**: SB Throughput (kg/h/m/beam) and MB Throughput (kg/h/m/beam) calculated from Belt BW, MB grams, Belt Speed, and S/M Beams; Total Throughput (kg/h) = (SB × S Beams × Adjusted width) + (MB × M Beams × Adjusted width), displayed as whole numbers
+- **Production Time**: Production Time (hrs/t) = 1000 / (Gross Yield × Throughput); Batch Production Time (including overconsumption) = (1 + overconsumption) × minimum batch size (tons) × production time, displayed as days/hours/minutes
+ - **Required Field Highlighting**: Visual feedback system with light red backgrounds for mandatory fields, light yellow for optional fields, and light blue when completed; includes field color legend
  - **Beam Configuration**: 8-head production setup with GSM and BICO (A/B component) ratio inputs, integrated BICO ratio splitting
  - **Material Recycling**: Siko (scrap %) and Repro (regranulate %) controls that reduce first Spunbond polymer consumption and display as separate line items (Recyclate and Regranulate)
  - **Surfactant Management**: Dynamic row-based entry with delete buttons, responsive grid layout (3 per row on wide screens)

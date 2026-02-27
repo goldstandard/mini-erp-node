@@ -329,6 +329,46 @@ Complete verification that the Manufacturing Cost ERP system is fully functional
   - [x] No loading delays
   - [x] Responsive to input
 
+## ✅ Calculated Field Formulas
+
+### BOM Calculator Formulas (`src/frontend/bom-calculator.html`)
+
+#### Scrap & Yield Calculations
+- **Edge Trim (%)**: `(1 - (Usable Width Netto / Max Usable Width)) × 100`
+- **Total Scrap (%)**: `Edge Trim + Web Loss + Changeover Loss + Other Scrap`
+- **Gross Yield (%)**: `100 - Total Scrap %`
+
+#### Throughput Calculations
+- **SB Throughput (kg/h)**: `(Belt Width - MB Grams) × Belt Speed × 60 / 1000 / S Beams`
+- **MB Throughput (kg/h)**: `MB Grams × Belt Speed × 60 / 1000 / M Beams`
+- **Total Throughput (kg/h)**: `(SB Throughput × S Beams × Adjusted Effective Width) + (MB Throughput × M Beams × Adjusted Effective Width)`
+
+#### Production Time Calculations
+- **Production Time (hrs/t)**: `1000 / (Gross Yield % ÷ 100 × Total Throughput kg/h)`
+- **Batch Production Time**: `(1 + Overconsumption %) × Minimum Batch Size (tons) × Production Time (hrs/t)`
+  - Formatted as days/hours/minutes (e.g., "2d 14h 30m" or "14h 30m")
+
+#### Material Calculations
+- **BICO Ratio A (%)**: `100 - BICO Ratio B %` (Auto-calculated for SB beams 1,2,7,8)
+- **Material Consumption (kg)**: `Target Production × (Material Percentage / 100) × (1 + Overconsumption %)`
+- **Surfactant Consumption (kg)**: `Target Production × (Concentration × OPU % / 100) × (1 + Overconsumption %)`
+- **Net Polymer (%)**: `Base Material % - Pigment % - Additive %`
+
+#### Validation Calculations
+- **Overconsumption Check**: Compares expected total (from overconsumption factor) against actual summed material consumption
+- **GSM Validation**: Compares target GSM against calculated beam GSM sum
+
+#### Formula Functions
+
+| Function | Purpose | Key Inputs | Key Outputs |
+|----------|---------|-----------|-------------|
+| `calculateScrapPercentages()` | Calculate scrap and yield | Max usable width, usable width netto, web/changeover/other losses | Edge trim %, total scrap %, gross yield % |
+| `calculateThroughput()` | Calculate line throughput | Belt width, MB grams, belt speed, beam counts, effective width | SB throughput, MB throughput, total throughput |
+| `calculateProductionTime()` | Calculate production hours per ton | Gross yield %, total throughput | Production time (hrs/t) |
+| `calculateBOM()` | Main BOM calculation | Target production, GSM values, material percentages, overconsumption | Material consumptions, total BOM |
+| `displayResults()` | Format and display results | Calculated materials, production data | Formatted consumption table with batch time |
+| `calculateNetPolymer()` | Calculate polymer net % | Material row base/pigment/additive % | Net polymer % for each material |
+
 ## 🚀 Ready for Production
 
 - [x] All features implemented
@@ -339,6 +379,7 @@ Complete verification that the Manufacturing Cost ERP system is fully functional
 - [x] Responsive design verified
 - [x] API fully functional
 - [x] UI/UX polished
+- [x] All calculated field formulas documented
 
 ---
 

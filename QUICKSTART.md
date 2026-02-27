@@ -102,6 +102,17 @@ You should see the Manufacturing Cost ERP Dashboard.
 - Set your filters (currency, product, country, etc.)
 - Click **"Export CSV"**
 - A CSV file downloads for further analysis in Excel
+
+### 7. BOM Calculator (Optional)
+- Open **http://localhost:3000/src/frontend/bom-calculator.html**
+- Select a line to auto-populate Width (m), Adjusted effective width (m), and line parameters
+- Throughput fields (displayed as whole numbers):
+  * SB Throughput (kg/h/m/beam) from Belt BW, MB grams, Belt Speed, S Beams
+  * MB Throughput (kg/h/m/beam) from MB grams, Belt Speed, M Beams
+  * Total Throughput (kg/h) = (SB × S Beams × Adjusted width) + (MB × M Beams × Adjusted width)
+  * Production Time (hrs/t) = 1000 / (Gross Yield × Throughput)
+  * Batch Production Time (including overconsumption) = (1 + overconsumption) × minimum batch size (tons) × production time
+- Required field color system: red (mandatory when empty), yellow (optional when empty), blue (completed)
 ### Top Horizontal Scroller
 - When the aggregated table is wide, use the synchronized scrollbar at the top of the table to scroll horizontally without having to move to the bottom of the table.
 

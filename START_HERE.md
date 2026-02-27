@@ -19,6 +19,7 @@ A complete ERP dashboard that allows you to:
 ✅ **Edit Products** - Create, modify, and copy product definitions  
 ✅ **Export Data** - Download costs as CSV for Excel analysis  
 ✅ **Responsive Design** - Works on desktop, tablet, and mobile  
+✅ **BOM Calculator** - Line parameters, width/adjusted width, SB/MB/Total throughput calculations (whole numbers), production time and batch production time (including overconsumption), and required field color system (red=mandatory, yellow=optional, blue=completed)  
 
 ### 2. **Intelligent Cost Calculations**
 

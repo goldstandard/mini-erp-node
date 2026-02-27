@@ -21,6 +21,34 @@
       padding-bottom: 15px;
     }
 
+    .field-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin: 0 0 12px;
+      padding: 8px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background: #f8f9fa;
+      font-size: 0.85em;
+      color: #333;
+    }
+
+    .field-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    .field-legend .legend-swatch {
+      width: 18px;
+      height: 12px;
+      border-radius: 3px;
+      border: 1px solid #ddd;
+    }
+
     .calculator-header h1 {
       margin: 0;
       color: #1e3a8a;
@@ -121,6 +149,18 @@
 
     .beam-config-populated {
       background-color: #e3f2fd !important;
+    }
+
+    .required-populated {
+      background-color: #e3f2fd !important;
+    }
+
+    .required-empty-red {
+      background-color: #ffe6e6 !important;
+    }
+
+    .required-empty-yellow {
+      background-color: #fff8d6 !important;
     }
 
     .beam-table {
@@ -606,6 +646,19 @@
       gap: 10px;
       margin-bottom: 20px;
       flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .field-legend {
+      margin: 0;
+      padding: 6px 10px;
     }
 
     .toolbar button {
@@ -629,10 +682,26 @@
 
     <!-- Toolbar for Save/Load Actions -->
     <div class="toolbar">
-      <button class="btn-success" onclick="openSaveModal()">💾 Save WIP</button>
-      <button class="btn-primary" onclick="openLoadModal()">📂 Load WIP</button>
-      <button class="btn-secondary" onclick="exportCompleted()">📤 Export Completed</button>
-      <button class="btn-secondary" onclick="importCompleted()">📥 Import Recipe</button>
+      <div class="toolbar-actions">
+        <button class="btn-success" onclick="openSaveModal()">💾 Save WIP</button>
+        <button class="btn-primary" onclick="openLoadModal()">📂 Load WIP</button>
+        <button class="btn-secondary" onclick="exportCompleted()">📤 Export Recipe</button>
+        <button class="btn-secondary" onclick="importCompleted()">📥 Import Recipe</button>
+      </div>
+      <div class="field-legend" aria-label="Field color legend">
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:#ffe6e6;"></span>
+          <span>Mandatory fields</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:#fff8d6;"></span>
+          <span>Optional fields</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:#e3f2fd;"></span>
+          <span>Field completed</span>
+        </div>
+      </div>
     </div>
 
     <!-- Description -->
@@ -696,12 +765,65 @@
           <input type="number" id="mbGrams" placeholder="MB grams" step="0.1" min="0" />
         </div>
         <div class="input-field">
-          <label for="bicoRatioDesc">Bico Ratio</label>
+          <label for="bicoRatioDesc">Bico Ratio A</label>
           <select id="bicoRatioDesc"></select>
+        </div>
+        <div class="input-field">
+          <label for="bicoRatioD">Bico Ratio D</label>
+          <select id="bicoRatioD"></select>
         </div>
         <div class="input-field">
           <label for="treatment">Treatment</label>
           <select id="treatment"></select>
+        </div>
+        <div class="input-field">
+          <label for="crystallizer1">Crystallizer 1</label>
+          <select id="crystallizer1">
+            <option value="No" selected>No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </div>
+        <div class="input-field">
+          <label for="crystallizer2Bico">Crystallizer 2 (Bico)</label>
+          <select id="crystallizer2Bico">
+            <option value="No" selected>No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </div>
+        <div class="input-field">
+          <label for="mainMaterialDryer">Main material dryer</label>
+          <select id="mainMaterialDryer">
+            <option value="No" selected>No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </div>
+        <div class="input-field">
+          <label for="sideMaterialDryerBico">Side material drier (Bico)</label>
+          <select id="sideMaterialDryerBico">
+            <option value="No" selected>No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </div>
+        <div class="input-field">
+          <label for="additiveDryer1">Additive dryer 1</label>
+          <select id="additiveDryer1">
+            <option value="No" selected>No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </div>
+        <div class="input-field">
+          <label for="additiveDryer2">Additive dryer 2</label>
+          <select id="additiveDryer2">
+            <option value="No" selected>No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </div>
+        <div class="input-field">
+          <label for="additiveDryer3">Additive dryer 3</label>
+          <select id="additiveDryer3">
+            <option value="No" selected>No</option>
+            <option value="Yes">Yes</option>
+          </select>
         </div>
         <div class="input-field">
           <label for="color">Color</label>
@@ -736,16 +858,96 @@
           <select id="line"></select>
         </div>
         <div class="input-field">
+          <label for="lineWidth">Width (m)</label>
+          <input type="number" id="lineWidth" placeholder="Auto-populated" step="0.1" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="adjustedEffectiveWidth">Adjusted effective width (m)</label>
+          <input type="number" id="adjustedEffectiveWidth" placeholder="Calculated" step="0.1" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="lineConfiguration">Configuration</label>
+          <input type="text" id="lineConfiguration" placeholder="Auto-populated" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
           <label for="beltSpeed">Belt Speed (m/min)</label>
           <input type="number" id="beltSpeed" placeholder="Belt Speed (m/min)" step="0.1" min="0" />
         </div>
         <div class="input-field">
-          <label for="maxUsableWidth">Max usable width (brutto)</label>
+          <label for="maxUsableWidth">Max usable width (brutto, %)</label>
           <input type="number" id="maxUsableWidth" placeholder="Max usable width (brutto)" step="1" min="0" />
         </div>
         <div class="input-field">
-          <label for="usableWidth">Usable width (netto)</label>
+          <label for="usableWidth">Usable width (netto, %)</label>
           <input type="number" id="usableWidth" placeholder="Usable width (netto)" step="1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="edgeTrimPercent">Edge trim (%)</label>
+          <input type="number" id="edgeTrimPercent" placeholder="Calculated" step="0.01" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="webLossPercent">Web loss (%)</label>
+          <input type="number" id="webLossPercent" placeholder="%" step="0.01" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="changeoverLossPercent">Changeover loss (%)</label>
+          <input type="number" id="changeoverLossPercent" placeholder="%" step="0.01" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="otherScrapPercent">Other scrap (%)</label>
+          <input type="number" id="otherScrapPercent" placeholder="%" step="0.01" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="totalScrapPercent">Total Scrap (%)</label>
+          <input type="number" id="totalScrapPercent" placeholder="Calculated" step="0.01" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="grossYieldPercent">Gross Yield (%)</label>
+          <input type="number" id="grossYieldPercent" placeholder="Calculated" step="0.01" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="sBeams">S Beams</label>
+          <input type="number" id="sBeams" placeholder="From Line parameters" step="1" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="mBeams">M Beams</label>
+          <input type="number" id="mBeams" placeholder="From Line parameters" step="1" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="sbEffectiveWidth">SB - effective width (m)</label>
+          <input type="number" id="sbEffectiveWidth" placeholder="From Line parameters" step="0.01" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="mbEffectiveWidth">MB - effective width (m)</label>
+          <input type="number" id="mbEffectiveWidth" placeholder="From Line parameters" step="0.01" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="sbMaxThroughput">Spunbond beam max throughput (kg/h/m)</label>
+          <input type="number" id="sbMaxThroughput" placeholder="From Line parameters" step="0.01" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="mbMaxThroughput">Meltblown beam max throughput (kg/h/m)</label>
+          <input type="number" id="mbMaxThroughput" placeholder="From Line parameters" step="0.01" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="spinBeltMaxSpeed">Spin belt max speed (m/min)</label>
+          <input type="number" id="spinBeltMaxSpeed" placeholder="From Line parameters" step="0.1" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="sbThroughput">SB Throughput (kg/h/m/beam)</label>
+          <input type="number" id="sbThroughput" placeholder="Calculated" step="1" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="mbThroughput">MB Throughput (kg/h/m/beam)</label>
+          <input type="number" id="mbThroughput" placeholder="Calculated" step="1" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="totalThroughput">Throughput (kg/h)</label>
+          <input type="number" id="totalThroughput" placeholder="Calculated" step="1" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="productionTime">Production Time (hrs/t)</label>
+          <input type="number" id="productionTime" placeholder="Calculated" step="0.01" readonly class="calculated-field" />
         </div>
       </div>
     </div>
@@ -1116,6 +1318,12 @@
             <td><input type="text" placeholder="%" class="material-input" /></td>
             <td style="vertical-align: middle; padding: 3px 2px;"><button class="reset-row-btn" onclick="resetMaterialRow(this)">Reset</button></td>
           </tr>
+          <tr id="overconsumptionRow">
+            <td style="background-color: #e3f2fd;"><strong>Overconsumption %</strong></td>
+            <td colspan="12" style="background-color: #e3f2fd;">
+              <input type="number" id="overconsumptionPercent" placeholder="%" step="0.01" min="0" />
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -1435,6 +1643,134 @@
       }
     }
 
+    let lineParametersMap = {};
+
+    async function loadLineParameters() {
+      try {
+        const response = await fetch('/data/Line_parameters.xlsx');
+        if (!response.ok) {
+          throw new Error('Failed to load line parameters');
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+        
+        // Build map: Line name (CZ01, CZ02, etc.) -> parameters
+        // The file has parameter names in first column, lines as other columns
+        
+        // Get all line names from the first data row
+        const firstRow = data[0];
+        const lineNames = Object.keys(firstRow).filter(key => key !== 'Line');
+        
+        lineNames.forEach(lineName => {
+          lineParametersMap[lineName] = {};
+          
+          data.forEach(row => {
+            const paramName = row.Line;
+            const paramValue = row[lineName];
+            
+            if (paramName && paramValue !== undefined && paramValue !== null) {
+              // Map parameter names to field IDs
+              if (paramName.includes('S Beams') || paramName.includes('S Beams')) {
+                lineParametersMap[lineName].sBeams = parseFloat(paramValue) || 0;
+              } else if (paramName.includes('M Beams') || paramName.includes('M Bearms')) {
+                lineParametersMap[lineName].mBeams = parseFloat(paramValue) || 0;
+              } else if (paramName.includes('SB - effective width')) {
+                lineParametersMap[lineName].sbEffectiveWidth = parseFloat(paramValue) || 0;
+              } else if (paramName.includes('MB - effective width')) {
+                lineParametersMap[lineName].mbEffectiveWidth = parseFloat(paramValue) || 0;
+              } else if (paramName.includes('Spunbond beam max') || paramName.includes('Spunbond beam max')) {
+                lineParametersMap[lineName].sbMaxThroughput = parseFloat(paramValue) || 0;
+              } else if (paramName.includes('Meltblown beam max')) {
+                lineParametersMap[lineName].mbMaxThroughput = parseFloat(paramValue) || 0;
+              } else if (paramName.includes('Spin belt max speed')) {
+                lineParametersMap[lineName].spinBeltMaxSpeed = parseFloat(paramValue) || 0;
+              } else if (paramName.includes('Width (m)') || paramName.includes('Width(m)')) {
+                lineParametersMap[lineName].width = parseFloat(paramValue) || 0;
+              } else if (paramName.includes('Configuration')) {
+                lineParametersMap[lineName].configuration = paramValue || '';
+              }
+            }
+          });
+        });
+        
+        console.log('Line parameters loaded:', lineParametersMap);
+        
+        // Now attach event listener after map is ready
+        const lineSelect = document.getElementById('line');
+        if (lineSelect) {
+          lineSelect.addEventListener('change', populateLineParameters);
+          console.log('Line dropdown change listener attached from loadLineParameters');
+        }
+        
+        console.log('Line parameters loaded successfully');
+      } catch (error) {
+        console.error('Error loading line parameters:', error);
+      }
+    }
+
+    function populateLineParameters() {
+      const lineSelect = document.getElementById('line');
+      const selectedLine = lineSelect.value;
+      
+      console.log('Line selected:', selectedLine);
+      console.log('Available lines in map:', Object.keys(lineParametersMap));
+      
+      // Retry if map isn't populated yet
+      if (Object.keys(lineParametersMap).length === 0) {
+        console.warn('Line parameters map not ready yet, retrying in 500ms');
+        setTimeout(() => populateLineParameters(), 500);
+        return;
+      }
+      
+      if (!selectedLine || !lineParametersMap[selectedLine]) {
+        // Clear fields if no line selected
+        console.log('Line not found in map, clearing fields');
+        document.getElementById('sBeams').value = '';
+        document.getElementById('mBeams').value = '';
+        document.getElementById('sbEffectiveWidth').value = '';
+        document.getElementById('mbEffectiveWidth').value = '';
+        document.getElementById('sbMaxThroughput').value = '';
+        document.getElementById('mbMaxThroughput').value = '';
+        document.getElementById('spinBeltMaxSpeed').value = '';
+        document.getElementById('lineWidth').value = '';
+        document.getElementById('adjustedEffectiveWidth').value = '';
+        document.getElementById('lineConfiguration').value = '';
+        document.getElementById('sbThroughput').value = '';
+        document.getElementById('mbThroughput').value = '';
+        document.getElementById('totalThroughput').value = '';
+        document.getElementById('productionTime').value = '';
+        return;
+      }
+      
+      const params = lineParametersMap[selectedLine];
+      console.log('Parameters found:', params);
+      
+      document.getElementById('sBeams').value = params.sBeams || '';
+      document.getElementById('mBeams').value = params.mBeams || '';
+      document.getElementById('sbEffectiveWidth').value = params.sbEffectiveWidth || '';
+      document.getElementById('mbEffectiveWidth').value = params.mbEffectiveWidth || '';
+      document.getElementById('sbMaxThroughput').value = params.sbMaxThroughput || '';
+      document.getElementById('mbMaxThroughput').value = params.mbMaxThroughput || '';
+      document.getElementById('spinBeltMaxSpeed').value = params.spinBeltMaxSpeed || '';
+      if (params.width !== undefined && params.width !== null && params.width !== '') {
+        const widthValue = parseFloat(params.width);
+        document.getElementById('lineWidth').value = isNaN(widthValue) ? '' : widthValue.toFixed(1);
+      } else {
+        document.getElementById('lineWidth').value = '';
+      }
+      if (params.width !== undefined && params.width !== null && params.width !== '') {
+        const adjustedWidth = parseFloat(params.width) - 0.1;
+        document.getElementById('adjustedEffectiveWidth').value = isNaN(adjustedWidth) ? '' : adjustedWidth.toFixed(1);
+      } else {
+        document.getElementById('adjustedEffectiveWidth').value = '';
+      }
+      document.getElementById('lineConfiguration').value = params.configuration || '';
+      calculateThroughput();
+    }
+
     function initializeBeamConfigColorTracking() {
       // Add color tracking for BICO ratio B inputs (1B, 2B, 7B, 8B) - editable fields only
       const bicoBInputIds = ['beamBico_1_B', 'beamBico_2_B', 'beamBico_7_B', 'beamBico_8_B'];
@@ -1470,15 +1806,89 @@
     }
 
     function updateBeamInputBackground(element) {
-      // Check if element has a value that's not empty and not zero
+      // Check if element has a value that's not empty and not zero/zero
       const value = element.value;
-      const isPopulated = value !== '' && value !== '0' && value !== 0;
+      // Check: value is not empty AND value is not "0" AND value is not 0
+      // For numeric inputs, element.value is always a string
+      const isPopulated = value !== '' && value.trim() !== '' && value !== '0' && parseFloat(value) !== 0;
       
       if (isPopulated) {
         element.classList.add('beam-config-populated');
       } else {
         element.classList.remove('beam-config-populated');
       }
+    }
+
+    function updateRequiredFieldBackground(element, emptyClass) {
+      const value = element.value;
+      const isPopulated = value !== '' && value.trim() !== '';
+
+      if (isPopulated) {
+        element.classList.remove('required-empty-red', 'required-empty-yellow');
+        element.classList.add('required-populated');
+      } else {
+        element.classList.remove('required-populated');
+        element.classList.add(emptyClass);
+      }
+    }
+
+    function initializeRequiredFieldTracking() {
+      const redRequiredIds = [
+        'customer', 'marketSegment', 'application', 'smms', 'monoBico', 'structure',
+        'mainRawMat', 'bonding', 'totalGSM', 'beltBW', 'mbGrams', 'bicoRatioDesc',
+        'treatment', 'color', 'sikoPercent', 'reproPercent', 'line', 'beltSpeed',
+        'maxUsableWidth', 'usableWidth', 'webLossPercent', 'changeoverLossPercent',
+        'targetProduction'
+      ];
+
+      const yellowRequiredIds = [
+        'pdId', 'sapId', 'sapIdSimilar', 'cores', 'slitWidth', 'lengthMeters',
+        'rollDiameter', 'otherScrapPercent', 'overconsumptionPercent'
+      ];
+
+      const attachTracking = (id, emptyClass) => {
+        const element = document.getElementById(id);
+        if (!element) {
+          return;
+        }
+
+        const eventType = element.tagName.toLowerCase() === 'select' ? 'change' : 'input';
+        const handler = () => updateRequiredFieldBackground(element, emptyClass);
+        handler();
+        element.addEventListener(eventType, handler);
+      };
+
+      redRequiredIds.forEach(id => attachTracking(id, 'required-empty-red'));
+      yellowRequiredIds.forEach(id => attachTracking(id, 'required-empty-yellow'));
+    }
+
+    function refreshRequiredFieldColors() {
+      const redRequiredIds = [
+        'customer', 'marketSegment', 'application', 'smms', 'monoBico', 'structure',
+        'mainRawMat', 'bonding', 'totalGSM', 'beltBW', 'mbGrams', 'bicoRatioDesc',
+        'treatment', 'color', 'sikoPercent', 'reproPercent', 'line', 'beltSpeed',
+        'maxUsableWidth', 'usableWidth', 'webLossPercent', 'changeoverLossPercent',
+        'targetProduction'
+      ];
+
+      const yellowRequiredIds = [
+        'pdId', 'sapId', 'sapIdSimilar', 'cores', 'slitWidth', 'lengthMeters',
+        'rollDiameter', 'otherScrapPercent', 'overconsumptionPercent'
+      ];
+
+      redRequiredIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+          updateRequiredFieldBackground(element, 'required-empty-red');
+        }
+      });
+
+      yellowRequiredIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+          updateRequiredFieldBackground(element, 'required-empty-yellow');
+        }
+      });
     }
 
     function calculateBOM() {
@@ -1490,6 +1900,8 @@
       const unit = document.getElementById('targetUnit').value;
       const sikoPercent = parseFloat(document.getElementById("sikoPercent").value) || 0;
       const reproPercent = parseFloat(document.getElementById("reproPercent").value) || 0;
+      const overconsumptionPercent = parseFloat(document.getElementById('overconsumptionPercent').value) || 0;
+      const overconsumptionFactor = 1 + (overconsumptionPercent / 100);
       
       // Convert to kg for internal calculations
       const targetProduction = unit === 'tons' ? targetProductionInput * 1000 : targetProductionInput;
@@ -1620,7 +2032,7 @@
         if (gsmContribution <= 0 || totalGSMWeight <= 0) return;
 
         const percentage = (gsmContribution / totalGSMWeight) * 100;
-        const consumption = targetProduction * (percentage / 100);
+        const consumption = targetProduction * (percentage / 100) * overconsumptionFactor;
 
         let materialLabel = materialName;
         if (typeSelector.value === 'SB') {
@@ -1663,7 +2075,7 @@
 
         if (matName && concValue > 0 && opuPercent > 0) {
           const surfactantFraction = concValue * (opuPercent / 100);
-          const consumption = targetProduction * surfactantFraction;
+          const consumption = targetProduction * surfactantFraction * overconsumptionFactor;
           const label = `Surfactant ${index + 1}`;
           materials[label] = {
             name: matName,
@@ -1676,7 +2088,7 @@
 
       // Add Siko and Repro to materials if nonzero
       if (sikoPercent > 0) {
-        const sikoConsumption = targetProduction * (sikoPercent / 100);
+        const sikoConsumption = targetProduction * (sikoPercent / 100) * overconsumptionFactor;
         materials['siko'] = {
           name: 'Siko',
           materialLabel: 'Recyclate',
@@ -1686,7 +2098,7 @@
       }
 
       if (reproPercent > 0) {
-        const reproConsumption = targetProduction * (reproPercent / 100);
+        const reproConsumption = targetProduction * (reproPercent / 100) * overconsumptionFactor;
         materials['repro'] = {
           name: 'Repro',
           materialLabel: 'Regranulate',
@@ -1696,10 +2108,10 @@
       }
 
       // Display results
-      displayResults(materials, targetProduction, calculatedTotalGSM);
+      displayResults(materials, targetProduction, calculatedTotalGSM, overconsumptionPercent);
     }
 
-    function displayResults(materials, total, totalGSM) {
+    function displayResults(materials, total, totalGSM, overconsumptionPercent = 0) {
       const resultsBody = document.getElementById('resultsBody');
       resultsBody.innerHTML = '';
       
@@ -1714,6 +2126,8 @@
         consumptionHeader.textContent = `Consumption (${unitLabel})`;
       }
 
+      const overconsumptionFactor = 1 + (overconsumptionPercent / 100);
+      const adjustedTotal = total * overconsumptionFactor;
       let totalConsumption = 0;
       let totalPercentageSum = 0;
       let firstSBPolymerSeen = false;
@@ -1753,7 +2167,7 @@
         
         // Subtract Siko and Repro from first SB polymer only
         if (mat.materialLabel === 'Spunbond polymer' && !firstSBPolymerSeen && (sikoPercent > 0 || reproPercent > 0)) {
-          finalConsumption -= (total * ((sikoPercent + reproPercent) / 100));
+          finalConsumption -= (adjustedTotal * ((sikoPercent + reproPercent) / 100));
           firstSBPolymerSeen = true;
           isAdjustedSBPolymer = true;
         }
@@ -1763,11 +2177,11 @@
         // For adjusted SB polymer, recalculate percentage based on new consumption
         let percentageValue;
         if (isAdjustedSBPolymer) {
-          percentageValue = total > 0 ? (finalConsumption / total * 100) : 0;
+          percentageValue = adjustedTotal > 0 ? (finalConsumption / adjustedTotal * 100) : 0;
         } else {
           percentageValue = mat.percentage !== undefined
             ? mat.percentage
-            : (total > 0 ? (finalConsumption / total * 100) : 0);
+            : (adjustedTotal > 0 ? (finalConsumption / adjustedTotal * 100) : 0);
         }
         
         const displayConsumption = finalConsumption / conversionFactor;
@@ -1795,14 +2209,48 @@
       `;
       resultsBody.appendChild(totalRow);
 
-      // Add GSM info
-      const infoRow = document.createElement('tr');
-      infoRow.innerHTML = `
-        <td colspan="4" style="text-align: center; background: #f0f4ff; font-weight: 600;">
-          Total GSM from beams: ${totalGSM.toFixed(2)}
-        </td>
-      `;
-      resultsBody.appendChild(infoRow);
+      if (overconsumptionPercent > 0) {
+        const expectedTotal = adjustedTotal / conversionFactor;
+        const delta = displayTotal - expectedTotal;
+        const validationRow = document.createElement('tr');
+        validationRow.innerHTML = `
+          <td colspan="4" style="text-align: center; background: #f0f4ff; font-weight: 600;">
+            Overconsumption check: expected ${expectedTotal.toFixed(2)} ${unitLabel}, actual ${displayTotal.toFixed(2)} ${unitLabel}, delta ${delta.toFixed(2)} ${unitLabel}
+          </td>
+        `;
+        resultsBody.appendChild(validationRow);
+      }
+
+      // Add Batch Production Time
+      const targetProductionInput = parseFloat(document.getElementById('targetProduction').value) || 0;
+      const productionTime = parseFloat(document.getElementById('productionTime').value) || 0;
+      
+      if (targetProductionInput > 0 && productionTime > 0) {
+        // Batch Production Time = (1 + overconsumption) * minimum batch size (tons) * production time
+        const overconsumptionFactor = 1 + (overconsumptionPercent / 100);
+        const targetProductionTons = unit === 'tons' ? targetProductionInput : targetProductionInput / 1000;
+        const totalHours = overconsumptionFactor * targetProductionTons * productionTime;
+        
+        // Format as days/hours/minutes
+        const days = Math.floor(totalHours / 24);
+        const remainingHours = Math.floor(totalHours % 24);
+        const minutes = Math.floor((totalHours * 60) % 60);
+        
+        let timeString = '';
+        if (days > 0) {
+          timeString = `${days}d ${remainingHours}h ${minutes}m`;
+        } else {
+          timeString = `${remainingHours}h ${minutes}m`;
+        }
+        
+        const batchTimeRow = document.createElement('tr');
+        batchTimeRow.innerHTML = `
+          <td colspan="4" style="text-align: center; background: #e3f2fd; font-weight: 600;">
+            Batch Production Time (including overconsumption): ${timeString}
+          </td>
+        `;
+        resultsBody.appendChild(batchTimeRow);
+      }
 
       document.getElementById('resultsSection').style.display = 'block';
       
@@ -1946,6 +2394,93 @@
       
       // Initial validation
       validateBICORatio();
+    }
+
+    // Scrap percentage calculations
+    function calculateScrapPercentages() {
+      const maxUsableWidth = parseFloat(document.getElementById('maxUsableWidth').value) || 0;
+      const usableWidthNetto = parseFloat(document.getElementById('usableWidth').value) || 0;
+      const webLoss = parseFloat(document.getElementById('webLossPercent').value) || 0;
+      const changeoverLoss = parseFloat(document.getElementById('changeoverLossPercent').value) || 0;
+      const otherScrap = parseFloat(document.getElementById('otherScrapPercent').value) || 0;
+
+      // Calculate Edge trim (%) = (1 - (usableWidthNetto / maxUsableWidth)) * 100
+      let edgeTrim = 0;
+      if (maxUsableWidth > 0 && usableWidthNetto > 0 && usableWidthNetto <= maxUsableWidth) {
+        edgeTrim = (1 - (usableWidthNetto / maxUsableWidth)) * 100;
+      }
+      document.getElementById('edgeTrimPercent').value = edgeTrim.toFixed(2);
+
+      // Calculate Total Scrap (%) = Edge trim + Web loss + Changeover loss + Other scrap
+      const totalScrap = edgeTrim + webLoss + changeoverLoss + otherScrap;
+      document.getElementById('totalScrapPercent').value = totalScrap.toFixed(2);
+
+      // Calculate Gross Yield (%) = 100 - Total Scrap (%)
+      const grossYield = 100 - totalScrap;
+      document.getElementById('grossYieldPercent').value = grossYield.toFixed(2);
+    }
+
+    function initializeScrapCalculations() {
+      // Add event listeners to fields that affect scrap calculations
+      document.getElementById('maxUsableWidth').addEventListener('input', calculateScrapPercentages);
+      document.getElementById('usableWidth').addEventListener('input', calculateScrapPercentages);
+      document.getElementById('webLossPercent').addEventListener('input', calculateScrapPercentages);
+      document.getElementById('changeoverLossPercent').addEventListener('input', calculateScrapPercentages);
+      document.getElementById('otherScrapPercent').addEventListener('input', calculateScrapPercentages);
+
+      // Initial calculation
+      calculateScrapPercentages();
+    }
+
+    function calculateThroughput() {
+      const beltBW = parseFloat(document.getElementById('beltBW').value) || 0;
+      const mbGrams = parseFloat(document.getElementById('mbGrams').value) || 0;
+      const beltSpeed = parseFloat(document.getElementById('beltSpeed').value) || 0;
+      const sBeams = parseFloat(document.getElementById('sBeams').value) || 0;
+      const mBeams = parseFloat(document.getElementById('mBeams').value) || 0;
+      const adjustedEffectiveWidth = parseFloat(document.getElementById('adjustedEffectiveWidth').value) || 0;
+
+      let sbThroughput = 0;
+      if (sBeams > 0) {
+        sbThroughput = (beltBW - mbGrams) * beltSpeed * 60 / 1000 / sBeams;
+      }
+
+      let mbThroughput = 0;
+      if (mBeams > 0) {
+        mbThroughput = mbGrams * beltSpeed * 60 / 1000 / mBeams;
+      }
+
+      document.getElementById('sbThroughput').value = sbThroughput.toFixed(0);
+      document.getElementById('mbThroughput').value = mbThroughput.toFixed(0);
+
+      // Calculate total throughput: (SB throughput * S Beams * Adjusted effective width) + (MB throughput * M Beams * Adjusted effective width)
+      const totalThroughput = (sbThroughput * sBeams * adjustedEffectiveWidth) + (mbThroughput * mBeams * adjustedEffectiveWidth);
+      document.getElementById('totalThroughput').value = totalThroughput.toFixed(0);
+    }
+
+    function calculateProductionTime() {
+      const grossYieldPercent = parseFloat(document.getElementById('grossYieldPercent').value) || 0;
+      const totalThroughput = parseFloat(document.getElementById('totalThroughput').value) || 0;
+
+      let productionTime = 0;
+      if (grossYieldPercent > 0 && totalThroughput > 0) {
+        // Production Time (hrs/t) = 1000 / (Gross Yield (as decimal) * Throughput)
+        const grossYieldDecimal = grossYieldPercent / 100;
+        productionTime = 1000 / (grossYieldDecimal * totalThroughput);
+      }
+
+      document.getElementById('productionTime').value = productionTime > 0 ? productionTime.toFixed(2) : '';
+    }
+
+    function initializeThroughputCalculations() {
+      const fields = ['beltBW', 'mbGrams', 'beltSpeed', 'sBeams', 'mBeams', 'adjustedEffectiveWidth'];
+      fields.forEach(fieldId => {
+        const element = document.getElementById(fieldId);
+        if (element) {
+          element.addEventListener('input', calculateThroughput);
+        }
+      });
+      calculateThroughput();
     }
 
     // Validate material row: check if dropdowns are used, then validate sum = 100%
@@ -2251,6 +2786,30 @@
             });
           }
         }
+        
+        // Special handling for bicoRatioD: populate with same values as bicoRatioDesc and preselect "n.a."
+        const bicoRatioDescSelect = document.getElementById('bicoRatioDesc');
+        const bicoRatioDSelect = document.getElementById('bicoRatioD');
+        if (bicoRatioDescSelect && bicoRatioDSelect) {
+          // Clone all options from bicoRatioDesc to bicoRatioD
+          bicoRatioDSelect.innerHTML = '';
+          Array.from(bicoRatioDescSelect.options).forEach(option => {
+            const newOption = document.createElement('option');
+            newOption.value = option.value;
+            newOption.textContent = option.textContent;
+            bicoRatioDSelect.appendChild(newOption);
+          });
+          
+          // Preselect "n.a." in bicoRatioD if it exists
+          const naOption = Array.from(bicoRatioDSelect.options).find(opt => 
+            opt.value.toLowerCase() === 'n.a.' || opt.value.toLowerCase() === 'n.a'
+          );
+          
+          if (naOption) {
+            bicoRatioDSelect.value = naOption.value;
+          }
+        }
+        
       } catch (error) {
         console.error('Error loading description lists:', error);
       }
@@ -2261,12 +2820,14 @@
       // Ensure XLSX is loaded before calling loadDescriptionLists
       if (typeof XLSX !== 'undefined') {
         loadDescriptionLists();
+        loadLineParameters();
       } else {
         console.warn('XLSX library not loaded, waiting...');
         // Try again after a short delay
         setTimeout(() => {
           if (typeof XLSX !== 'undefined') {
             loadDescriptionLists();
+            loadLineParameters();
           } else {
             console.error('XLSX library failed to load');
           }
@@ -2274,10 +2835,13 @@
       }
       
       loadMaterialLists();
+      initializeRequiredFieldTracking();
       initializeBeamConfigColorTracking();
       initializeBicoCalculations();
       initializeGSMValidation();
       initializeBICORatioValidation();
+      initializeScrapCalculations();
+      initializeThroughputCalculations();
       calculateNetPolymer();
     });
 
@@ -2296,10 +2860,15 @@
       // Gather Description section
       const descriptionFields = [
         'pdId', 'sapId', 'sapIdSimilar', 'customer', 'marketSegment', 'application',
-        'sOrSms', 'monoOrBico', 'structure', 'mainRawMat', 'bonding', 'bicoRatioDesc',
-        'treatment', 'color', 'cores', 'line', 'slitWidth', 'customerBW', 'beltBW',
-        'mbGrams', 'length', 'rollDiameter', 'sikoPercent', 'reproPercent',
-        'beltSpeed', 'maxUsableWidth', 'usableWidthNetto'
+        'smms', 'monoBico', 'structure', 'mainRawMat', 'bonding', 'bicoRatioDesc', 'bicoRatioD',
+        'treatment', 'crystallizer1', 'crystallizer2Bico', 'mainMaterialDryer',
+        'sideMaterialDryerBico', 'additiveDryer1', 'additiveDryer2', 'additiveDryer3',
+        'color', 'cores', 'line', 'lineWidth', 'adjustedEffectiveWidth', 'lineConfiguration', 'slitWidth', 'beltBW',
+        'mbGrams', 'lengthMeters', 'rollDiameter', 'sikoPercent', 'reproPercent',
+        'beltSpeed', 'maxUsableWidth', 'usableWidth', 'webLossPercent', 
+        'changeoverLossPercent', 'otherScrapPercent', 'edgeTrimPercent', 'totalScrapPercent', 
+        'grossYieldPercent', 'sBeams', 'mBeams', 'sbEffectiveWidth', 'mbEffectiveWidth',
+        'sbMaxThroughput', 'mbMaxThroughput', 'spinBeltMaxSpeed', 'sbThroughput', 'mbThroughput', 'totalThroughput', 'productionTime'
       ];
       
       descriptionFields.forEach(field => {
@@ -2324,6 +2893,7 @@
       data.beamConfiguration.bico_2_B = document.getElementById('beamBico_2_B')?.value || '';
       data.beamConfiguration.bico_7_B = document.getElementById('beamBico_7_B')?.value || '';
       data.beamConfiguration.bico_8_B = document.getElementById('beamBico_8_B')?.value || '';
+      data.beamConfiguration.overconsumptionPercent = document.getElementById('overconsumptionPercent')?.value || '';
 
       // Gather Material rows (skip GSM and BICO rows)
       const allRows = document.querySelectorAll('#beamTable tbody tr');
@@ -2416,6 +2986,9 @@
         if (data.beamConfiguration.bico_8_B) {
           document.getElementById('beamBico_8_B').value = data.beamConfiguration.bico_8_B;
         }
+        if (data.beamConfiguration.overconsumptionPercent !== undefined) {
+          document.getElementById('overconsumptionPercent').value = data.beamConfiguration.overconsumptionPercent;
+        }
       }
 
       // Recalculate BICO A values
@@ -2459,7 +3032,12 @@
                   inputs[i].value = value;
                 }
               });
-            }, 100);
+              
+              // Apply color highlighting to this row immediately after values are set
+              inputs.forEach(input => {
+                updateBeamInputBackground(input);
+              });
+            }, 100 * (index + 1)); // Stagger timeouts to avoid collision
           }
         });
       }
@@ -2482,12 +3060,96 @@
         });
       }
 
-      // Recalculate validations
-      validateGSM();
-      validateBICORatio();
-      calculateNetPolymer();
+      // Recalculate all validations and calculations after a delay to ensure all data is loaded
+      // Extended delay to account for all material rows being set with colors
+      const maxDelay = Math.max((data.materials?.length || 0) * 100 + 500, 800);
+      setTimeout(() => {
+        refreshAllCalculations();
+      }, maxDelay);
       
       alert('Data loaded successfully!');
+    }
+
+    function refreshAllCalculations() {
+      // Populate line parameters if line is selected
+      if (document.getElementById('line').value) {
+        populateLineParameters();
+      }
+      
+      // Update BICO A values for all SB beams
+      [1, 2, 7, 8].forEach(beamNum => {
+        updateBicoRatioA(beamNum);
+      });
+      
+      // Validate GSM values
+      validateGSM();
+      
+      // Validate BICO ratios
+      validateBICORatio();
+      
+      // Calculate scrap percentages (Edge trim, Total Scrap, Gross Yield)
+      calculateScrapPercentages();
+
+      // Calculate throughput values
+      calculateThroughput();
+
+      // Calculate production time
+      calculateProductionTime();
+      
+      // Calculate net polymer
+      calculateNetPolymer();
+      
+      // Refresh beam input background colors
+      refreshBeamInputColors();
+
+      // Refresh required field colors
+      refreshRequiredFieldColors();
+      
+      console.log('All calculations refreshed');
+    }
+
+    function refreshBeamInputColors() {
+      console.log('Refreshing beam input colors...');
+      
+      // Refresh GSM input colors (1-8)
+      for (let i = 1; i <= 8; i++) {
+        const element = document.getElementById(`beamGSM_${i}`);
+        if (element) {
+          console.log(`Updating GSM_${i}: value="${element.value}"`);
+          updateBeamInputBackground(element);
+        }
+      }
+
+      // Refresh BICO B input colors (1B, 2B, 7B, 8B)
+      const bicoBInputIds = ['beamBico_1_B', 'beamBico_2_B', 'beamBico_7_B', 'beamBico_8_B'];
+      bicoBInputIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+          console.log(`Updating ${id}: value="${element.value}"`);
+          updateBeamInputBackground(element);
+        }
+      });
+
+      // Refresh material input colors
+      const allRows = document.querySelectorAll('#beamTable tbody tr');
+      let materialRowCount = 0;
+      
+      allRows.forEach((row, rowIndex) => {
+        // Skip GSM and BICO rows
+        const hasTypeSelector = row.querySelectorAll('select.material-row-selector').length > 0;
+        if (!hasTypeSelector) {
+          return; // Skip non-material rows
+        }
+        
+        materialRowCount++;
+        const inputs = row.querySelectorAll('input.material-input:not(.calculated-field)');
+        inputs.forEach((input, colIndex) => {
+          console.log(`Updating material row ${materialRowCount}, col ${colIndex}: value="${input.value}"`);
+          updateBeamInputBackground(input);
+        });
+      });
+      
+      console.log(`Refreshed colors for ${materialRowCount} material rows`);
     }
 
     function openSaveModal() {
