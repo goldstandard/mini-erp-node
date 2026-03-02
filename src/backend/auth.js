@@ -548,6 +548,111 @@ async function getUserGroups(userId) {
   }));
 }
 
+async function updateGroup(groupId, name, description = '') {
+  // Verify group exists
+  const group = await dbGet('SELECT id FROM groups WHERE id = ?', [groupId]);
+  if (!group) {
+    throw new Error('Group not found');
+  }
+
+  // Check if new name is already taken by another group
+  const existing = await dbGet('SELECT id FROM groups WHERE name = ? AND id != ?', [name, groupId]);
+  if (existing) {
+    throw new Error('Group name already exists');
+  }
+
+  await dbRun(
+    'UPDATE groups SET name = ?, description = ? WHERE id = ?',
+    [name, description, groupId]
+  );
+
+  return { id: groupId, name, description };
+}
+
+async function deleteGroup(groupId) {
+  // Verify group exists
+  const group = await dbGet('SELECT id FROM groups WHERE id = ?', [groupId]);
+  if (!group) {
+    throw new Error('Group not found');
+  }
+
+  // Remove all users from group
+  await dbRun('DELETE FROM user_groups WHERE group_id = ?', [groupId]);
+
+  // Delete group
+  await dbRun('DELETE FROM groups WHERE id = ?', [groupId]);
+
+  return { id: groupId, status: 'deleted' };
+}
+
+async function getUsersInGroup(groupId) {
+  // Verify group exists
+  const group = await dbGet('SELECT id FROM groups WHERE id = ?', [groupId]);
+  if (!group) {
+    throw new Error('Group not found');
+  }
+
+  const users = await dbAll(
+    `SELECT u.id, u.email, u.name, u.role FROM users u
+     JOIN user_groups ug ON u.id = ug.user_id
+     WHERE ug.group_id = ?
+     ORDER BY u.name`,
+    [groupId]
+  );
+
+  return users;
+}
+
+async function createDirectUser(email, fullName, password, groupId = null) {
+  // Validate email format
+  if (!email || !email.includes('@')) {
+    throw new Error('Invalid email address');
+  }
+
+  // Check if user already exists
+  const existing = await dbGet('SELECT id FROM users WHERE email = ?', [email]);
+  if (existing) {
+    throw new Error('Email already in use');
+  }
+
+  // Verify group exists if groupId provided
+  if (groupId) {
+    const group = await dbGet('SELECT id FROM groups WHERE id = ?', [groupId]);
+    if (!group) {
+      throw new Error('Group not found');
+    }
+  }
+
+  // Hash password
+  const hashedPassword = await hashPassword(password);
+  const userId = require('uuid').v4();
+
+  // Create user with viewer role by default
+  const result = await dbRun(
+    'INSERT INTO users (id, email, name, password, role, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [userId, email, fullName, hashedPassword, 'viewer', new Date().toISOString()]
+  );
+
+  // Add to group if provided
+  if (groupId) {
+    await dbRun(
+      'INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)',
+      [userId, groupId]
+    );
+  }
+
+  // Log audit event
+  await auditLog('user_created', `Created user: ${email} (${fullName})`, userId);
+
+  return {
+    id: userId,
+    email,
+    name: fullName,
+    role: 'viewer',
+    groupId: groupId || null
+  };
+}
+
 // ==================== EXPORTS ====================
 
 module.exports = {
@@ -581,6 +686,10 @@ module.exports = {
   addUserToGroup,
   removeUserFromGroup,
   getUserGroups,
+  updateGroup,
+  deleteGroup,
+  getUsersInGroup,
+  createDirectUser,
 
   // Utilities
   auditLog,

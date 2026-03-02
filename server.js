@@ -218,6 +218,74 @@ app.post("/api/admin/groups", auth.authMiddleware, auth.requirePermission('user:
   }
 });
 
+// Update group (admin only)
+app.put("/api/admin/groups/:id", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    const group = await auth.updateGroup(req.params.id, name, description);
+    res.json({
+      success: true,
+      message: 'Group updated successfully.',
+      group
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Delete group (admin only)
+app.delete("/api/admin/groups/:id", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const result = await auth.deleteGroup(req.params.id);
+    res.json({
+      success: true,
+      message: 'Group deleted successfully.',
+      result
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Get users in group (admin only)
+app.get("/api/admin/groups/:id/users", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const users = await auth.getUsersInGroup(req.params.id);
+    res.json(users);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Create new user directly (admin only)
+app.post("/api/admin/users", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const { email, fullName, password, groupId } = req.body;
+    const user = await auth.createDirectUser(email, fullName, password, groupId);
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully.',
+      user
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Remove user from group (admin only)
+app.delete("/api/admin/users/:userId/groups/:groupId", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const result = await auth.removeUserFromGroup(req.params.userId, req.params.groupId);
+    res.json({
+      success: true,
+      message: 'User removed from group successfully.',
+      result
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // Main costing endpoint
 app.get("/api/costs", (req, res) => {
   try {

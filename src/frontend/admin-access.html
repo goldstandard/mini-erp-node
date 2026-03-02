@@ -295,6 +295,176 @@
             opacity: 0.5;
         }
 
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        }
+
+        .groups-container {
+            display: grid;
+            gap: 20px;
+        }
+
+        .group-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        .group-header h3 {
+            margin: 0 0 8px 0;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .group-description {
+            margin: 0 0 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .group-date {
+            margin: 0;
+            color: #999;
+            font-size: 12px;
+        }
+
+        .group-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-edit {
+            background-color: #667eea;
+            color: white;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-edit:hover {
+            background-color: #5568d3;
+        }
+
+        .btn-delete-group {
+            background-color: #f44336;
+            color: white;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-delete-group:hover {
+            background-color: #da190b;
+        }
+
+        .group-users {
+            margin-top: 15px;
+        }
+
+        .users-list {
+            margin-bottom: 15px;
+        }
+
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9f9f9;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            border-left: 3px solid #667eea;
+        }
+
+        .user-info {
+            flex-grow: 1;
+        }
+
+        .user-info strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .user-info small {
+            color: #666;
+        }
+
+        .btn-remove-user {
+            background-color: #ff9800;
+            color: white;
+            padding: 6px 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .btn-remove-user:hover {
+            background-color: #e68900;
+        }
+
+        .btn-add-user {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .btn-add-user:hover {
+            background-color: #45a049;
+        }
+
+        .no-users {
+            color: #999;
+            font-style: italic;
+            margin-bottom: 15px;
+        }
+
+        .loading-text {
+            color: #999;
+            font-style: italic;
+        }
+
+        .error-text {
+            color: #f44336;
+            font-style: italic;
+        }
+
         .loading {
             text-align: center;
             padding: 20px;
@@ -412,6 +582,63 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit Group Modal -->
+    <div id="editGroupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Group</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="editGroupName">Group Name *</label>
+                    <input type="text" id="editGroupName" placeholder="e.g., Product Managers" required />
+                </div>
+                <div class="form-group">
+                    <label for="editGroupDescription">Description</label>
+                    <textarea id="editGroupDescription" placeholder="Describe the group's purpose..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeEditGroupModal()">Cancel</button>
+                <button class="btn-primary" onclick="confirmEditGroup()">Update Group</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create User Modal -->
+    <div id="createUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New User</h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newUserEmail">Email *</label>
+                    <input type="email" id="newUserEmail" placeholder="user@pfnonwovens.com" required />
+                </div>
+                <div class="form-group">
+                    <label for="newUserName">Full Name *</label>
+                    <input type="text" id="newUserName" placeholder="John Doe" required />
+                </div>
+                <div class="form-group">
+                    <label for="newUserPassword">Password *</label>
+                    <input type="password" id="newUserPassword" placeholder="Secure password" required />
+                </div>
+                <div class="form-group">
+                    <label for="newUserGroup">Assign to Group</label>
+                    <select id="newUserGroup">
+                        <option value="">-- No Group --</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeCreateUserModal()">Cancel</button>
+                <button class="btn-primary" onclick="confirmCreateUser()">Create User</button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         let currentDenyRequestId = null;
@@ -633,44 +860,87 @@
                     return;
                 }
 
-                let html = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Group Name</th>
-                                <th>Description</th>
-                                <th>Permissions</th>
-                                <th>Created</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
+                let html = `<div class="groups-container">`;
 
-                groups.forEach(group => {
+                for (const group of groups) {
                     const createdDate = new Date(group.created_at).toLocaleDateString();
-                    const permissions = group.permissions.length > 0 ? group.permissions.join(', ') : 'None';
-
+                    
                     html += `
-                        <tr>
-                            <td>${group.name}</td>
-                            <td>${group.description || '-'}</td>
-                            <td>${permissions}</td>
-                            <td>${createdDate}</td>
-                        </tr>
+                        <div class="group-card">
+                            <div class="group-header">
+                                <div>
+                                    <h3>${group.name}</h3>
+                                    <p class="group-description">${group.description || 'No description'}</p>
+                                    <p class="group-date">Created: ${createdDate}</p>
+                                </div>
+                                <div class="group-actions">
+                                    <button class="btn-edit" onclick="openEditGroupModal('${group.id}', '${group.name}', '${(group.description || '').replace(/'/g, "&apos;")}')">✏️ Edit</button>
+                                    <button class="btn-delete-group" onclick="deleteGroup('${group.id}', '${group.name}')">🗑️ Delete</button>
+                                </div>
+                            </div>
+                            <div class="group-users" id="users-${group.id}">
+                                <div class="loading-text">Loading users...</div>
+                            </div>
+                        </div>
                     `;
-                });
+                }
 
-                html += `
-                        </tbody>
-                    </table>
-                `;
-
+                html += `</div>`;
                 content.innerHTML = html;
+                
+                // Load users for each group
+                for (const group of groups) {
+                    loadGroupUsers(group.id);
+                }
             } catch (err) {
                 loading.style.display = 'none';
                 showAlert('alertError', '❌ Error: ' + err.message, 'error');
             }
         }
+
+        async function loadGroupUsers(groupId) {
+            try {
+                const response = await fetch(`/api/admin/groups/${groupId}/users`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load users');
+                }
+
+                const users = await response.json();
+                const usersContainer = document.getElementById(`users-${groupId}`);
+
+                if (users.length === 0) {
+                    usersContainer.innerHTML = '<p class="no-users">No users assigned to this group</p>';
+                    usersContainer.innerHTML += `<button class="btn-add-user" onclick="openCreateUserModal('${groupId}')">+ Add User</button>`;
+                    return;
+                }
+
+                let html = '<div class="users-list">';
+                users.forEach(user => {
+                    html += `
+                        <div class="user-item">
+                            <div class="user-info">
+                                <strong>${user.name}</strong>
+                                <br>
+                                <small>${user.email} (${user.role})</small>
+                            </div>
+                            <button class="btn-remove-user" onclick="removeUserFromGroup('${user.id}', '${groupId}')">Remove</button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                html += `<button class="btn-add-user" onclick="openCreateUserModal('${groupId}')">+ Add User to Group</button>`;
+                usersContainer.innerHTML = html;
+            } catch (err) {
+                const usersContainer = document.getElementById(`users-${groupId}`);
+                usersContainer.innerHTML = `<p class="error-text">Error loading users: ${err.message}</p>`;
+            }
+        }
+
 
         function showCreateGroupModal() {
             document.getElementById('createGroupModal').classList.add('active');
@@ -719,6 +989,193 @@
 
         function returnToDashboard() {
             window.location.href = '/dashboard';
+        }
+
+        let currentEditGroupId = null;
+        let currentCreateUserGroupId = null;
+
+        function openEditGroupModal(groupId, groupName, groupDescription) {
+            currentEditGroupId = groupId;
+            document.getElementById('editGroupName').value = groupName;
+            document.getElementById('editGroupDescription').value = groupDescription;
+            document.getElementById('editGroupModal').classList.add('active');
+        }
+
+        function closeEditGroupModal() {
+            document.getElementById('editGroupModal').classList.remove('active');
+            currentEditGroupId = null;
+        }
+
+        async function confirmEditGroup() {
+            const name = document.getElementById('editGroupName').value.trim();
+            const description = document.getElementById('editGroupDescription').value.trim();
+
+            if (!name) {
+                showAlert('alertError', '❌ Group name is required', 'error');
+                return;
+            }
+
+            if (!currentEditGroupId) {
+                showAlert('alertError', '❌ No group selected', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/groups/${currentEditGroupId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, description })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('alertSuccess', '✅ Group updated successfully');
+                    closeEditGroupModal();
+                    loadGroups();
+                } else {
+                    showAlert('alertError', '❌ ' + data.error, 'error');
+                }
+            } catch (err) {
+                showAlert('alertError', '❌ Error: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteGroup(groupId, groupName) {
+            if (!confirm(`Are you sure you want to delete the group "${groupName}"? This will remove all users from the group.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/groups/${groupId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('alertSuccess', '✅ Group deleted successfully');
+                    loadGroups();
+                } else {
+                    showAlert('alertError', '❌ ' + data.error, 'error');
+                }
+            } catch (err) {
+                showAlert('alertError', '❌ Error: ' + err.message, 'error');
+            }
+        }
+
+        async function openCreateUserModal(groupId) {
+            currentCreateUserGroupId = groupId;
+            
+            // Clear form
+            document.getElementById('newUserEmail').value = '';
+            document.getElementById('newUserName').value = '';
+            document.getElementById('newUserPassword').value = '';
+            
+            // Load groups for the dropdown
+            try {
+                const response = await fetch('/api/admin/groups', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const groups = await response.json();
+                const groupSelect = document.getElementById('newUserGroup');
+                groupSelect.innerHTML = '<option value="">-- No Group --</option>';
+                
+                groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = group.name;
+                    if (group.id === groupId) {
+                        option.selected = true;
+                    }
+                    groupSelect.appendChild(option);
+                });
+            } catch (err) {
+                showAlert('alertError', '❌ Error loading groups', 'error');
+                return;
+            }
+
+            document.getElementById('createUserModal').classList.add('active');
+        }
+
+        function closeCreateUserModal() {
+            document.getElementById('createUserModal').classList.remove('active');
+            currentCreateUserGroupId = null;
+        }
+
+        async function confirmCreateUser() {
+            const email = document.getElementById('newUserEmail').value.trim();
+            const fullName = document.getElementById('newUserName').value.trim();
+            const password = document.getElementById('newUserPassword').value.trim();
+            const groupId = document.getElementById('newUserGroup').value || null;
+
+            if (!email || !fullName || !password) {
+                showAlert('alertError', '❌ Email, full name, and password are required', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/users', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email,
+                        fullName,
+                        password,
+                        groupId: groupId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('alertSuccess', `✅ User created successfully (${data.user.email})`);
+                    closeCreateUserModal();
+                    loadGroups();
+                } else {
+                    showAlert('alertError', '❌ ' + data.error, 'error');
+                }
+            } catch (err) {
+                showAlert('alertError', '❌ Error: ' + err.message, 'error');
+            }
+        }
+
+        async function removeUserFromGroup(userId, groupId) {
+            if (!confirm('Are you sure you want to remove this user from the group?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/groups/${groupId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('alertSuccess', '✅ User removed from group');
+                    loadGroups();
+                } else {
+                    showAlert('alertError', '❌ ' + data.error, 'error');
+                }
+            } catch (err) {
+                showAlert('alertError', '❌ Error: ' + err.message, 'error');
+            }
         }
 
         function logout() {
