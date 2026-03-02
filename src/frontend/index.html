@@ -208,29 +208,30 @@
       window.location.href = '/admin-access.html';
     });
 
-    // Check if user is authenticated on page load and show admin button if user is admin
+    // Check if user is authenticated on page load and show admin button if in Admin group
     window.addEventListener('load', async () => {
       const token = localStorage.getItem('authToken');
       if (!token) {
         // Not logged in, redirect to login
         window.location.href = '/';
       } else {
-        // Check if user is admin
+        // Check if user is in Admin group
         try {
-          const response = await fetch('/api/auth/me', {
+          const response = await fetch('/api/auth/me/groups', {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           });
           if (response.ok) {
-            const user = await response.json();
-            // Only show admin button for mfischer@pfnonwovens.com
-            if (user.email === 'mfischer@pfnonwovens.com') {
+            const groups = await response.json();
+            // Check if user is in Admin group
+            const isAdmin = groups.some(group => group.name === 'Admin');
+            if (isAdmin) {
               document.getElementById('adminBtn').style.display = 'block';
             }
           }
         } catch (err) {
-          console.warn('Could not check user role:', err);
+          console.warn('Could not check user groups:', err);
         }
       }
     });

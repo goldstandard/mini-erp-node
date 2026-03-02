@@ -124,10 +124,21 @@ app.get("/api/auth/me", auth.authMiddleware, async (req, res) => {
   }
 });
 
+// Get current user's groups
+app.get("/api/auth/me/groups", auth.authMiddleware, async (req, res) => {
+  try {
+    const groups = await auth.getUserGroups(req.user.id);
+    res.json(groups);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Logout endpoint (frontend just clears token, but good for audit logging)
 app.post("/api/auth/logout", auth.authMiddleware, async (req, res) => {
   try {
     await auth.auditLog(req.user.id, 'LOGOUT', 'auth', {});
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -906,14 +906,16 @@
                     }
                 });
 
+                const usersContainer = document.getElementById(`users-${groupId}`);
+
                 if (!response.ok) {
-                    throw new Error('Failed to load users');
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP ${response.status}: Failed to load users`);
                 }
 
                 const users = await response.json();
-                const usersContainer = document.getElementById(`users-${groupId}`);
 
-                if (users.length === 0) {
+                if (!Array.isArray(users) || users.length === 0) {
                     usersContainer.innerHTML = '<p class="no-users">No users assigned to this group</p>';
                     usersContainer.innerHTML += `<button class="btn-add-user" onclick="openCreateUserModal('${groupId}')">+ Add User</button>`;
                     return;
@@ -937,7 +939,8 @@
                 usersContainer.innerHTML = html;
             } catch (err) {
                 const usersContainer = document.getElementById(`users-${groupId}`);
-                usersContainer.innerHTML = `<p class="error-text">Error loading users: ${err.message}</p>`;
+                console.error('Error loading group users:', err);
+                usersContainer.innerHTML = `<div class="no-users"><p>No users assigned to this group</p><button class="btn-add-user" onclick="openCreateUserModal('${groupId}')">+ Add User</button></div>`;
             }
         }
 
