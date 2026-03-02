@@ -17,15 +17,21 @@ A comprehensive Node.js + Express + Vanilla JavaScript ERP system for analyzing 
 ## ⚡ Quick Start (5 minutes)
 
 ```bash
+cd mini-erp-node
 npm install                      # Install dependencies
 node scripts/setup.js           # Create test admin user
 npm start                       # Start server
-# Visit: http://localhost:3000/login.html
+# Visit: http://localhost:3000/
 ```
 
-**Test Credentials**:
-- Email: `testuser@pfnonwovens.com`
+You'll be redirected to login. **Test Credentials**:
+- Email: `testuser@pfnonwovels.com`
 - Password: `TestPass123`
+
+After login, you'll access:
+- **Dashboard** (`/dashboard`) - Cost analysis and filtering
+- **BOM Calculator** (`/bom-calculator`) - Product composition design
+- **Products** (`/products`) - Edit product definitions
 
 ---
 
@@ -34,10 +40,20 @@ npm start                       # Start server
 **Features**:
 - SQLite database (file-based, zero configuration)
 - JWT tokens (48-hour sessions)
-- Bcrypt password hashing
+- Bcryptjs password hashing (pure JavaScript, Azure-compatible)
 - Role-based access control (4 roles: Admin, Analyst, Engineer, Viewer)
 - Audit logging of all auth events
-- Login page + frontend auth helper
+- **Login page with frontend authentication flow**
+- **Protected routes** requiring valid JWT tokens
+- **Logout functionality** on all protected pages
+
+**Protected Routes**:
+| Route | Purpose | Auth Required |
+|-------|---------|---------------|
+| `/` | Login page | No |
+| `/dashboard` | Main cost analysis dashboard | Yes |
+| `/bom-calculator` | BOM design tool | Yes |
+| `/products` | Product data editor | Yes |
 
 **API Endpoints**:
 | Method | Endpoint | Auth | Purpose |
@@ -85,14 +101,18 @@ npm start                       # Start server
 ## File Structure
 
 ```
-├── package.json                 # Dependencies
-├── data/                        # Excel source files
+├── package.json                 # Dependencies, build scripts
+├── data/                        # Excel source files + SQLite database
 │   ├── FX_rates.xlsx           # Currency conversion rates
 │   ├── Lines.xlsx              # Manufacturing line costs
 │   ├── Products.xlsx           # Product recipes (BOMs)
-│   └── RawMat_prices.xlsx      # Material prices by country/currency
+│   ├── RawMat_prices.xlsx      # Material prices by country/currency
+│   └── mini_erp.db             # SQLite database (auto-created, contains users & audit logs)
+├── scripts/
+│   └── setup.js                # Initialize database with test user
 ├── src/
 │   ├── backend/
+│   │   ├── auth.js             # Authentication system (SQLite, JWT, RBAC, audit logging)
 │   │   ├── fx.js               # FX rate loading & conversion
 │   │   ├── lines.js            # Manufacturing line data loader
 │   │   ├── materials.js        # Raw material prices loader
@@ -100,10 +120,14 @@ npm start                       # Start server
 │   │   ├── products-editor.js  # Product editing & duplication logic
 │   │   └── costing.js          # Main cost calculation engine
 │   └── frontend/
-│       ├── index.html          # Main dashboard UI
-│       ├── products-editor.html # Product editor interface
+│       ├── login.html          # Login page (entry point)
+│       ├── auth.js             # Token management & auth helpers
+│       ├── index.html          # Main dashboard UI (/dashboard)
+│       ├── bom-calculator.html # BOM design tool (/bom-calculator)
+│       ├── products-editor.html # Product editor (/products)
 │       ├── styles.css          # Responsive styling
 │       └── script.js           # Frontend logic & API calls
+├── server.js                    # Express server with auth routes
 └── README.md                    # This file
 ```
 
@@ -451,18 +475,28 @@ curl http://localhost:3000/api/debug/fx
 - **FX Conversion**: Supports up to 3-leg conversions (e.g., CZK → USD → EUR)
 - **Scaling**: Current implementation supports 1000+ products efficiently
 
+## Completed Enhancements
+
+- [x] User authentication & role-based access (Phase 1 ✅)
+- [x] SQLite backend for user management + audit logs
+- [x] Login page with JWT token handling
+- [x] Protected frontend routes requiring authentication
+- [x] Logout functionality across all pages
+- [x] Bcryptjs for password hashing (Azure-compatible)
+
 ## Future Enhancements
 
-- [ ] Database backend (instead of Excel files)
-- [ ] Data upload/refresh endpoints
+- [ ] Database backend for product/costing data (instead of Excel files)
+- [ ] Azure Entra ID / OAuth integration
+- [ ] Data upload/refresh endpoints for Excel files
 - [ ] Multi-language support
 - [ ] Advanced filtering (date ranges, cost ranges)
 - [ ] Data visualization (charts, graphs)
-- [ ] User authentication & role-based access
 - [ ] Historical cost tracking
 - [ ] Scenario modeling (what-if analysis)
 - [ ] Material sourcing optimization
 - [ ] Line efficiency metrics
+- [ ] Email notifications for cost alerts
 
 ## Troubleshooting
 

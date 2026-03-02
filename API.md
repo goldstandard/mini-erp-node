@@ -10,7 +10,21 @@ http://localhost:3000/api
 
 ## Authentication
 
-All authentication endpoints are available publicly. Costing endpoints are currently unprotected but can be secured by adding `auth.authMiddleware` to require authentication.
+**Frontend Routes** (HTML pages) are now protected with JWT authentication:
+- `GET /` - Login page (public, redirects to login if authenticated)
+- `GET /dashboard` - Requires valid JWT token
+- `GET /bom-calculator` - Requires valid JWT token
+- `GET /products` - Requires valid JWT token
+
+**API Endpoints** are currently unprotected. Costing endpoints can be secured by adding `auth.authMiddleware` to require authentication.
+
+### Frontend Authentication Flow
+
+1. **Login**: POST to `/api/auth/login` with email/password → receive JWT token
+2. **Store Token**: Frontend stores token in `localStorage` (key: `authToken`)
+3. **Access Protected Pages**: Token sent in `Authorization: Bearer <token>` header (automatic via `auth.js`)
+4. **Token Validation**: Server validates token on each request
+5. **Logout**: Clear token from localStorage, redirect to login page
 
 ### Authentication Endpoints
 

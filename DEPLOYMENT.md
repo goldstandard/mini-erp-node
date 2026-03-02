@@ -18,12 +18,17 @@ node scripts/setup.js
 # 3. Start development server
 npm start
 
-# 4. Access at http://localhost:3000/login.html
+# 4. Access at http://localhost:3000
 ```
 
-Test credentials:
+You'll be redirected to login:
 - Email: `testuser@pfnonwovens.com`
 - Password: `TestPass123`
+
+After login:
+- **Dashboard** (`/dashboard`) - Cost analysis
+- **BOM Calculator** (`/bom-calculator`) - Product composition
+- **Products** (`/products`) - Product editor
 
 ### Development Workflow
 
@@ -291,11 +296,13 @@ For testing only:
 
 **Solution**: All dependencies must be in `package.json`
 ```bash
-npm install bcrypt jsonwebtoken sqlite3 uuid
+npm install bcryptjs jsonwebtoken sqlite3 uuid cors xlsx
 git add package.json package-lock.json
 git commit -m "Add dependencies"
 git push
 ```
+
+**Note**: We use `bcryptjs` (pure JavaScript) instead of `bcrypt` for Azure compatibility (doesn't require compilation).
 
 ### Application Won't Start
 
