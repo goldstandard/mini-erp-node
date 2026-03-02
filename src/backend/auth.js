@@ -1,7 +1,7 @@
 /**
  * Simple Authentication System for Mini ERP
  * Consolidated module - Database, JWT, Auth logic all in one
- * Uses SQLite (free, no setup needed)
+ * Uses SQLite (file-based, no setup needed)
  */
 
 const sqlite3 = require('sqlite3').verbose();
@@ -79,7 +79,6 @@ function dbAll(sql, params = []) {
       });
     });
   });
-}
 
 // ==================== DATABASE INITIALIZATION ====================
 
