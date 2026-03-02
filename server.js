@@ -29,17 +29,17 @@ app.get("/", (req, res) => {
   res.redirect("/login.html");
 });
 
-// Map specific URLs to HTML files - use sendFile directly
+// Map specific URLs to HTML files - use sendFile with absolute paths
 app.get("/dashboard", (req, res) => {
-  res.sendFile(path.join(__dirname, "src", "frontend", "index.html"), { root: process.cwd() });
+  res.sendFile(path.join(__dirname, "src", "frontend", "index.html"));
 });
 
 app.get("/bom-calculator", (req, res) => {
-  res.sendFile(path.join(__dirname, "src", "frontend", "bom-calculator.html"), { root: process.cwd() });
+  res.sendFile(path.join(__dirname, "src", "frontend", "bom-calculator.html"));
 });
 
 app.get("/products", (req, res) => {
-  res.sendFile(path.join(__dirname, "src", "frontend", "products-editor.html"), { root: process.cwd() });
+  res.sendFile(path.join(__dirname, "src", "frontend", "products-editor.html"));
 });
 
 // Public static files (CSS, JS, HTML, etc.)
