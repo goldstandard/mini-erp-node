@@ -25,21 +25,63 @@ auth.initializeDatabase().catch(err => {
 // ==================== FRONTEND ROUTING ====================
 
 // Redirect root to login page
-app.get("/", (req, res) => {
-  res.redirect("/login.html");
+app.get("/", (req, res, next) => {
+  try {
+    console.log("[ROUTE] GET / - Redirecting to /login.html");
+    res.redirect("/login.html");
+  } catch (err) {
+    console.error("[ERROR] Root redirect failed:", err);
+    next(err);
+  }
 });
 
 // Map specific URLs to HTML files - use sendFile with absolute paths
-app.get("/dashboard", (req, res) => {
-  res.sendFile(path.join(__dirname, "src", "frontend", "index.html"));
+app.get("/dashboard", (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, "src", "frontend", "index.html");
+    console.log("[ROUTE] GET /dashboard - Serving:", filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("[ERROR] Failed to send index.html:", err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error("[ERROR] Dashboard route error:", err);
+    next(err);
+  }
 });
 
-app.get("/bom-calculator", (req, res) => {
-  res.sendFile(path.join(__dirname, "src", "frontend", "bom-calculator.html"));
+app.get("/bom-calculator", (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, "src", "frontend", "bom-calculator.html");
+    console.log("[ROUTE] GET /bom-calculator - Serving:", filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("[ERROR] Failed to send bom-calculator.html:", err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error("[ERROR] BOM calculator route error:", err);
+    next(err);
+  }
 });
 
-app.get("/products", (req, res) => {
-  res.sendFile(path.join(__dirname, "src", "frontend", "products-editor.html"));
+app.get("/products", (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, "src", "frontend", "products-editor.html");
+    console.log("[ROUTE] GET /products - Serving:", filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("[ERROR] Failed to send products-editor.html:", err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error("[ERROR] Products route error:", err);
+    next(err);
+  }
 });
 
 // Public static files (CSS, JS, HTML, etc.)
@@ -456,11 +498,24 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
+console.log(`[STARTUP] Starting server on port ${PORT}...`);
+console.log(`[STARTUP] Node version: ${process.version}`);
+console.log(`[STARTUP] Working directory: ${process.cwd()}`);
+console.log(`[STARTUP] __dirname: ${__dirname}`);
+
 app.listen(PORT, () => {
   console.log(`✓ Server running at http://localhost:${PORT}`);
   console.log(`✓ Database initialized at ${path.join(__dirname, 'data', 'mini_erp.db')}`);
   console.log(``);
+  console.log(`Frontend routes:`);
+  console.log(`  - GET / → /login.html (redirect)`);
+  console.log(`  - GET /dashboard → index.html`);
+  console.log(`  - GET /bom-calculator → bom-calculator.html`);
+  console.log(`  - GET /products → products-editor.html`);
+  console.log(``);
+  console.log(`API endpoints:`);
   console.log(`  - GET /api/health - Health check`);
+  console.log(`  - POST /api/auth/login - User login`);
   console.log(`  - GET /api/metadata - Available filters`);
   console.log(`  - GET /api/costs - Main costing endpoint`);
   console.log(`  - GET /api/export/costs - Export to CSV`);
