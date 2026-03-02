@@ -224,7 +224,8 @@
           });
           if (response.ok) {
             const user = await response.json();
-            if (user.role === 'admin') {
+            // Only show admin button for mfischer@pfnonwovens.com
+            if (user.email === 'mfischer@pfnonwovens.com') {
               document.getElementById('adminBtn').style.display = 'block';
             }
           }

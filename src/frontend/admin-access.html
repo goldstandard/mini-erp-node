@@ -32,6 +32,11 @@
             color: #333;
         }
 
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
         .logout-btn {
             padding: 10px 20px;
             background-color: #f44336;
@@ -44,6 +49,20 @@
 
         .logout-btn:hover {
             background-color: #da190b;
+        }
+
+        .return-btn {
+            padding: 10px 20px;
+            background-color: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .return-btn:hover {
+            background-color: #5568d3;
         }
 
         .tabs {
@@ -301,7 +320,10 @@
     <div class="admin-container">
         <div class="header">
             <h1>🔧 Admin - Access Management</h1>
-            <button class="logout-btn" onclick="logout()">Logout</button>
+            <div class="header-buttons">
+                <button class="return-btn" onclick="returnToDashboard()">Return to Dashboard</button>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
         </div>
 
         <div id="alertSuccess" class="alert alert-success"></div>
@@ -693,6 +715,10 @@
             } catch (err) {
                 showAlert('alertError', '❌ Error: ' + err.message, 'error');
             }
+        }
+
+        function returnToDashboard() {
+            window.location.href = '/dashboard';
         }
 
         function logout() {
