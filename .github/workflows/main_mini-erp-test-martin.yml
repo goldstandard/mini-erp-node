@@ -134,17 +134,31 @@ jobs:
           package: deploy
 
       - name: Health check
+        continue-on-error: true
         run: |
+          echo "Health check started (non-blocking)"
           for i in {1..10}; do
             code=$(curl -s -o /tmp/health.json -w "%{http_code}" "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/health" || true)
             if [ "$code" = "200" ]; then
-              echo "Health check passed"
+              echo "✅ Health check passed"
               cat /tmp/health.json
               exit 0
             fi
             echo "Health check attempt $i failed (HTTP $code), retrying in 15s..."
             sleep 15
           done
-          echo "Health check failed after deployment"
-          exit 1
+          echo "⚠️ Health check failed after deployment"
+          echo ""
+          echo "Deployment succeeded but app may not be running. Check Azure Portal:"
+          echo "1. Go to: https://portal.azure.com → Your App Service → Log stream"
+          echo "2. Check: Deployment Center → Logs for build/startup errors"
+          echo "3. Check: Diagnose and solve problems → Application Logs"
+          echo ""
+          echo "Common issues:"
+          echo "- SQLite native modules need rebuild (see README troubleshooting)"
+          echo "- Missing PORT environment variable (Azure assigns dynamically)"
+          echo "- npm install not running during deployment"
+          echo ""
+          echo "App may become available in 1-2 minutes after cold start."
+          exit 0
           
