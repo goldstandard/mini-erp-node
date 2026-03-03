@@ -603,6 +603,27 @@ async function getUsersInGroup(groupId) {
   return users;
 }
 
+async function getAllUsers() {
+  const users = await dbAll(
+    `SELECT u.id, u.email, u.name, u.role, u.created_at,
+            GROUP_CONCAT(g.name) as groups,
+            GROUP_CONCAT(g.id) as group_ids
+     FROM users u
+     LEFT JOIN user_groups ug ON u.id = ug.user_id
+     LEFT JOIN groups g ON ug.group_id = g.id
+     GROUP BY u.id
+     ORDER BY u.name`,
+    []
+  );
+
+  // Parse group info into arrays
+  return users.map(user => ({
+    ...user,
+    groups: user.groups ? user.groups.split(',') : [],
+    group_ids: user.group_ids ? user.group_ids.split(',').map(Number) : []
+  }));
+}
+
 async function createDirectUser(email, fullName, password, groupId = null) {
   // Validate email format
   if (!email || !email.includes('@')) {
@@ -876,6 +897,7 @@ module.exports = {
   updateGroup,
   deleteGroup,
   getUsersInGroup,
+  getAllUsers,
   createDirectUser,
   updateUser,
   changePassword,

@@ -137,8 +137,10 @@ jobs:
         continue-on-error: true
         run: |
           echo "Health check started (non-blocking)"
+          WEBAPP_URL="${{ steps.deploy-to-webapp.outputs.webapp-url }}"
+          echo "Checking health at: ${WEBAPP_URL}/api/health"
           for i in {1..10}; do
-            code=$(curl -s -o /tmp/health.json -w "%{http_code}" "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/health" || true)
+            code=$(curl -s -o /tmp/health.json -w "%{http_code}" "${WEBAPP_URL}/api/health" || true)
             if [ "$code" = "200" ]; then
               echo "✅ Health check passed"
               cat /tmp/health.json

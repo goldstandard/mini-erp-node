@@ -297,6 +297,16 @@ app.get("/api/admin/groups/:id/users", auth.authMiddleware, auth.requirePermissi
   }
 });
 
+// Get all users (admin only)
+app.get("/api/admin/users", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const users = await auth.getAllUsers();
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Create new user directly (admin only)
 app.post("/api/admin/users", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
   try {
