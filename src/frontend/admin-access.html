@@ -599,6 +599,7 @@
                 </div>
                 
                 <div class="audit-actions">
+                    <button class="btn-primary" onclick="clearAuditFilters()">🔃 Clear Filters</button>
                     <button class="btn-primary" onclick="exportAuditLogs()">📥 Export CSV</button>
                     <button class="btn-primary" onclick="loadAuditLogs()">🔄 Refresh</button>
                 </div>
@@ -1393,6 +1394,15 @@
                 return String(email).trim();
             }
             return fallback;
+        }
+
+        function clearAuditFilters() {
+            document.getElementById('auditFilterUser').value = '';
+            document.getElementById('auditFilterAction').value = '';
+            document.getElementById('auditStartDate').value = '';
+            document.getElementById('auditEndDate').value = '';
+            document.getElementById('auditSearch').value = '';
+            loadAuditLogs();
         }
 
         async function loadAuditLogs() {
