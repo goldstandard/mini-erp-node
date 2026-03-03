@@ -31,37 +31,66 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Node.js version
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Show build context
         run: |
+          set -euo pipefail
           echo "Commit: ${{ github.sha }}"
           echo "Branch: ${{ github.ref_name }}"
           node --version
-          npm --version
+          if command -v npm >/dev/null 2>&1; then
+            npm --version || echo "npm exists but version check failed; continuing"
+          else
+            echo "npm not found on runner PATH; continuing"
+          fi
 
       - name: Validate required project files
         run: |
-          test -f package.json
-          test -f server.js
-          test -d src
+          set -euo pipefail
+          echo "[CHECK] package.json"
+          [ -f package.json ]
+          echo "[CHECK] server.js"
+          [ -f server.js ]
+          echo "[CHECK] src directory"
+          [ -d src ]
+          echo "[CHECK] Node syntax for server.js"
           node --check server.js
+          echo "Validation passed"
 
       - name: Prepare deployment package
         run: |
+          set -euo pipefail
           mkdir -p deploy
-          rsync -a ./ deploy/ \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude 'deploy' \
-            --exclude 'node_modules' \
-            --exclude '*.log' \
-            --exclude 'server-output.txt' \
-            --exclude 'azure-deployment-info.txt'
+          if command -v rsync >/dev/null 2>&1; then
+            echo "Using rsync to prepare deployment package"
+            rsync -a ./ deploy/ \
+              --exclude '.git' \
+              --exclude '.github' \
+              --exclude 'deploy' \
+              --exclude 'node_modules' \
+              --exclude '*.log' \
+              --exclude 'server-output.txt' \
+              --exclude 'azure-deployment-info.txt'
+          else
+            echo "rsync not available; using tar fallback"
+            tar \
+              --exclude=.git \
+              --exclude=.github \
+              --exclude=deploy \
+              --exclude=node_modules \
+              --exclude='*.log' \
+              --exclude=server-output.txt \
+              --exclude=azure-deployment-info.txt \
+              -cf deploy.tar .
+            tar -xf deploy.tar -C deploy
+            rm -f deploy.tar
+          fi
           test -f deploy/package.json
           test -f deploy/server.js
+          echo "Deployment package prepared successfully"
           if [ -f deploy/web.config ]; then
             echo "web.config found"
           else
