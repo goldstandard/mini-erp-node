@@ -6,6 +6,14 @@ All notable changes to the Mini ERP system are documented here. For current feat
 
 ### Added
 
+#### BOM Calculator Updates
+- **Scrap percentage formula simplified**: Removed "Changeover Loss" field
+  - Total Scrap now calculated as: Edge trim + Web loss + Other scrap
+  - Users can incorporate changeover losses into "Other scrap" field
+- **Width unit clarification**: Updated field labels from "(%)" to "(m)" for width measurements
+  - "Max usable width (brutto, m)"
+  - "Usable width (netto, m)"
+
 #### Polymer Index Features
 - **Line Chart Visualization** (`Show Chart` button on `/polymer-indexes`)
   - Interactive chart displays index trends over selected year range

@@ -45,13 +45,19 @@ Test credentials (created by setup script):
 
 ## Main Routes
 
-Frontend:
+Frontend (primary pages):
 
-- `/` login page
+- `/` redirects to `/login.html`
 - `/dashboard` cost dashboard
 - `/bom-calculator` BOM calculator
 - `/products` product editor
 - `/polymer-indexes` polymer index manager
+
+Frontend (supplementary pages):
+
+- `/request-access.html` user access request form
+- `/admin-access.html` admin panel (groups, users, permissions) — accessible to admins only
+- `/polymer-index-admin.html` polymer index definition manager — accessible to admins only
 
 API root:
 
@@ -87,14 +93,31 @@ mini-erp-node/
     │   ├── materials.js
     │   ├── products.js
     │   ├── products-editor.js
-    │   └── polymer-indexes.js
+    │   ├── polymer-indexes.js
+    │   ├── auth/
+    │   │   └── providers/ (OAuth/LDAP provider configs)
+    │   ├── constants/ (database schema, permissions)
+    │   ├── db/
+    │   │   └── connection.js (SQLite setup)
+    │   ├── middleware/ (auth, logging, error handlers)
+    │   ├── models/ (database models)
+    │   ├── routes/ (API endpoints)
+    │   │   ├── auth.js
+    │   │   └── users.js
+    │   └── utils/
+    │       └── auditLog.js
     ├── frontend/
-    │   ├── index.html
+    │   ├── index.html (cost dashboard)
     │   ├── bom-calculator.html
     │   ├── products-editor.html
     │   ├── polymer-indexes.html
-    │   ├── app.js
-    │   ├── script.js
+    │   ├── login.html
+    │   ├── admin-access.html (admin group/user manager)
+    │   ├── polymer-index-admin.html (polymer index definitions)
+    │   ├── request-access.html (user access request form)
+    │   ├── app.js (dashboard controller)
+    │   ├── auth.js (auth utilities)
+    │   ├── script.js (shared utilities)
     │   └── styles.css
     └── data/
         └── mini_erp.db

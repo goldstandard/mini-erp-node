@@ -108,6 +108,31 @@
       font-size: 0.85em;
     }
 
+    .line-field-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3px;
+      min-height: 18px;
+    }
+
+    .line-field-header .line-field-label {
+      margin: 0;
+    }
+
+    .line-parameters-link {
+      font-size: 0.82em;
+      color: #2b6cb0;
+      text-decoration: none;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .line-parameters-link:hover {
+      text-decoration: underline;
+      color: #1f4f82;
+    }
+
     .section.description-section .input-field input,
     .section.description-section .input-field select {
       padding: 6px;
@@ -117,6 +142,17 @@
 
     .section.production-target-section .input-field input,
     .section.production-target-section .input-field select {
+      background-color: #e3f2fd;
+    }
+
+    .commentary-section .input-group {
+      grid-template-columns: 1fr;
+    }
+
+    .commentary-section textarea {
+      width: 100%;
+      min-height: 96px;
+      resize: vertical;
       background-color: #e3f2fd;
     }
 
@@ -140,8 +176,22 @@
       font-size: 0.9em;
     }
 
+    .input-field textarea {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.9em;
+      font-family: inherit;
+    }
+
     .input-field input:focus,
     .input-field select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+    }
+
+    .input-field textarea:focus {
       outline: none;
       border-color: #667eea;
       box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
@@ -650,6 +700,40 @@
       background: #e8eaf6;
     }
 
+    .techparams-modal-content {
+      max-width: 1400px;
+      width: min(98vw, 1400px);
+      max-height: 85vh;
+      padding: 20px;
+    }
+
+    .techparams-sheet-wrap {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      overflow: auto;
+      max-height: calc(85vh - 100px);
+      padding: 8px;
+    }
+
+    .techparams-sheet-wrap table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: fixed;
+      font-size: 0.78em;
+    }
+
+    .techparams-sheet-wrap td,
+    .techparams-sheet-wrap th {
+      border: 1px solid #d6d6d6;
+      padding: 3px 5px;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      vertical-align: middle;
+      text-align: center;
+    }
+
     .dataset-header {
       display: flex;
       justify-content: space-between;
@@ -828,6 +912,13 @@
           <input type="number" id="beltBW" placeholder="Belt BW" step="0.1" min="0" />
         </div>
         <div class="input-field">
+          <div class="line-field-header">
+            <label for="line" class="line-field-label">Line</label>
+            <a href="#" id="lineParametersLink" class="line-parameters-link" onclick="openTechParamsModal(); return false;">Line Parameters</a>
+          </div>
+          <select id="line"></select>
+        </div>
+        <div class="input-field">
           <label for="mbGrams">MB grams</label>
           <input type="number" id="mbGrams" placeholder="MB grams" step="0.1" min="0" />
         </div>
@@ -835,7 +926,7 @@
           <label for="bicoRatioDesc">Bico Ratio A</label>
           <select id="bicoRatioDesc"></select>
         </div>
-        <div class="input-field">
+        <div class="input-field line12-only-field">
           <label for="bicoRatioD">Bico Ratio D</label>
           <select id="bicoRatioD"></select>
         </div>
@@ -843,49 +934,49 @@
           <label for="treatment">Treatment</label>
           <select id="treatment"></select>
         </div>
-        <div class="input-field">
+        <div class="input-field line12-only-field">
           <label for="crystallizer1">Crystallizer 1</label>
           <select id="crystallizer1">
             <option value="No" selected>No</option>
             <option value="Yes">Yes</option>
           </select>
         </div>
-        <div class="input-field">
+        <div class="input-field line12-only-field">
           <label for="crystallizer2Bico">Crystallizer 2 (Bico)</label>
           <select id="crystallizer2Bico">
             <option value="No" selected>No</option>
             <option value="Yes">Yes</option>
           </select>
         </div>
-        <div class="input-field">
+        <div class="input-field line12-only-field">
           <label for="mainMaterialDryer">Main material dryer</label>
           <select id="mainMaterialDryer">
             <option value="No" selected>No</option>
             <option value="Yes">Yes</option>
           </select>
         </div>
-        <div class="input-field">
+        <div class="input-field line12-only-field">
           <label for="sideMaterialDryerBico">Side material drier (Bico)</label>
           <select id="sideMaterialDryerBico">
             <option value="No" selected>No</option>
             <option value="Yes">Yes</option>
           </select>
         </div>
-        <div class="input-field">
+        <div class="input-field line12-only-field">
           <label for="additiveDryer1">Additive dryer 1</label>
           <select id="additiveDryer1">
             <option value="No" selected>No</option>
             <option value="Yes">Yes</option>
           </select>
         </div>
-        <div class="input-field">
+        <div class="input-field line12-only-field">
           <label for="additiveDryer2">Additive dryer 2</label>
           <select id="additiveDryer2">
             <option value="No" selected>No</option>
             <option value="Yes">Yes</option>
           </select>
         </div>
-        <div class="input-field">
+        <div class="input-field line12-only-field">
           <label for="additiveDryer3">Additive dryer 3</label>
           <select id="additiveDryer3">
             <option value="No" selected>No</option>
@@ -919,10 +1010,6 @@
         <div class="input-field">
           <label for="reproPercent">Repro (%)</label>
           <input type="number" id="reproPercent" placeholder="Repro (%)" step="0.1" min="0" />
-        </div>
-        <div class="input-field">
-          <label for="line">Line</label>
-          <select id="line"></select>
         </div>
         <div class="input-field">
           <label for="lineWidth">Width (m)</label>
@@ -1029,6 +1116,17 @@
             <option value="kg">kg NW</option>
             <option value="tons" selected>tons NW</option>
           </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Commentary -->
+    <div class="section commentary-section">
+      <h2>Commentary</h2>
+      <div class="input-group">
+        <div class="input-field">
+          <label for="notes">Notes</label>
+          <textarea id="notes" rows="3" placeholder="Enter notes"></textarea>
         </div>
       </div>
     </div>
@@ -1803,6 +1901,8 @@
           lineSelect.addEventListener('change', populateLineParameters);
           console.log('Line dropdown change listener attached from loadLineParameters');
         }
+
+        updateLine12DependentFields();
         
         console.log('Line parameters loaded successfully');
       } catch (error) {
@@ -1810,9 +1910,21 @@
       }
     }
 
+    function updateLine12DependentFields() {
+      const lineSelect = document.getElementById('line');
+      const selectedLine = (lineSelect?.value || '').trim();
+      const isLine12 = /^CZ12/i.test(selectedLine);
+      const line12OnlyFields = document.querySelectorAll('.line12-only-field');
+
+      line12OnlyFields.forEach(field => {
+        field.style.display = isLine12 ? '' : 'none';
+      });
+    }
+
     function populateLineParameters() {
       const lineSelect = document.getElementById('line');
       const selectedLine = lineSelect.value;
+      updateLine12DependentFields();
       
       console.log('Line selected:', selectedLine);
       console.log('Available lines in map:', Object.keys(lineParametersMap));
@@ -2808,21 +2920,90 @@
       }
     }
 
-    // Load description dropdown lists from Sources.xlsx
+    let techParamsHtml = '';
+
+    function normalizeSheetName(name) {
+      return (name || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function findSheetByName(workbook, targetName) {
+      const normalizedTarget = normalizeSheetName(targetName);
+      const matchedName = (workbook.SheetNames || []).find(name => normalizeSheetName(name) === normalizedTarget);
+      return matchedName ? workbook.Sheets[matchedName] : null;
+    }
+
+    async function loadWorkbookFromDataFolder() {
+      const candidateFiles = ['/data/File Sources.xlsx', '/data/Sources.xlsx'];
+
+      for (const filePath of candidateFiles) {
+        const response = await fetch(filePath);
+        if (!response.ok) {
+          continue;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        return {
+          workbook: XLSX.read(arrayBuffer, { type: 'array' }),
+          sourcePath: filePath
+        };
+      }
+
+      return null;
+    }
+
+    function cacheTechParamsSheet(workbook, sourcePath) {
+      const techParamsSheet = findSheetByName(workbook, 'TechParams');
+      if (!techParamsSheet) {
+        techParamsHtml = `<p style="margin:0; color:#a33;">Sheet "TechParams" was not found in ${sourcePath}.</p>`;
+        return;
+      }
+
+      // Render sheet as an HTML table to preserve the Excel-like grid layout.
+      techParamsHtml = XLSX.utils.sheet_to_html(techParamsSheet, {
+        editable: false,
+        id: 'techParamsSheetTable'
+      });
+    }
+
+    function openTechParamsModal() {
+      const modal = document.getElementById('techParamsModal');
+      const content = document.getElementById('techParamsContent');
+      if (!modal || !content) {
+        return;
+      }
+
+      if (!techParamsHtml) {
+        content.innerHTML = '<p style="margin:0; color:#a33;">Tech parameters are not loaded yet. Please try again in a moment.</p>';
+      } else {
+        content.innerHTML = techParamsHtml;
+      }
+
+      modal.classList.add('active');
+    }
+
+    function closeTechParamsModal() {
+      const modal = document.getElementById('techParamsModal');
+      if (modal) {
+        modal.classList.remove('active');
+      }
+    }
+
+    // Load description dropdown lists from source workbook
     async function loadDescriptionLists() {
       try {
-        const response = await fetch('/data/Sources.xlsx');
-        if (!response.ok) {
-          console.error('Failed to fetch Sources.xlsx:', response.status, response.statusText);
+        const workbookData = await loadWorkbookFromDataFolder();
+        if (!workbookData) {
+          console.error('Failed to fetch workbook from /data/File Sources.xlsx or /data/Sources.xlsx');
           return;
         }
+
+        const workbook = workbookData.workbook;
+        const sourcePath = workbookData.sourcePath;
+        cacheTechParamsSheet(workbook, sourcePath);
         
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        
-        const listsSheet = workbook.Sheets['Lists'];
+        const listsSheet = findSheetByName(workbook, 'Lists');
         if (!listsSheet) {
-          console.warn('Lists sheet not found in Sources.xlsx');
+          console.warn(`Lists sheet not found in ${sourcePath}`);
           return;
         }
 
@@ -2940,15 +3121,96 @@
       initializeScrapCalculations();
       initializeThroughputCalculations();
       calculateNetPolymer();
+      updateLine12DependentFields();
     });
 
     // ===== SAVE/LOAD FUNCTIONALITY =====
+
+    function buildControlKey(control, index) {
+      if (control.id) {
+        return `id:${control.id}`;
+      }
+
+      const namePart = control.name ? `name:${control.name}:` : 'name::';
+      return `${namePart}${control.tagName.toLowerCase()}:${control.type || ''}:${index}`;
+    }
+
+    function captureFormSnapshot() {
+      const controls = document.querySelectorAll('input, select, textarea');
+      const snapshot = [];
+
+      controls.forEach((control, index) => {
+        const type = (control.type || '').toLowerCase();
+        if (type === 'button' || type === 'submit' || type === 'reset' || type === 'file') {
+          return;
+        }
+
+        snapshot.push({
+          key: buildControlKey(control, index),
+          tag: control.tagName.toLowerCase(),
+          type,
+          value: control.value,
+          checked: !!control.checked
+        });
+      });
+
+      return snapshot;
+    }
+
+    function applyFormSnapshot(snapshot, retries = 4, retryDelay = 200) {
+      if (!Array.isArray(snapshot) || snapshot.length === 0) {
+        return;
+      }
+
+      const controls = document.querySelectorAll('input, select, textarea');
+      const controlMap = new Map();
+
+      controls.forEach((control, index) => {
+        const type = (control.type || '').toLowerCase();
+        if (type === 'button' || type === 'submit' || type === 'reset' || type === 'file') {
+          return;
+        }
+
+        controlMap.set(buildControlKey(control, index), control);
+      });
+
+      let pendingSelects = 0;
+
+      snapshot.forEach(item => {
+        const control = controlMap.get(item.key);
+        if (!control) {
+          return;
+        }
+
+        const controlType = (control.type || '').toLowerCase();
+        if (controlType === 'checkbox' || controlType === 'radio') {
+          control.checked = !!item.checked;
+          return;
+        }
+
+        if (control.tagName.toLowerCase() === 'select') {
+          const targetValue = item.value == null ? '' : String(item.value);
+          const hasOption = Array.from(control.options).some(option => option.value === targetValue);
+          if (!hasOption && targetValue !== '') {
+            pendingSelects++;
+            return;
+          }
+        }
+
+        control.value = item.value ?? '';
+      });
+
+      if (pendingSelects > 0 && retries > 0) {
+        setTimeout(() => applyFormSnapshot(snapshot, retries - 1, retryDelay), retryDelay);
+      }
+    }
     
     function gatherCurrentData() {
       const data = {
         timestamp: new Date().toISOString(),
         description: {},
         productionTarget: {},
+        commentary: {},
         beamConfiguration: {},
         materials: [],
         surfactants: []
@@ -2979,6 +3241,9 @@
       data.productionTarget.targetProduction = document.getElementById('targetProduction')?.value || '';
       data.productionTarget.targetUnit = document.getElementById('targetUnit')?.value || 'kg';
       data.productionTarget.totalGSM = document.getElementById('totalGSM')?.value || '';
+
+      // Gather Commentary
+      data.commentary.notes = document.getElementById('notes')?.value || '';
 
       // Gather Beam Configuration
       for (let i = 1; i <= 8; i++) {
@@ -3033,6 +3298,9 @@
         }
       });
 
+      // Full-form snapshot to ensure every entry field on the page is preserved.
+      data.formSnapshot = captureFormSnapshot();
+
       return data;
     }
 
@@ -3060,6 +3328,11 @@
         if (data.productionTarget.totalGSM) {
           document.getElementById('totalGSM').value = data.productionTarget.totalGSM;
         }
+      }
+
+      // Load Commentary
+      if (data.commentary && data.commentary.notes !== undefined) {
+        document.getElementById('notes').value = data.commentary.notes || '';
       }
 
       // Load Beam Configuration
@@ -3157,10 +3430,18 @@
         });
       }
 
+      // Restore any remaining fields not covered by structured loaders.
+      if (data.formSnapshot) {
+        applyFormSnapshot(data.formSnapshot);
+      }
+
       // Recalculate all validations and calculations after a delay to ensure all data is loaded
       // Extended delay to account for all material rows being set with colors
       const maxDelay = Math.max((data.materials?.length || 0) * 100 + 500, 800);
       setTimeout(() => {
+        if (data.formSnapshot) {
+          applyFormSnapshot(data.formSnapshot);
+        }
         refreshAllCalculations();
       }, maxDelay);
       
@@ -3168,6 +3449,8 @@
     }
 
     function refreshAllCalculations() {
+      updateLine12DependentFields();
+
       // Populate line parameters if line is selected
       if (document.getElementById('line').value) {
         populateLineParameters();
@@ -3464,6 +3747,17 @@
       <div class="dataset-list" id="datasetListContainer">
         <!-- Datasets will be populated here -->
       </div>
+    </div>
+  </div>
+
+  <!-- Line Parameters Modal -->
+  <div id="techParamsModal" class="modal-overlay" onclick="if (event.target === this) closeTechParamsModal()">
+    <div class="modal-content techparams-modal-content">
+      <div class="modal-header">
+        <h2>Line Parameters</h2>
+        <button class="modal-close" onclick="closeTechParamsModal()">&times;</button>
+      </div>
+      <div id="techParamsContent" class="techparams-sheet-wrap"></div>
     </div>
   </div>
 
