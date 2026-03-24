@@ -160,6 +160,31 @@ Response shape:
 - `POST /api/products/duplicate`
 - `POST /api/products/delete`
 - `GET /api/bom/lists`
+- `GET /api/bom/customers`
+- `PUT /api/bom/customers`
+- `GET /api/bom/description-lists`
+- `PUT /api/bom/description-lists/:listKey`
+- `POST /api/bom/records` (auth required)
+- `GET /api/bom/records` (auth required)
+- `GET /api/bom/records/:id` (auth required)
+- `PUT /api/bom/records/:id` (auth required)
+
+### BOM Recipe Persistence
+
+- `POST /api/bom/records`
+  - Stores a full BOM snapshot in `bom_records` plus material percentages from Calculation Results in `bom_record_materials`
+  - Request body includes:
+    - `record` object (description fields, throughput/scrap values, minimum batch size + unit, notes)
+    - `materials` array (`material_label`, `material_name`, `percentage`)
+
+- `GET /api/bom/records`
+  - Returns saved record list for future browsing/edit workflows
+
+- `GET /api/bom/records/:id`
+  - Returns one full BOM record including child `materials`
+
+- `PUT /api/bom/records/:id`
+  - Updates a saved BOM record and replaces its `materials` rows in a transaction
 
 ## Debug Endpoints
 

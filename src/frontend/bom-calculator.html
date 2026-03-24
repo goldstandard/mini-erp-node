@@ -588,8 +588,11 @@
       background: white;
       border-radius: 8px;
       padding: 30px;
-      max-width: 700px;
-      width: 90%;
+      --modal-width-ch: 56ch;
+      --modal-min-width: 340px;
+      --modal-max-width: 900px;
+      width: clamp(var(--modal-min-width), var(--modal-width-ch), min(92vw, var(--modal-max-width)));
+      max-width: min(92vw, var(--modal-max-width));
       max-height: 80vh;
       overflow-y: auto;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
@@ -701,8 +704,11 @@
     }
 
     .techparams-modal-content {
-      max-width: 1400px;
-      width: min(98vw, 1400px);
+      --modal-width-ch: 120ch;
+      --modal-max-width: 1400px;
+      --modal-min-width: 560px;
+      width: clamp(var(--modal-min-width), var(--modal-width-ch), min(98vw, var(--modal-max-width)));
+      max-width: min(98vw, var(--modal-max-width));
       max-height: 85vh;
       padding: 20px;
     }
@@ -732,6 +738,97 @@
       overflow-wrap: anywhere;
       vertical-align: middle;
       text-align: center;
+    }
+
+    .customer-modal-content {
+      max-width: 760px;
+    }
+
+    .customer-editor-help {
+      margin: 0 0 12px;
+      font-size: 0.9em;
+      color: #555;
+    }
+
+    .customer-editor-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+      max-height: 46vh;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .customer-editor-row {
+      display: flex;
+      align-items: center;
+    }
+
+    .customer-editor-row input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.9em;
+    }
+
+    /* Denser layout for Customer editor and adaptive modal width. */
+    #customerModal .customer-modal-content {
+      --modal-width-ch: 52ch;
+      --modal-max-width: 760px;
+      --modal-min-width: 340px;
+      width: clamp(var(--modal-min-width), var(--modal-width-ch), min(92vw, var(--modal-max-width)));
+      max-width: min(92vw, var(--modal-max-width));
+      padding: 14px;
+    }
+
+    #customerModal .customer-editor-help {
+      margin: 0 0 8px;
+      font-size: 0.83em;
+    }
+
+    #customerModal .customer-editor-list {
+      gap: 4px;
+      margin-bottom: 8px;
+      max-height: 58vh;
+      padding-right: 0;
+    }
+
+    #customerModal .customer-editor-row input {
+      padding: 5px 7px;
+      border-radius: 4px;
+      font-size: 0.84em;
+      line-height: 1.2;
+    }
+
+    /* Denser layout for Description list editor to show more rows. */
+    #descriptionListModal .customer-modal-content {
+      --modal-width-ch: 52ch;
+      --modal-max-width: 700px;
+      --modal-min-width: 340px;
+      width: clamp(var(--modal-min-width), var(--modal-width-ch), min(92vw, var(--modal-max-width)));
+      max-width: min(92vw, var(--modal-max-width));
+      padding: 14px;
+    }
+
+    #descriptionListModal .customer-editor-help {
+      margin: 0 0 8px;
+      font-size: 0.83em;
+    }
+
+    #descriptionListModal .customer-editor-list {
+      gap: 4px;
+      margin-bottom: 8px;
+      max-height: 58vh;
+      padding-right: 0;
+    }
+
+    #descriptionListModal .customer-editor-row input {
+      padding: 5px 7px;
+      border-radius: 4px;
+      font-size: 0.84em;
+      line-height: 1.2;
     }
 
     .dataset-header {
@@ -838,6 +935,7 @@
         <button class="btn-primary" onclick="openLoadModal()">📂 Load WIP</button>
         <button class="btn-secondary" onclick="exportCompleted()">📤 Export Recipe</button>
         <button class="btn-secondary" onclick="importCompleted()">📥 Import Recipe</button>
+        <button class="btn-success" onclick="openSaveBomRecordModal()" style="background:#1b5e20; display:none;" id="saveBomRecordToolbarBtn">📊 Save BOM Record</button>
       </div>
       <div class="field-legend" aria-label="Field color legend">
         <div class="legend-item">
@@ -863,16 +961,15 @@
           <label for="pdId">PD ID</label>
           <input type="text" id="pdId" placeholder="Enter PD ID" />
         </div>
-        <div class="input-field">
+        <div class="input-field" style="display: none;" aria-hidden="true">
           <label for="sapId">SAP ID</label>
           <input type="text" id="sapId" placeholder="Enter SAP ID" />
         </div>
         <div class="input-field">
-          <label for="sapIdSimilar">SAP ID (similar material)</label>
-          <input type="text" id="sapIdSimilar" placeholder="Enter SAP ID" />
-        </div>
-        <div class="input-field">
-          <label for="customer">Customer</label>
+          <div class="line-field-header">
+            <label for="customer" class="line-field-label">Customer</label>
+            <a href="#" id="customerManagementLink" class="line-parameters-link" onclick="openCustomerModal(); return false;">Manage Customers</a>
+          </div>
           <select id="customer"></select>
         </div>
         <div class="input-field">
@@ -896,8 +993,20 @@
           <select id="structure"></select>
         </div>
         <div class="input-field">
+          <label for="bicoRatioDesc">Bico Ratio</label>
+          <select id="bicoRatioDesc"></select>
+        </div>
+        <div class="input-field">
           <label for="mainRawMat">Main RawMat</label>
           <select id="mainRawMat"></select>
+        </div>
+        <div class="input-field">
+          <label for="treatment">Treatment</label>
+          <select id="treatment"></select>
+        </div>
+        <div class="input-field">
+          <label for="color">Color</label>
+          <select id="color"></select>
         </div>
         <div class="input-field">
           <label for="bonding">Bonding</label>
@@ -912,6 +1021,10 @@
           <input type="number" id="beltBW" placeholder="Belt BW" step="0.1" min="0" />
         </div>
         <div class="input-field">
+          <label for="mbGrams">MB grams</label>
+          <input type="number" id="mbGrams" placeholder="MB grams" step="0.1" min="0" />
+        </div>
+        <div class="input-field">
           <div class="line-field-header">
             <label for="line" class="line-field-label">Line</label>
             <a href="#" id="lineParametersLink" class="line-parameters-link" onclick="openTechParamsModal(); return false;">Line Parameters</a>
@@ -919,89 +1032,8 @@
           <select id="line"></select>
         </div>
         <div class="input-field">
-          <label for="mbGrams">MB grams</label>
-          <input type="number" id="mbGrams" placeholder="MB grams" step="0.1" min="0" />
-        </div>
-        <div class="input-field">
-          <label for="bicoRatioDesc">Bico Ratio A</label>
-          <select id="bicoRatioDesc"></select>
-        </div>
-        <div class="input-field line12-only-field">
-          <label for="bicoRatioD">Bico Ratio D</label>
-          <select id="bicoRatioD"></select>
-        </div>
-        <div class="input-field">
-          <label for="treatment">Treatment</label>
-          <select id="treatment"></select>
-        </div>
-        <div class="input-field line12-only-field">
-          <label for="crystallizer1">Crystallizer 1</label>
-          <select id="crystallizer1">
-            <option value="No" selected>No</option>
-            <option value="Yes">Yes</option>
-          </select>
-        </div>
-        <div class="input-field line12-only-field">
-          <label for="crystallizer2Bico">Crystallizer 2 (Bico)</label>
-          <select id="crystallizer2Bico">
-            <option value="No" selected>No</option>
-            <option value="Yes">Yes</option>
-          </select>
-        </div>
-        <div class="input-field line12-only-field">
-          <label for="mainMaterialDryer">Main material dryer</label>
-          <select id="mainMaterialDryer">
-            <option value="No" selected>No</option>
-            <option value="Yes">Yes</option>
-          </select>
-        </div>
-        <div class="input-field line12-only-field">
-          <label for="sideMaterialDryerBico">Side material drier (Bico)</label>
-          <select id="sideMaterialDryerBico">
-            <option value="No" selected>No</option>
-            <option value="Yes">Yes</option>
-          </select>
-        </div>
-        <div class="input-field line12-only-field">
-          <label for="additiveDryer1">Additive dryer 1</label>
-          <select id="additiveDryer1">
-            <option value="No" selected>No</option>
-            <option value="Yes">Yes</option>
-          </select>
-        </div>
-        <div class="input-field line12-only-field">
-          <label for="additiveDryer2">Additive dryer 2</label>
-          <select id="additiveDryer2">
-            <option value="No" selected>No</option>
-            <option value="Yes">Yes</option>
-          </select>
-        </div>
-        <div class="input-field line12-only-field">
-          <label for="additiveDryer3">Additive dryer 3</label>
-          <select id="additiveDryer3">
-            <option value="No" selected>No</option>
-            <option value="Yes">Yes</option>
-          </select>
-        </div>
-        <div class="input-field">
-          <label for="color">Color</label>
-          <select id="color"></select>
-        </div>
-        <div class="input-field">
-          <label for="cores">Cores</label>
-          <select id="cores"></select>
-        </div>
-        <div class="input-field">
-          <label for="slitWidth">Slit Width (mm)</label>
-          <input type="number" id="slitWidth" placeholder="Slit Width (mm)" step="1" min="0" />
-        </div>
-        <div class="input-field">
-          <label for="lengthMeters">Length (m)</label>
-          <input type="number" id="lengthMeters" placeholder="Length (m)" step="1" min="0" />
-        </div>
-        <div class="input-field">
-          <label for="rollDiameter">Roll Diameter (mm)</label>
-          <input type="number" id="rollDiameter" placeholder="Roll Diameter (mm)" step="1" min="0" />
+          <label for="beltSpeed">Belt Speed (m/min)</label>
+          <input type="number" id="beltSpeed" placeholder="Belt Speed (m/min)" step="0.1" min="0" />
         </div>
         <div class="input-field">
           <label for="sikoPercent">Siko (%)</label>
@@ -1024,10 +1056,6 @@
           <input type="text" id="lineConfiguration" placeholder="Auto-populated" readonly class="calculated-field" />
         </div>
         <div class="input-field">
-          <label for="beltSpeed">Belt Speed (m/min)</label>
-          <input type="number" id="beltSpeed" placeholder="Belt Speed (m/min)" step="0.1" min="0" />
-        </div>
-        <div class="input-field">
           <label for="maxUsableWidth">Max usable width (brutto, m)</label>
           <input type="number" id="maxUsableWidth" placeholder="Max usable width (brutto)" step="1" min="0" />
         </div>
@@ -1037,11 +1065,11 @@
         </div>
         <div class="input-field">
           <label for="edgeTrimPercent">Edge trim (%)</label>
-          <input type="number" id="edgeTrimPercent" placeholder="Calculated" step="0.01" readonly class="calculated-field" />
+          <input type="number" id="edgeTrimPercent" placeholder="%" step="0.01" min="0" />
         </div>
         <div class="input-field">
           <label for="webLossPercent">Web loss (%)</label>
-          <input type="number" id="webLossPercent" placeholder="%" step="0.01" min="0" />
+          <input type="number" id="webLossPercent" placeholder="Calculated" step="0.01" readonly class="calculated-field" />
         </div>
         <div class="input-field">
           <label for="otherScrapPercent">Other scrap (%)</label>
@@ -1057,11 +1085,11 @@
         </div>
         <div class="input-field">
           <label for="sBeams">S Beams</label>
-          <input type="number" id="sBeams" placeholder="From Line parameters" step="1" readonly class="calculated-field" />
+          <input type="number" id="sBeams" placeholder="From Line parameters" step="1" min="0" />
         </div>
         <div class="input-field">
           <label for="mBeams">M Beams</label>
-          <input type="number" id="mBeams" placeholder="From Line parameters" step="1" readonly class="calculated-field" />
+          <input type="number" id="mBeams" placeholder="From Line parameters" step="1" min="0" />
         </div>
         <div class="input-field">
           <label for="sbEffectiveWidth">SB - effective width (m)</label>
@@ -1098,6 +1126,22 @@
         <div class="input-field">
           <label for="productionTime">Production Time (hrs/t)</label>
           <input type="number" id="productionTime" placeholder="Calculated" step="0.01" readonly class="calculated-field" />
+        </div>
+        <div class="input-field">
+          <label for="cores">Cores</label>
+          <select id="cores"></select>
+        </div>
+        <div class="input-field">
+          <label for="slitWidth">Slit Width (mm)</label>
+          <input type="number" id="slitWidth" placeholder="Slit Width (mm)" step="1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="lengthMeters">Length (m)</label>
+          <input type="number" id="lengthMeters" placeholder="Length (m)" step="1" min="0" />
+        </div>
+        <div class="input-field">
+          <label for="rollDiameter">Roll Diameter (mm)</label>
+          <input type="number" id="rollDiameter" placeholder="Roll Diameter (mm)" step="1" min="0" />
         </div>
       </div>
     </div>
@@ -1552,6 +1596,9 @@
         <tbody id="resultsBody">
         </tbody>
       </table>
+      <div style="margin-top: 16px; text-align: right;">
+        <button class="btn-success" onclick="openSaveBomRecordModal()" style="background:#1b5e20; padding:12px 24px; font-size:1em;">📊 Save BOM Record</button>
+      </div>
     </div>
   </div>
 
@@ -1794,7 +1841,7 @@
     function populateSurfactantOptions(select) {
       if (!materialLists.list_surfactant) return;
 
-      materialLists.list_surfactant.forEach(surfactant => {
+      sortValuesForDisplay(materialLists.list_surfactant).forEach(surfactant => {
         const option = document.createElement('option');
         option.value = surfactant;
         option.textContent = surfactant;
@@ -1902,29 +1949,15 @@
           console.log('Line dropdown change listener attached from loadLineParameters');
         }
 
-        updateLine12DependentFields();
-        
         console.log('Line parameters loaded successfully');
       } catch (error) {
         console.error('Error loading line parameters:', error);
       }
     }
 
-    function updateLine12DependentFields() {
-      const lineSelect = document.getElementById('line');
-      const selectedLine = (lineSelect?.value || '').trim();
-      const isLine12 = /^CZ12/i.test(selectedLine);
-      const line12OnlyFields = document.querySelectorAll('.line12-only-field');
-
-      line12OnlyFields.forEach(field => {
-        field.style.display = isLine12 ? '' : 'none';
-      });
-    }
-
     function populateLineParameters() {
       const lineSelect = document.getElementById('line');
       const selectedLine = lineSelect.value;
-      updateLine12DependentFields();
       
       console.log('Line selected:', selectedLine);
       console.log('Available lines in map:', Object.keys(lineParametersMap));
@@ -1941,6 +1974,8 @@
         console.log('Line not found in map, clearing fields');
         document.getElementById('sBeams').value = '';
         document.getElementById('mBeams').value = '';
+        document.getElementById('sBeams').removeAttribute('max');
+        document.getElementById('mBeams').removeAttribute('max');
         document.getElementById('sbEffectiveWidth').value = '';
         document.getElementById('mbEffectiveWidth').value = '';
         document.getElementById('sbMaxThroughput').value = '';
@@ -1961,6 +1996,16 @@
       
       document.getElementById('sBeams').value = params.sBeams || '';
       document.getElementById('mBeams').value = params.mBeams || '';
+      if (params.sBeams !== undefined && params.sBeams !== null && params.sBeams !== '') {
+        document.getElementById('sBeams').max = params.sBeams;
+      } else {
+        document.getElementById('sBeams').removeAttribute('max');
+      }
+      if (params.mBeams !== undefined && params.mBeams !== null && params.mBeams !== '') {
+        document.getElementById('mBeams').max = params.mBeams;
+      } else {
+        document.getElementById('mBeams').removeAttribute('max');
+      }
       document.getElementById('sbEffectiveWidth').value = params.sbEffectiveWidth || '';
       document.getElementById('mbEffectiveWidth').value = params.mbEffectiveWidth || '';
       document.getElementById('sbMaxThroughput').value = params.sbMaxThroughput || '';
@@ -1980,6 +2025,38 @@
       }
       document.getElementById('lineConfiguration').value = params.configuration || '';
       calculateThroughput();
+    }
+
+    function initializeBeamCountOverrides() {
+      ['sBeams', 'mBeams'].forEach(fieldId => {
+        const input = document.getElementById(fieldId);
+        if (!input) {
+          return;
+        }
+
+        input.addEventListener('input', () => {
+          const rawValue = input.value;
+          if (rawValue === '') {
+            calculateThroughput();
+            return;
+          }
+
+          const parsedValue = parseFloat(rawValue);
+          const maxValue = parseFloat(input.max);
+
+          if (Number.isFinite(parsedValue)) {
+            if (parsedValue < 0) {
+              input.value = '0';
+            } else if (Number.isFinite(maxValue) && parsedValue > maxValue) {
+              input.value = String(maxValue);
+            } else if (!Number.isInteger(parsedValue)) {
+              input.value = String(Math.floor(parsedValue));
+            }
+          }
+
+          calculateThroughput();
+        });
+      });
     }
 
     function initializeBeamConfigColorTracking() {
@@ -2048,12 +2125,12 @@
         'customer', 'marketSegment', 'application', 'smms', 'monoBico', 'structure',
         'mainRawMat', 'bonding', 'totalGSM', 'beltBW', 'mbGrams', 'bicoRatioDesc',
         'treatment', 'color', 'sikoPercent', 'reproPercent', 'line', 'beltSpeed',
-        'maxUsableWidth', 'usableWidth', 'webLossPercent',
+        'maxUsableWidth', 'usableWidth', 'edgeTrimPercent',
         'targetProduction'
       ];
 
       const yellowRequiredIds = [
-        'pdId', 'sapId', 'sapIdSimilar', 'cores', 'slitWidth', 'lengthMeters',
+        'pdId', 'sapId', 'cores', 'slitWidth', 'lengthMeters',
         'rollDiameter', 'otherScrapPercent', 'overconsumptionPercent'
       ];
 
@@ -2078,12 +2155,12 @@
         'customer', 'marketSegment', 'application', 'smms', 'monoBico', 'structure',
         'mainRawMat', 'bonding', 'totalGSM', 'beltBW', 'mbGrams', 'bicoRatioDesc',
         'treatment', 'color', 'sikoPercent', 'reproPercent', 'line', 'beltSpeed',
-        'maxUsableWidth', 'usableWidth', 'webLossPercent',
+        'maxUsableWidth', 'usableWidth', 'edgeTrimPercent',
         'targetProduction'
       ];
 
       const yellowRequiredIds = [
-        'pdId', 'sapId', 'sapIdSimilar', 'cores', 'slitWidth', 'lengthMeters',
+        'pdId', 'sapId', 'cores', 'slitWidth', 'lengthMeters',
         'rollDiameter', 'otherScrapPercent', 'overconsumptionPercent'
       ];
 
@@ -2102,7 +2179,39 @@
       });
     }
 
+    function getMissingRedRequiredFields() {
+      const redRequiredIds = [
+        'customer', 'marketSegment', 'application', 'smms', 'monoBico', 'structure',
+        'mainRawMat', 'bonding', 'totalGSM', 'beltBW', 'mbGrams', 'bicoRatioDesc',
+        'treatment', 'color', 'sikoPercent', 'reproPercent', 'line', 'beltSpeed',
+        'maxUsableWidth', 'usableWidth', 'edgeTrimPercent',
+        'targetProduction'
+      ];
+
+      const missingLabels = [];
+      redRequiredIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        const value = (element.value || '').trim();
+        if (value !== '') return;
+
+        const labelEl = document.querySelector(`label[for="${id}"]`);
+        missingLabels.push((labelEl?.textContent || id).trim());
+      });
+
+      return missingLabels;
+    }
+
     function calculateBOM() {
+      // Validate all required fields FIRST before any calculations
+      refreshRequiredFieldColors();
+      const missingRequired = getMissingRedRequiredFields();
+      
+      if (missingRequired.length > 0) {
+        alert(`Cannot calculate BOM. Please fill all mandatory fields:\n\n${missingRequired.join('\n')}`);
+        return;
+      }
+
       validatePolymerSums();
       validateMaterialSelections();
 
@@ -2464,6 +2573,7 @@
       }
 
       document.getElementById('resultsSection').style.display = 'block';
+      document.getElementById('saveBomRecordToolbarBtn').style.display = '';
       
       // Scroll to results
       document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
@@ -2611,15 +2721,15 @@
     function calculateScrapPercentages() {
       const maxUsableWidth = parseFloat(document.getElementById('maxUsableWidth').value) || 0;
       const usableWidthNetto = parseFloat(document.getElementById('usableWidth').value) || 0;
-      const webLoss = parseFloat(document.getElementById('webLossPercent').value) || 0;
+      const edgeTrim = parseFloat(document.getElementById('edgeTrimPercent').value) || 0;
       const otherScrap = parseFloat(document.getElementById('otherScrapPercent').value) || 0;
 
-      // Calculate Edge trim (%) = (1 - (usableWidthNetto / maxUsableWidth)) * 100
-      let edgeTrim = 0;
+      // Calculate Web loss (%) = (1 - (usableWidthNetto / maxUsableWidth)) * 100
+      let webLoss = 0;
       if (maxUsableWidth > 0 && usableWidthNetto > 0 && usableWidthNetto <= maxUsableWidth) {
-        edgeTrim = (1 - (usableWidthNetto / maxUsableWidth)) * 100;
+        webLoss = (1 - (usableWidthNetto / maxUsableWidth)) * 100;
       }
-      document.getElementById('edgeTrimPercent').value = edgeTrim.toFixed(2);
+      document.getElementById('webLossPercent').value = webLoss.toFixed(2);
 
       // Calculate Total Scrap (%) = Edge trim + Web loss + Other scrap
       const totalScrap = edgeTrim + webLoss + otherScrap;
@@ -2634,7 +2744,7 @@
       // Add event listeners to fields that affect scrap calculations
       document.getElementById('maxUsableWidth').addEventListener('input', calculateScrapPercentages);
       document.getElementById('usableWidth').addEventListener('input', calculateScrapPercentages);
-      document.getElementById('webLossPercent').addEventListener('input', calculateScrapPercentages);
+      document.getElementById('edgeTrimPercent').addEventListener('input', calculateScrapPercentages);
       document.getElementById('otherScrapPercent').addEventListener('input', calculateScrapPercentages);
 
       // Initial calculation
@@ -2737,10 +2847,11 @@
         input.placeholder = '%'; // Restore placeholder
       });
       
-      // Remove column-disabled class from all cells
+      // Remove column-disabled class from all cells and reset background colors
       const allCells = Array.from(row.querySelectorAll('td'));
       allCells.forEach(cell => {
         cell.classList.remove('column-disabled');
+        cell.style.backgroundColor = ''; // Reset background color to white
       });
       
       // Reset row background
@@ -2887,7 +2998,7 @@
       
       if (selectedType === 'SB' && materialLists.list_sb) {
         console.log('Populating SB list:', materialLists.list_sb.length, 'items');
-        materialLists.list_sb.forEach(material => {
+        sortValuesForDisplay(materialLists.list_sb).forEach(material => {
           const option = document.createElement('option');
           option.value = material;
           option.textContent = material;
@@ -2895,7 +3006,7 @@
         });
       } else if (selectedType === 'MB' && materialLists.list_mb) {
         console.log('Populating MB list:', materialLists.list_mb.length, 'items');
-        materialLists.list_mb.forEach(material => {
+        sortValuesForDisplay(materialLists.list_mb).forEach(material => {
           const option = document.createElement('option');
           option.value = material;
           option.textContent = material;
@@ -2903,7 +3014,7 @@
         });
       } else if (selectedType === 'Pigment' && materialLists.list_pigment) {
         console.log('Populating Pigment list:', materialLists.list_pigment.length, 'items');
-        materialLists.list_pigment.forEach(material => {
+        sortValuesForDisplay(materialLists.list_pigment).forEach(material => {
           const option = document.createElement('option');
           option.value = material;
           option.textContent = material;
@@ -2911,7 +3022,7 @@
         });
       } else if (selectedType === 'Additive' && materialLists.list_additive) {
         console.log('Populating Additive list:', materialLists.list_additive.length, 'items');
-        materialLists.list_additive.forEach(material => {
+        sortValuesForDisplay(materialLists.list_additive).forEach(material => {
           const option = document.createElement('option');
           option.value = material;
           option.textContent = material;
@@ -2921,6 +3032,468 @@
     }
 
     let techParamsHtml = '';
+    let customerEditorLockedCount = 0;
+    let activeDescriptionListKey = '';
+    let activeDescriptionListLockedCount = 0;
+
+    const editableDescriptionListConfig = {
+      marketSegment: 'Market Segment',
+      application: 'Application',
+      smms: 'S/SMS',
+      monoBico: 'Mono/Bico',
+      structure: 'Structure',
+      bicoRatioDesc: 'Bico Ratio',
+      mainRawMat: 'Main RawMat',
+      bonding: 'Bonding',
+      treatment: 'Treatment',
+      color: 'Color'
+    };
+
+    function normalizeOptionList(values) {
+      const seen = new Set();
+      const normalized = [];
+
+      (values || []).forEach(value => {
+        const text = (value ?? '').toString().trim();
+        if (!text) {
+          return;
+        }
+
+        const key = text.toLowerCase();
+        if (seen.has(key)) {
+          return;
+        }
+
+        seen.add(key);
+        normalized.push(text);
+      });
+
+      return normalized;
+    }
+
+    function isNaDisplayValue(value) {
+      const normalized = (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '');
+
+      return normalized === 'n.a.' || normalized === 'n.a' || normalized === 'na' || normalized === 'n/a';
+    }
+
+    function sortValuesForDisplay(values) {
+      return [...(values || [])].sort((a, b) => {
+        const aIsNa = isNaDisplayValue(a);
+        const bIsNa = isNaDisplayValue(b);
+
+        if (aIsNa && !bIsNa) return 1;
+        if (!aIsNa && bIsNa) return -1;
+
+        return String(a).localeCompare(String(b), undefined, { sensitivity: 'base', numeric: true });
+      });
+    }
+
+    function setSelectOptions(selectId, values, preferredValue = null) {
+      const selectElement = document.getElementById(selectId);
+      if (!selectElement) {
+        return;
+      }
+
+      const selectedValue = preferredValue !== null ? preferredValue : selectElement.value;
+      const normalized = sortValuesForDisplay(normalizeOptionList(values));
+
+      selectElement.innerHTML = '<option value="">-- Select --</option>';
+      normalized.forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        selectElement.appendChild(option);
+      });
+
+      if (selectedValue && normalized.includes(selectedValue)) {
+        selectElement.value = selectedValue;
+      } else {
+        selectElement.value = '';
+      }
+    }
+
+    function getCustomerDropdownOptions() {
+      const selectElement = document.getElementById('customer');
+      if (!selectElement) {
+        return [];
+      }
+
+      return normalizeOptionList(Array.from(selectElement.options).map(option => option.value));
+    }
+
+    function estimateModalWidthCh(values, fallbackCh = 52, minCh = 34, maxCh = 72, extraCh = 16) {
+      const normalized = normalizeOptionList(values);
+      if (normalized.length === 0) {
+        return fallbackCh;
+      }
+
+      const longest = normalized.reduce((max, value) => Math.max(max, String(value).length), 0);
+      // Add extra space for input padding, border and breathing room.
+      return Math.max(minCh, Math.min(maxCh, longest + extraCh));
+    }
+
+    function applyDynamicModalWidth(modalId, values, options = {}) {
+      const modal = document.getElementById(modalId);
+      const content = modal?.querySelector('.modal-content');
+      if (!content) {
+        return;
+      }
+
+      const {
+        fallbackCh = 52,
+        minCh = 34,
+        maxCh = 72,
+        extraCh = 16,
+        maxWidthPx = null,
+        minWidthPx = null
+      } = options;
+
+      const widthCh = estimateModalWidthCh(values, fallbackCh, minCh, maxCh, extraCh);
+      content.style.setProperty('--modal-width-ch', `${widthCh}ch`);
+      if (Number.isFinite(maxWidthPx)) {
+        content.style.setProperty('--modal-max-width', `${maxWidthPx}px`);
+      }
+      if (Number.isFinite(minWidthPx)) {
+        content.style.setProperty('--modal-min-width', `${minWidthPx}px`);
+      }
+    }
+
+    async function fetchSharedCustomerOptions() {
+      const response = await fetch('/api/bom/customers');
+      if (!response.ok) {
+        throw new Error('Failed to load shared customer list');
+      }
+
+      const payload = await response.json();
+      return normalizeOptionList(payload.customers || []);
+    }
+
+    async function initializeCustomerOptions() {
+      try {
+        const sharedOptions = await fetchSharedCustomerOptions();
+        setSelectOptions('customer', sharedOptions);
+      } catch (error) {
+        console.error('Failed to load shared customer list:', error);
+        setSelectOptions('customer', []);
+      }
+    }
+
+    function createCustomerEditorRow(value = '') {
+      const list = document.getElementById('customerEditorList');
+      if (!list) {
+        return;
+      }
+
+      const row = document.createElement('div');
+      row.className = 'customer-editor-row';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'customer-editor-input';
+      input.placeholder = 'Customer name';
+      input.value = value;
+
+      row.appendChild(input);
+      list.appendChild(row);
+    }
+
+    function renderCustomerEditorRows(values) {
+      const list = document.getElementById('customerEditorList');
+      if (!list) {
+        return;
+      }
+
+      list.innerHTML = '';
+      const normalized = normalizeOptionList(values);
+
+      if (normalized.length === 0) {
+        createCustomerEditorRow('');
+        return;
+      }
+
+      normalized.forEach(value => createCustomerEditorRow(value));
+    }
+
+    function openCustomerModal() {
+      const modal = document.getElementById('customerModal');
+      if (!modal) {
+        return;
+      }
+
+      const currentCustomers = getCustomerDropdownOptions();
+      customerEditorLockedCount = currentCustomers.length;
+      renderCustomerEditorRows(currentCustomers);
+      applyDynamicModalWidth('customerModal', currentCustomers, { fallbackCh: 48, minCh: 34, maxCh: 72, extraCh: 16, maxWidthPx: 760, minWidthPx: 340 });
+      modal.classList.add('active');
+    }
+
+    function closeCustomerModal() {
+      const modal = document.getElementById('customerModal');
+      if (modal) {
+        modal.classList.remove('active');
+      }
+    }
+
+    function addCustomerRow() {
+      createCustomerEditorRow('');
+    }
+
+    function hasCaseInsensitiveDuplicates(values) {
+      const seen = new Set();
+
+      for (const value of values) {
+        const key = value.toLowerCase();
+        if (seen.has(key)) {
+          return true;
+        }
+        seen.add(key);
+      }
+
+      return false;
+    }
+
+    async function saveCustomerList() {
+      const inputs = Array.from(document.querySelectorAll('#customerEditorList .customer-editor-input'));
+      const enteredValues = inputs.map(input => (input.value || '').trim());
+
+      if (inputs.length < customerEditorLockedCount) {
+        alert('Removing existing customers is not allowed.');
+        return;
+      }
+
+      for (let i = 0; i < customerEditorLockedCount; i++) {
+        if (!enteredValues[i]) {
+          alert('Existing customers cannot be removed. Please keep names filled or rename them.');
+          return;
+        }
+      }
+
+      const nonEmptyValues = enteredValues.filter(Boolean);
+      if (hasCaseInsensitiveDuplicates(nonEmptyValues)) {
+        alert('Duplicate customer names are not allowed.');
+        return;
+      }
+
+      const normalized = normalizeOptionList(nonEmptyValues);
+
+      if (normalized.length === 0) {
+        alert('Add at least one customer name before saving.');
+        return;
+      }
+
+      const currentValue = document.getElementById('customer')?.value || '';
+      try {
+        const response = await fetch('/api/bom/customers', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ customers: normalized })
+        });
+
+        if (!response.ok) {
+          const errorPayload = await response.json().catch(() => ({}));
+          const message = errorPayload.error || 'Failed to save shared customer list.';
+          throw new Error(message);
+        }
+
+        setSelectOptions('customer', normalized, currentValue);
+        closeCustomerModal();
+      } catch (error) {
+        console.error('Error saving shared customer list:', error);
+        alert(`Failed to save customer list: ${error.message}`);
+      }
+    }
+
+    function attachDescriptionListManagementLinks() {
+      Object.entries(editableDescriptionListConfig).forEach(([fieldId, labelText]) => {
+        const selectElement = document.getElementById(fieldId);
+        const fieldWrapper = selectElement?.closest('.input-field');
+        if (!selectElement || !fieldWrapper) {
+          return;
+        }
+
+        if (fieldWrapper.querySelector('.description-list-edit-link')) {
+          return;
+        }
+
+        const label = fieldWrapper.querySelector(`label[for="${fieldId}"]`);
+        if (!label) {
+          return;
+        }
+
+        label.classList.add('line-field-label');
+        label.style.margin = '0';
+
+        const header = document.createElement('div');
+        header.className = 'line-field-header';
+
+        const link = document.createElement('a');
+        link.href = '#';
+        link.className = 'line-parameters-link description-list-edit-link';
+        link.textContent = 'Edit List';
+        link.onclick = (event) => {
+          event.preventDefault();
+          openDescriptionListModal(fieldId);
+        };
+
+        header.appendChild(label);
+        header.appendChild(link);
+        fieldWrapper.insertBefore(header, selectElement);
+      });
+    }
+
+    function getDropdownOptionsByFieldId(fieldId) {
+      const selectElement = document.getElementById(fieldId);
+      if (!selectElement) {
+        return [];
+      }
+
+      return normalizeOptionList(Array.from(selectElement.options).map(option => option.value));
+    }
+
+    function renderDescriptionListEditorRows(values) {
+      const list = document.getElementById('descriptionListEditorList');
+      if (!list) {
+        return;
+      }
+
+      list.innerHTML = '';
+      const normalized = normalizeOptionList(values);
+
+      if (normalized.length === 0) {
+        const row = document.createElement('div');
+        row.className = 'customer-editor-row';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'description-list-editor-input';
+        input.placeholder = 'List value';
+
+        row.appendChild(input);
+        list.appendChild(row);
+        return;
+      }
+
+      normalized.forEach(value => {
+        const row = document.createElement('div');
+        row.className = 'customer-editor-row';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'description-list-editor-input';
+        input.placeholder = 'List value';
+        input.value = value;
+
+        row.appendChild(input);
+        list.appendChild(row);
+      });
+    }
+
+    function openDescriptionListModal(fieldId) {
+      const modal = document.getElementById('descriptionListModal');
+      const title = document.getElementById('descriptionListModalTitle');
+      if (!modal || !title || !editableDescriptionListConfig[fieldId]) {
+        return;
+      }
+
+      const currentValues = getDropdownOptionsByFieldId(fieldId);
+      activeDescriptionListKey = fieldId;
+      activeDescriptionListLockedCount = currentValues.length;
+      title.textContent = `Edit ${editableDescriptionListConfig[fieldId]} List`;
+      renderDescriptionListEditorRows(currentValues);
+      applyDynamicModalWidth('descriptionListModal', currentValues, { fallbackCh: 48, minCh: 34, maxCh: 72, extraCh: 16, maxWidthPx: 700, minWidthPx: 340 });
+      modal.classList.add('active');
+    }
+
+    function closeDescriptionListModal() {
+      const modal = document.getElementById('descriptionListModal');
+      if (modal) {
+        modal.classList.remove('active');
+      }
+    }
+
+    function addDescriptionListRow() {
+      const list = document.getElementById('descriptionListEditorList');
+      if (!list) {
+        return;
+      }
+
+      const row = document.createElement('div');
+      row.className = 'customer-editor-row';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'description-list-editor-input';
+      input.placeholder = 'List value';
+
+      row.appendChild(input);
+      list.appendChild(row);
+      input.focus();
+    }
+
+    async function saveDescriptionListValues() {
+      const fieldId = activeDescriptionListKey;
+      if (!fieldId) {
+        return;
+      }
+
+      const inputs = Array.from(document.querySelectorAll('#descriptionListEditorList .description-list-editor-input'));
+      const enteredValues = inputs.map(input => (input.value || '').trim());
+
+      if (inputs.length < activeDescriptionListLockedCount) {
+        alert('Removing existing values is not allowed.');
+        return;
+      }
+
+      for (let i = 0; i < activeDescriptionListLockedCount; i++) {
+        if (!enteredValues[i]) {
+          alert('Existing values cannot be removed. Keep them filled or rename them.');
+          return;
+        }
+      }
+
+      const nonEmptyValues = enteredValues.filter(Boolean);
+      if (hasCaseInsensitiveDuplicates(nonEmptyValues)) {
+        alert('Duplicate values are not allowed.');
+        return;
+      }
+
+      const normalized = normalizeOptionList(nonEmptyValues);
+      if (normalized.length === 0) {
+        alert('Add at least one value before saving.');
+        return;
+      }
+
+      const currentValue = document.getElementById(fieldId)?.value || '';
+
+      try {
+        const response = await fetch(`/api/bom/description-lists/${encodeURIComponent(fieldId)}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ values: normalized })
+        });
+
+        if (!response.ok) {
+          const errorPayload = await response.json().catch(() => ({}));
+          throw new Error(errorPayload.error || 'Failed to save list.');
+        }
+
+        const payload = await response.json();
+        setSelectOptions(fieldId, payload.values || normalized, currentValue);
+        closeDescriptionListModal();
+      } catch (error) {
+        console.error('Error saving description list:', error);
+        alert(`Failed to save list: ${error.message}`);
+      }
+    }
 
     function normalizeSheetName(name) {
       return (name || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -2978,6 +3551,11 @@
         content.innerHTML = techParamsHtml;
       }
 
+      // Prefer wide modal for table-heavy TechParams while staying viewport responsive.
+      const columnCount = Math.max((techParamsHtml.match(/<th/gi) || []).length, (techParamsHtml.match(/<td/gi) || []).length / 10);
+      const approxValues = [String(Math.round(columnCount)) + ' columns'];
+      applyDynamicModalWidth('techParamsModal', approxValues, { fallbackCh: 120, minCh: 80, maxCh: 150, extraCh: 80, maxWidthPx: 1400, minWidthPx: 560 });
+
       modal.classList.add('active');
     }
 
@@ -2988,106 +3566,42 @@
       }
     }
 
-    // Load description dropdown lists from source workbook
-    async function loadDescriptionLists() {
+    async function loadTechParamsPreview() {
       try {
         const workbookData = await loadWorkbookFromDataFolder();
         if (!workbookData) {
-          console.error('Failed to fetch workbook from /data/File Sources.xlsx or /data/Sources.xlsx');
+          console.error('Failed to fetch workbook for TechParams preview.');
           return;
         }
 
-        const workbook = workbookData.workbook;
-        const sourcePath = workbookData.sourcePath;
-        cacheTechParamsSheet(workbook, sourcePath);
-        
-        const listsSheet = findSheetByName(workbook, 'Lists');
-        if (!listsSheet) {
-          console.warn(`Lists sheet not found in ${sourcePath}`);
-          return;
+        cacheTechParamsSheet(workbookData.workbook, workbookData.sourcePath);
+      } catch (error) {
+        console.error('Error loading TechParams preview:', error);
+      }
+    }
+
+    // Load description dropdown lists from shared API (DB-backed)
+    async function loadDescriptionLists() {
+      try {
+        await initializeCustomerOptions();
+
+        const response = await fetch('/api/bom/description-lists');
+        if (!response.ok) {
+          throw new Error('Failed to load description lists');
         }
 
-        // Read all data from the Lists sheet
-        const data = XLSX.utils.sheet_to_json(listsSheet, { header: 1 });
-        console.log('Description lists data loaded:', data.length, 'rows');
-        
-        // Extract field names from the first row (header)
-        const headers = data[0] || [];
-        console.log('Headers found:', headers);
-        
-        const fieldMap = {
-          'Customer': 'customer',
-          'Segment': 'marketSegment',
-          'Application': 'application',
-          'S/SMS': 'smms',
-          'Mono/Bico': 'monoBico',
-          'Structure': 'structure',
-          'Main RawMat': 'mainRawMat',
-          'Bonding': 'bonding',
-          'BICO_ratio': 'bicoRatioDesc',
-          'Treatment': 'treatment',
-          'Color': 'color',
-          'Cores': 'cores',
-          'Line': 'line'
-        };
+        const payload = await response.json();
+        const lists = payload.lists || {};
 
-        // Process each field
-        for (const [fieldName, fieldId] of Object.entries(fieldMap)) {
-          const columnIndex = headers.indexOf(fieldName);
-          if (columnIndex === -1) {
-            console.warn('Column not found:', fieldName);
-            continue;
-          }
+        const listFieldIds = [
+          'marketSegment', 'application', 'smms', 'monoBico',
+          'structure', 'bicoRatioDesc', 'mainRawMat', 'bonding',
+          'treatment', 'color', 'line', 'cores'
+        ];
 
-          // Extract values from this column (skip header row)
-          const values = [];
-          for (let i = 1; i < data.length; i++) {
-            const value = data[i][columnIndex];
-            if (value && value.toString().trim() !== '') {
-              values.push(value.toString().trim());
-            }
-          }
-
-          // Remove duplicates while preserving source order
-          const uniqueValues = [...new Set(values)];
-          console.log(`Field '${fieldName}': ${uniqueValues.length} unique values`);
-
-          // Populate the dropdown
-          const selectElement = document.getElementById(fieldId);
-          if (selectElement) {
-            selectElement.innerHTML = '<option value="">-- Select --</option>';
-            uniqueValues.forEach(value => {
-              const option = document.createElement('option');
-              option.value = value;
-              option.textContent = value;
-              selectElement.appendChild(option);
-            });
-          }
-        }
-        
-        // Special handling for bicoRatioD: populate with same values as bicoRatioDesc and preselect "n.a."
-        const bicoRatioDescSelect = document.getElementById('bicoRatioDesc');
-        const bicoRatioDSelect = document.getElementById('bicoRatioD');
-        if (bicoRatioDescSelect && bicoRatioDSelect) {
-          // Clone all options from bicoRatioDesc to bicoRatioD
-          bicoRatioDSelect.innerHTML = '';
-          Array.from(bicoRatioDescSelect.options).forEach(option => {
-            const newOption = document.createElement('option');
-            newOption.value = option.value;
-            newOption.textContent = option.textContent;
-            bicoRatioDSelect.appendChild(newOption);
-          });
-          
-          // Preselect "n.a." in bicoRatioD if it exists
-          const naOption = Array.from(bicoRatioDSelect.options).find(opt => 
-            opt.value.toLowerCase() === 'n.a.' || opt.value.toLowerCase() === 'n.a'
-          );
-          
-          if (naOption) {
-            bicoRatioDSelect.value = naOption.value;
-          }
-        }
-        
+        listFieldIds.forEach(fieldId => {
+          setSelectOptions(fieldId, lists[fieldId] || []);
+        });
       } catch (error) {
         console.error('Error loading description lists:', error);
       }
@@ -3095,16 +3609,19 @@
 
     // Initialize on page load
     window.addEventListener('load', () => {
-      // Ensure XLSX is loaded before calling loadDescriptionLists
+      attachDescriptionListManagementLinks();
+      loadDescriptionLists();
+
+      // Ensure XLSX is loaded before calling TechParams-related loaders
       if (typeof XLSX !== 'undefined') {
-        loadDescriptionLists();
+        loadTechParamsPreview();
         loadLineParameters();
       } else {
         console.warn('XLSX library not loaded, waiting...');
         // Try again after a short delay
         setTimeout(() => {
           if (typeof XLSX !== 'undefined') {
-            loadDescriptionLists();
+            loadTechParamsPreview();
             loadLineParameters();
           } else {
             console.error('XLSX library failed to load');
@@ -3120,8 +3637,8 @@
       initializeBICORatioValidation();
       initializeScrapCalculations();
       initializeThroughputCalculations();
+      initializeBeamCountOverrides();
       calculateNetPolymer();
-      updateLine12DependentFields();
     });
 
     // ===== SAVE/LOAD FUNCTIONALITY =====
@@ -3218,10 +3735,9 @@
 
       // Gather Description section
       const descriptionFields = [
-        'pdId', 'sapId', 'sapIdSimilar', 'customer', 'marketSegment', 'application',
-        'smms', 'monoBico', 'structure', 'mainRawMat', 'bonding', 'bicoRatioDesc', 'bicoRatioD',
-        'treatment', 'crystallizer1', 'crystallizer2Bico', 'mainMaterialDryer',
-        'sideMaterialDryerBico', 'additiveDryer1', 'additiveDryer2', 'additiveDryer3',
+        'pdId', 'sapId', 'customer', 'marketSegment', 'application',
+        'smms', 'monoBico', 'structure', 'mainRawMat', 'bonding', 'bicoRatioDesc',
+        'treatment',
         'color', 'cores', 'line', 'lineWidth', 'adjustedEffectiveWidth', 'lineConfiguration', 'slitWidth', 'beltBW',
         'mbGrams', 'lengthMeters', 'rollDiameter', 'sikoPercent', 'reproPercent',
         'beltSpeed', 'maxUsableWidth', 'usableWidth', 'webLossPercent', 
@@ -3449,8 +3965,6 @@
     }
 
     function refreshAllCalculations() {
-      updateLine12DependentFields();
-
       // Populate line parameters if line is selected
       if (document.getElementById('line').value) {
         populateLineParameters();
@@ -3553,6 +4067,7 @@
       const nameParts = [customer, marketSegment, sOrSms, application, basisWeight, bonding, color]
         .filter(part => part && part.toLowerCase() !== 'n.a.');
       nameInput.value = nameParts.join(' ');
+      applyDynamicModalWidth('saveModal', nameParts, { fallbackCh: 46, minCh: 34, maxCh: 74, extraCh: 14, maxWidthPx: 860, minWidthPx: 340 });
     }
 
     function closeSaveModal() {
@@ -3632,6 +4147,13 @@
         `;
         listContainer.appendChild(item);
       });
+
+      const widthHints = wipData.map(dataset => [
+        dataset.name,
+        dataset.description?.customer,
+        dataset.description?.application
+      ].filter(Boolean).join(' | '));
+      applyDynamicModalWidth('loadModal', widthHints, { fallbackCh: 64, minCh: 40, maxCh: 96, extraCh: 18, maxWidthPx: 1040, minWidthPx: 380 });
 
       document.getElementById('loadModal').classList.add('active');
     }
@@ -3715,6 +4237,158 @@
       }
     });
 
+    // ==================== BOM RECORD SAVE ====================
+
+    function collectBomRecord() {
+      const g = (id) => (document.getElementById(id)?.value || '').trim();
+      const n = (id) => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? null : v; };
+
+      const record = {
+        sap_id: g('sapId'),
+        pd_id: g('pdId'),
+        customer: g('customer'),
+        market_segment: g('marketSegment'),
+        application: g('application'),
+        smms: g('smms'),
+        mono_bico: g('monoBico'),
+        structure: g('structure'),
+        bico_ratio_desc: g('bicoRatioDesc'),
+        main_raw_mat: g('mainRawMat'),
+        treatment: g('treatment'),
+        color: g('color'),
+        bonding: g('bonding'),
+        customer_bw: n('totalGSM'),
+        belt_bw: n('beltBW'),
+        mb_grams: n('mbGrams'),
+        line: g('line'),
+        belt_speed: n('beltSpeed'),
+        siko_percent: n('sikoPercent'),
+        repro_percent: n('reproPercent'),
+        max_usable_width: n('maxUsableWidth'),
+        usable_width: n('usableWidth'),
+        edge_trim_percent: n('edgeTrimPercent'),
+        web_loss_percent: n('webLossPercent'),
+        other_scrap_percent: n('otherScrapPercent'),
+        total_scrap_percent: n('totalScrapPercent'),
+        gross_yield_percent: n('grossYieldPercent'),
+        s_beams: n('sBeams'),
+        m_beams: n('mBeams'),
+        sb_throughput: n('sbThroughput'),
+        mb_throughput: n('mbThroughput'),
+        total_throughput: n('totalThroughput'),
+        production_time: n('productionTime'),
+        cores: g('cores'),
+        slit_width: n('slitWidth'),
+        length_meters: n('lengthMeters'),
+        roll_diameter: n('rollDiameter'),
+        target_production: n('targetProduction'),
+        target_unit: g('targetUnit'),
+        notes: g('notes')
+      };
+
+      const materials = [];
+      const rows = document.querySelectorAll('#resultsBody tr');
+      rows.forEach((row, idx) => {
+        if (row.classList.contains('total-row')) return;
+        const cells = row.querySelectorAll('td');
+        // Material rows have exactly 4 cells; summary rows use colspan and won't have 4 separate tds
+        if (cells.length !== 4) return;
+        const strong = cells[0].querySelector('strong');
+        if (!strong) return;
+        const materialLabel = strong.textContent.trim();
+        const materialName = cells[1].textContent.trim();
+        const pct = parseFloat(cells[3].textContent.replace('%', '').trim());
+        if (!isNaN(pct)) {
+          materials.push({ material_label: materialLabel, material_name: materialName, percentage: pct, sort_order: idx });
+        }
+      });
+
+      return { record, materials };
+    }
+
+    function openSaveBomRecordModal() {
+      const { record, materials } = collectBomRecord();
+      const summaryEl = document.getElementById('saveBomRecordSummary');
+      const statusEl = document.getElementById('saveBomRecordStatus');
+      statusEl.textContent = '';
+
+      const lines = [];
+      if (record.pd_id) lines.push(`<strong>PD ID:</strong> ${record.pd_id}`);
+      if (record.customer) lines.push(`<strong>Customer:</strong> ${record.customer}`);
+      if (record.line) lines.push(`<strong>Line:</strong> ${record.line}`);
+      if (record.smms) lines.push(`<strong>S/SMS:</strong> ${record.smms}`);
+      if (record.customer_bw != null) lines.push(`<strong>Customer BW:</strong> ${record.customer_bw}`);
+      if (record.target_production != null) lines.push(`<strong>Min. batch size:</strong> ${record.target_production} ${record.target_unit || ''}`);
+      lines.push(`<strong>Materials in result:</strong> ${materials.length}`);
+
+      summaryEl.innerHTML = lines.join('<br>');
+      const widthHints = [record.pd_id, record.customer, record.line, record.smms, String(record.customer_bw || ''), String(record.target_production || '')].filter(Boolean);
+      applyDynamicModalWidth('saveBomRecordModal', widthHints, { fallbackCh: 50, minCh: 36, maxCh: 78, extraCh: 16, maxWidthPx: 920, minWidthPx: 360 });
+      document.getElementById('saveBomRecordModal').style.display = 'flex';
+    }
+
+    function closeSaveBomRecordModal() {
+      document.getElementById('saveBomRecordModal').style.display = 'none';
+    }
+
+    async function saveBomRecord() {
+      const token = localStorage.getItem('authToken');
+      const statusEl = document.getElementById('saveBomRecordStatus');
+      const btn = document.getElementById('saveBomRecordBtn');
+      statusEl.textContent = '';
+      btn.disabled = true;
+
+      try {
+        refreshRequiredFieldColors();
+        
+        // Validate PD ID - must be numeric only
+        const pdIdInput = document.getElementById('pdId');
+        if (pdIdInput && pdIdInput.value.trim()) {
+          const pdIdValue = pdIdInput.value.trim();
+          if (!/^\d+$/.test(pdIdValue)) {
+            statusEl.textContent = 'PD ID must contain only numeric characters (0-9).';
+            btn.disabled = false;
+            return;
+          }
+        }
+        
+        const missingRequired = getMissingRedRequiredFields();
+        if (missingRequired.length > 0) {
+          statusEl.textContent = `Please fill all mandatory fields first: ${missingRequired.join(', ')}`;
+          btn.disabled = false;
+          return;
+        }
+
+        const { record, materials } = collectBomRecord();
+
+        if (materials.length === 0) {
+          statusEl.textContent = 'No calculation results found. Please run the calculation first.';
+          btn.disabled = false;
+          return;
+        }
+
+        const response = await fetch('/api/bom/records', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ record, materials })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          const detail = data.details ? ` (${data.details})` : '';
+          statusEl.textContent = (data.error || 'Failed to save BOM record.') + detail;
+          btn.disabled = false;
+          return;
+        }
+
+        closeSaveBomRecordModal();
+        alert(`BOM record saved successfully (ID: ${data.id}).`);
+      } catch (err) {
+        statusEl.textContent = 'Network error. Please try again.';
+        btn.disabled = false;
+      }
+    }
+
   </script>
 
   <script src="auth.js"></script>
@@ -3758,6 +4432,56 @@
         <button class="modal-close" onclick="closeTechParamsModal()">&times;</button>
       </div>
       <div id="techParamsContent" class="techparams-sheet-wrap"></div>
+    </div>
+  </div>
+
+  <!-- Customer Management Modal -->
+  <div id="customerModal" class="modal-overlay" onclick="if (event.target === this) closeCustomerModal()">
+    <div class="modal-content customer-modal-content">
+      <div class="modal-header">
+        <h2>Manage Customers</h2>
+        <button class="modal-close" onclick="closeCustomerModal()">&times;</button>
+      </div>
+      <p class="customer-editor-help">Rename existing customer names and add new ones. Deletion is intentionally disabled.</p>
+      <div id="customerEditorList" class="customer-editor-list"></div>
+      <div class="save-actions">
+        <button class="btn-primary" onclick="addCustomerRow()">+ Add Customer</button>
+        <button class="btn-success" onclick="saveCustomerList()">Save</button>
+        <button class="btn-secondary" onclick="closeCustomerModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Description List Editor Modal -->
+  <div id="descriptionListModal" class="modal-overlay" onclick="if (event.target === this) closeDescriptionListModal()">
+    <div class="modal-content customer-modal-content">
+      <div class="modal-header">
+        <h2 id="descriptionListModalTitle">Edit List</h2>
+        <button class="modal-close" onclick="closeDescriptionListModal()">&times;</button>
+      </div>
+      <p class="customer-editor-help">Rename existing values and add new ones. Deletion is intentionally disabled.</p>
+      <div id="descriptionListEditorList" class="customer-editor-list"></div>
+      <div class="save-actions">
+        <button class="btn-primary" onclick="addDescriptionListRow()">+ Add Value</button>
+        <button class="btn-success" onclick="saveDescriptionListValues()">Save</button>
+        <button class="btn-secondary" onclick="closeDescriptionListModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save BOM Record Modal -->
+  <div id="saveBomRecordModal" class="modal-overlay" onclick="if (event.target === this) closeSaveBomRecordModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Save BOM Record</h2>
+        <button class="modal-close" onclick="closeSaveBomRecordModal()">&times;</button>
+      </div>
+      <div id="saveBomRecordSummary" style="margin: 12px 0; padding: 12px; background: #f5f5f5; border-radius: 6px; font-size: 0.95em; line-height: 1.7;"></div>
+      <p id="saveBomRecordStatus" style="color: #c62828; font-weight: 600; margin: 4px 0; min-height: 1.4em;"></p>
+      <div class="save-actions">
+        <button id="saveBomRecordBtn" class="btn-success" onclick="saveBomRecord()">Save to Database</button>
+        <button class="btn-secondary" onclick="closeSaveBomRecordModal()">Cancel</button>
+      </div>
     </div>
   </div>
 

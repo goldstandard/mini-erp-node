@@ -1,6 +1,7 @@
 const express = require("express");
 const path = require("path");
 const cors = require("cors");
+const fs = require("fs");
 
 const { computeCosts } = require("./src/backend/costing");
 const { loadProducts } = require("./src/backend/products");
@@ -8,11 +9,644 @@ const { loadLines } = require("./src/backend/lines");
 const { loadMaterials } = require("./src/backend/materials");
 const { loadFxRates } = require("./src/backend/fx");
 const { getEditableProducts, updateProduct, searchProducts, duplicateProduct, deleteProduct } = require("./src/backend/products-editor");
+const db = require("./src/backend/db/connection");
 const auth = require("./src/backend/auth");
 const polymerIndexes = require("./src/backend/polymer-indexes");
 const XLSX = require("xlsx");
 
 const app = express();
+
+const CUSTOMER_LIST_FILE_PATH = path.join(__dirname, "data", "customer-list.json");
+let customerStoreInitPromise = null;
+let bomListStoreInitPromise = null;
+let bomRecordStoreInitPromise = null;
+
+const DESCRIPTION_LIST_CONFIG = [
+  { key: "marketSegment", sourceHeader: "Segment", editable: 1 },
+  { key: "application", sourceHeader: "Application", editable: 1 },
+  { key: "smms", sourceHeader: "S/SMS", editable: 1 },
+  { key: "monoBico", sourceHeader: "Mono/Bico", editable: 1 },
+  { key: "structure", sourceHeader: "Structure", editable: 1 },
+  { key: "bicoRatioDesc", sourceHeader: "BICO_ratio", editable: 1 },
+  { key: "mainRawMat", sourceHeader: "Main RawMat", editable: 1 },
+  { key: "bonding", sourceHeader: "Bonding", editable: 1 },
+  { key: "treatment", sourceHeader: "Treatment", editable: 1 },
+  { key: "color", sourceHeader: "Color", editable: 1 },
+  { key: "line", sourceHeader: "Line", editable: 0 },
+  { key: "cores", sourceHeader: "Cores", editable: 0 }
+];
+
+const MATERIAL_LIST_CONFIG = [
+  { key: "list_sb", columnIndex: 0 },
+  { key: "list_mb", columnIndex: 1 },
+  { key: "list_pigment", columnIndex: 2 },
+  { key: "list_additive", columnIndex: 3 },
+  { key: "list_surfactant", columnIndex: 4, numericColumnIndex: 5 }
+];
+
+function normalizeUniqueStrings(values) {
+  const seen = new Set();
+  const normalized = [];
+
+  (values || []).forEach((value) => {
+    const text = (value ?? "").toString().trim();
+    if (!text) return;
+
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+
+    seen.add(key);
+    normalized.push(text);
+  });
+
+  return normalized;
+}
+
+function isNaDisplayValue(value) {
+  const normalized = (value ?? "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+  return normalized === "n.a." || normalized === "n.a" || normalized === "na" || normalized === "n/a";
+}
+
+function sortValuesForDisplay(values) {
+  return [...(values || [])].sort((a, b) => {
+    const aIsNa = isNaDisplayValue(a);
+    const bIsNa = isNaDisplayValue(b);
+
+    if (aIsNa && !bIsNa) return 1;
+    if (!aIsNa && bIsNa) return -1;
+
+    return String(a).localeCompare(String(b), undefined, { sensitivity: "base", numeric: true });
+  });
+}
+
+function readLegacyCustomerListFile() {
+  try {
+    if (!fs.existsSync(CUSTOMER_LIST_FILE_PATH)) {
+      return [];
+    }
+
+    const raw = fs.readFileSync(CUSTOMER_LIST_FILE_PATH, "utf-8");
+    const parsed = JSON.parse(raw);
+    const list = Array.isArray(parsed) ? parsed : parsed.customers;
+
+    return normalizeUniqueStrings(Array.isArray(list) ? list : []);
+  } catch (err) {
+    console.error("Error reading legacy customer list file:", err);
+    return [];
+  }
+}
+
+function hasCaseInsensitiveDuplicates(values) {
+  const seen = new Set();
+
+  for (const value of values || []) {
+    const text = (value ?? "").toString().trim();
+    if (!text) {
+      continue;
+    }
+
+    const key = text.toLowerCase();
+    if (seen.has(key)) {
+      return true;
+    }
+
+    seen.add(key);
+  }
+
+  return false;
+}
+
+function getCustomerSeedValuesFromSources() {
+  const sourceData = getListsSheetRowsFromSources();
+  const headerMap = new Map(
+    (sourceData.headers || []).map((header, index) => [normalizeHeaderText(header), index])
+  );
+
+  const customerColumnIndex = headerMap.get("customer");
+  if (customerColumnIndex === undefined) {
+    return [];
+  }
+
+  return normalizeUniqueStrings(sourceData.rows.map((row) => row[customerColumnIndex]));
+}
+
+function getCustomerSeedValuesFromProducts() {
+  try {
+    const products = loadProducts();
+    return normalizeUniqueStrings((products || []).map((item) => item.customer));
+  } catch (err) {
+    console.warn("Customer seed from products failed:", err.message || err);
+    return [];
+  }
+}
+
+function normalizeHeaderText(value) {
+  return (value || "").toString().trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function getListsSheetRowsFromSources() {
+  const sourceCandidates = [
+    path.join(__dirname, "data", "File Sources.xlsx"),
+    path.join(__dirname, "data", "Sources.xlsx")
+  ];
+
+  for (const sourcePath of sourceCandidates) {
+    if (!fs.existsSync(sourcePath)) {
+      continue;
+    }
+
+    const workbook = XLSX.readFile(sourcePath);
+    const listsSheetName = (workbook.SheetNames || []).find((name) => normalizeHeaderText(name) === "lists");
+    if (!listsSheetName) {
+      continue;
+    }
+
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[listsSheetName], { header: 1, defval: "" });
+    const headers = rows[0] || [];
+    return {
+      headers,
+      rows: rows.slice(1)
+    };
+  }
+
+  return {
+    headers: [],
+    rows: []
+  };
+}
+
+async function ensureBomListStoreReady() {
+  if (!bomListStoreInitPromise) {
+    bomListStoreInitPromise = (async () => {
+      await db.init();
+
+      await db.run(`
+        CREATE TABLE IF NOT EXISTS bom_dropdown_lists (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          list_key TEXT NOT NULL UNIQUE,
+          list_group TEXT NOT NULL,
+          editable INTEGER NOT NULL DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      await db.run(`
+        CREATE TABLE IF NOT EXISTS bom_dropdown_list_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          list_id INTEGER NOT NULL,
+          value TEXT NOT NULL COLLATE NOCASE,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          numeric_value REAL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (list_id) REFERENCES bom_dropdown_lists(id) ON DELETE CASCADE,
+          UNIQUE(list_id, value)
+        )
+      `);
+
+      for (const list of DESCRIPTION_LIST_CONFIG) {
+        await db.run(
+          `INSERT INTO bom_dropdown_lists (list_key, list_group, editable)
+           VALUES (?, 'description', ?)
+           ON CONFLICT(list_key) DO UPDATE SET
+             list_group='description',
+             editable=excluded.editable,
+             updated_at=CURRENT_TIMESTAMP`,
+          [list.key, list.editable]
+        );
+      }
+
+      for (const list of MATERIAL_LIST_CONFIG) {
+        await db.run(
+          `INSERT INTO bom_dropdown_lists (list_key, list_group, editable)
+           VALUES (?, 'material', 0)
+           ON CONFLICT(list_key) DO UPDATE SET
+             list_group='material',
+             editable=0,
+             updated_at=CURRENT_TIMESTAMP`,
+          [list.key]
+        );
+      }
+
+      const sourceData = getListsSheetRowsFromSources();
+      const headerMap = new Map(
+        (sourceData.headers || []).map((header, index) => [normalizeHeaderText(header), index])
+      );
+
+      for (const list of DESCRIPTION_LIST_CONFIG) {
+        const listRow = await db.get("SELECT id FROM bom_dropdown_lists WHERE list_key = ?", [list.key]);
+        if (!listRow) {
+          continue;
+        }
+
+        const itemCountRow = await db.get(
+          "SELECT COUNT(*) AS count FROM bom_dropdown_list_items WHERE list_id = ?",
+          [listRow.id]
+        );
+        if ((itemCountRow?.count || 0) > 0) {
+          continue;
+        }
+
+        const sourceIndex = headerMap.get(normalizeHeaderText(list.sourceHeader));
+        if (sourceIndex === undefined) {
+          continue;
+        }
+
+        const values = normalizeUniqueStrings(sourceData.rows.map((row) => row[sourceIndex]));
+        for (let i = 0; i < values.length; i++) {
+          await db.run(
+            "INSERT INTO bom_dropdown_list_items (list_id, value, sort_order) VALUES (?, ?, ?)",
+            [listRow.id, values[i], i]
+          );
+        }
+      }
+
+      for (const list of MATERIAL_LIST_CONFIG) {
+        const listRow = await db.get("SELECT id FROM bom_dropdown_lists WHERE list_key = ?", [list.key]);
+        if (!listRow) {
+          continue;
+        }
+
+        const itemCountRow = await db.get(
+          "SELECT COUNT(*) AS count FROM bom_dropdown_list_items WHERE list_id = ?",
+          [listRow.id]
+        );
+        if ((itemCountRow?.count || 0) > 0) {
+          continue;
+        }
+
+        const values = [];
+        const numericMap = {};
+
+        for (const row of sourceData.rows) {
+          const rawValue = row[list.columnIndex];
+          const textValue = (rawValue ?? "").toString().trim();
+          if (!textValue) {
+            continue;
+          }
+
+          const existingIndex = values.findIndex((item) => item.toLowerCase() === textValue.toLowerCase());
+          if (existingIndex === -1) {
+            values.push(textValue);
+          }
+
+          if (list.numericColumnIndex !== undefined) {
+            const numericRaw = parseFloat(row[list.numericColumnIndex]);
+            if (Number.isFinite(numericRaw) && numericMap[textValue] === undefined) {
+              numericMap[textValue] = numericRaw;
+            }
+          }
+        }
+
+        for (let i = 0; i < values.length; i++) {
+          const value = values[i];
+          await db.run(
+            "INSERT INTO bom_dropdown_list_items (list_id, value, sort_order, numeric_value) VALUES (?, ?, ?, ?)",
+            [listRow.id, value, i, numericMap[value] ?? null]
+          );
+        }
+      }
+    })();
+  }
+
+  return bomListStoreInitPromise;
+}
+
+async function getDescriptionListValues() {
+  await ensureBomListStoreReady();
+  const rows = await db.all(`
+    SELECT l.list_key, i.value
+    FROM bom_dropdown_lists l
+    LEFT JOIN bom_dropdown_list_items i ON i.list_id = l.id
+    WHERE l.list_group = 'description'
+    ORDER BY l.list_key, i.sort_order, lower(i.value)
+  `);
+
+  const result = {};
+  DESCRIPTION_LIST_CONFIG.forEach((list) => {
+    result[list.key] = [];
+  });
+
+  rows.forEach((row) => {
+    if (row.value) {
+      result[row.list_key].push(row.value);
+    }
+  });
+
+  Object.keys(result).forEach((key) => {
+    result[key] = sortValuesForDisplay(result[key]);
+  });
+
+  return result;
+}
+
+async function saveDescriptionListValuesWithoutDeletion(listKey, values) {
+  await ensureBomListStoreReady();
+
+  const config = DESCRIPTION_LIST_CONFIG.find((item) => item.key === listKey);
+  if (!config) {
+    const error = new Error("Unknown description list key.");
+    error.code = "DESCRIPTION_LIST_UNKNOWN";
+    throw error;
+  }
+
+  if (!config.editable) {
+    const error = new Error("This list is read-only.");
+    error.code = "DESCRIPTION_LIST_READONLY";
+    throw error;
+  }
+
+  const normalized = normalizeUniqueStrings(values);
+  const listRow = await db.get("SELECT id FROM bom_dropdown_lists WHERE list_key = ?", [listKey]);
+  if (!listRow) {
+    const error = new Error("Description list not found.");
+    error.code = "DESCRIPTION_LIST_UNKNOWN";
+    throw error;
+  }
+
+  const existingRows = await db.all(
+    "SELECT id, value FROM bom_dropdown_list_items WHERE list_id = ? ORDER BY sort_order, id",
+    [listRow.id]
+  );
+
+  if (normalized.length < existingRows.length) {
+    const error = new Error("Removing existing values is not allowed.");
+    error.code = "DESCRIPTION_LIST_REMOVAL_NOT_ALLOWED";
+    throw error;
+  }
+
+  await db.run("BEGIN IMMEDIATE TRANSACTION");
+  try {
+    const timestamp = Date.now();
+
+    for (const row of existingRows) {
+      await db.run(
+        "UPDATE bom_dropdown_list_items SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [`__tmp__${row.id}__${timestamp}`, row.id]
+      );
+    }
+
+    for (let i = 0; i < existingRows.length; i++) {
+      await db.run(
+        `UPDATE bom_dropdown_list_items
+         SET value = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [normalized[i], i, existingRows[i].id]
+      );
+    }
+
+    for (let i = existingRows.length; i < normalized.length; i++) {
+      await db.run(
+        "INSERT INTO bom_dropdown_list_items (list_id, value, sort_order) VALUES (?, ?, ?)",
+        [listRow.id, normalized[i], i]
+      );
+    }
+
+    await db.run("COMMIT");
+  } catch (error) {
+    await db.run("ROLLBACK").catch(() => {});
+    throw error;
+  }
+
+  const refreshed = await getDescriptionListValues();
+  return refreshed[listKey] || [];
+}
+
+async function getMaterialListValues() {
+  await ensureBomListStoreReady();
+
+  const rows = await db.all(`
+    SELECT l.list_key, i.value, i.numeric_value
+    FROM bom_dropdown_lists l
+    LEFT JOIN bom_dropdown_list_items i ON i.list_id = l.id
+    WHERE l.list_group = 'material'
+    ORDER BY l.list_key, i.sort_order, lower(i.value)
+  `);
+
+  const payload = {
+    list_sb: [],
+    list_mb: [],
+    list_pigment: [],
+    list_additive: [],
+    list_surfactant: [],
+    surfactant_conc_map: {}
+  };
+
+  rows.forEach((row) => {
+    if (!row.value) {
+      return;
+    }
+
+    if (payload[row.list_key]) {
+      payload[row.list_key].push(row.value);
+    }
+
+    if (row.list_key === "list_surfactant") {
+      payload.surfactant_conc_map[row.value] = Number.isFinite(row.numeric_value) ? row.numeric_value : "";
+    }
+  });
+
+  payload.list_sb = sortValuesForDisplay(payload.list_sb);
+  payload.list_mb = sortValuesForDisplay(payload.list_mb);
+  payload.list_pigment = sortValuesForDisplay(payload.list_pigment);
+  payload.list_additive = sortValuesForDisplay(payload.list_additive);
+  payload.list_surfactant = sortValuesForDisplay(payload.list_surfactant);
+
+  return payload;
+}
+
+async function ensureCustomerStoreReady() {
+  if (!customerStoreInitPromise) {
+    customerStoreInitPromise = (async () => {
+      await db.init();
+
+      await db.run(`
+        CREATE TABLE IF NOT EXISTS bom_customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      const countRow = await db.get("SELECT COUNT(*) AS count FROM bom_customers");
+      const existingCount = countRow?.count || 0;
+      if (existingCount > 0) {
+        return;
+      }
+
+      const legacyCustomers = readLegacyCustomerListFile();
+      const sourceCustomers = getCustomerSeedValuesFromSources();
+      const productCustomers = getCustomerSeedValuesFromProducts();
+      const seedCustomers = normalizeUniqueStrings([
+        ...legacyCustomers,
+        ...sourceCustomers,
+        ...productCustomers
+      ]);
+
+      if (seedCustomers.length === 0) {
+        return;
+      }
+
+      await db.run("BEGIN IMMEDIATE TRANSACTION");
+      try {
+        for (const customerName of seedCustomers) {
+          await db.run("INSERT INTO bom_customers (name) VALUES (?)", [customerName]);
+        }
+        await db.run("COMMIT");
+      } catch (error) {
+        await db.run("ROLLBACK").catch(() => {});
+        throw error;
+      }
+    })();
+  }
+
+  return customerStoreInitPromise;
+}
+
+async function getCustomerRowsById() {
+  await ensureCustomerStoreReady();
+  return db.all("SELECT id, name FROM bom_customers ORDER BY id ASC");
+}
+
+async function getCustomerNames() {
+  await ensureCustomerStoreReady();
+  const rows = await db.all("SELECT name FROM bom_customers");
+  return sortValuesForDisplay(rows.map((row) => row.name));
+}
+
+async function saveCustomerNamesWithoutDeletion(customers) {
+  const normalized = normalizeUniqueStrings(customers);
+  const existingRows = await getCustomerRowsById();
+
+  if (normalized.length < existingRows.length) {
+    const error = new Error("Removing existing customers is not allowed.");
+    error.code = "CUSTOMER_REMOVAL_NOT_ALLOWED";
+    throw error;
+  }
+
+  await db.run("BEGIN IMMEDIATE TRANSACTION");
+  try {
+    const timestamp = Date.now();
+
+    // Two-phase rename avoids unique collisions during swaps (e.g. A->B and B->A).
+    for (const row of existingRows) {
+      await db.run(
+        "UPDATE bom_customers SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [`__tmp__${row.id}__${timestamp}`, row.id]
+      );
+    }
+
+    for (let i = 0; i < existingRows.length; i++) {
+      await db.run(
+        "UPDATE bom_customers SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [normalized[i], existingRows[i].id]
+      );
+    }
+
+    for (let i = existingRows.length; i < normalized.length; i++) {
+      await db.run(
+        "INSERT INTO bom_customers (name) VALUES (?)",
+        [normalized[i]]
+      );
+    }
+
+    await db.run("COMMIT");
+  } catch (error) {
+    await db.run("ROLLBACK").catch(() => {});
+    throw error;
+  }
+
+  return getCustomerNames();
+}
+
+async function ensureBomRecordStoreReady() {
+  if (!bomRecordStoreInitPromise) {
+    bomRecordStoreInitPromise = (async () => {
+      await db.init();
+
+      await db.run(`
+        CREATE TABLE IF NOT EXISTS bom_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sap_id TEXT,
+          pd_id TEXT,
+          customer TEXT,
+          market_segment TEXT,
+          application TEXT,
+          smms TEXT,
+          mono_bico TEXT,
+          structure TEXT,
+          bico_ratio_desc TEXT,
+          main_raw_mat TEXT,
+          treatment TEXT,
+          color TEXT,
+          bonding TEXT,
+          customer_bw REAL,
+          belt_bw REAL,
+          mb_grams REAL,
+          line TEXT,
+          belt_speed REAL,
+          siko_percent REAL,
+          repro_percent REAL,
+          max_usable_width REAL,
+          usable_width REAL,
+          edge_trim_percent REAL,
+          web_loss_percent REAL,
+          other_scrap_percent REAL,
+          total_scrap_percent REAL,
+          gross_yield_percent REAL,
+          s_beams INTEGER,
+          m_beams INTEGER,
+          sb_throughput REAL,
+          mb_throughput REAL,
+          total_throughput REAL,
+          production_time REAL,
+          cores TEXT,
+          slit_width REAL,
+          length_meters REAL,
+          roll_diameter REAL,
+          target_production REAL,
+          target_unit TEXT,
+          notes TEXT,
+          author TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          created_by INTEGER
+        )
+      `);
+
+      // Migration: Add author column if it doesn't exist
+      try {
+        await db.run('ALTER TABLE bom_records ADD COLUMN author TEXT');
+        console.log('[MIGRATION] Added author column to bom_records');
+      } catch (err) {
+        // Column already exists, that's fine
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding author column:', err.message);
+        }
+      };
+
+      await db.run(`
+        CREATE TABLE IF NOT EXISTS bom_record_materials (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          record_id INTEGER NOT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          material_label TEXT NOT NULL,
+          material_name TEXT NOT NULL,
+          percentage REAL NOT NULL,
+          FOREIGN KEY (record_id) REFERENCES bom_records(id) ON DELETE CASCADE
+        )
+      `);
+    })();
+  }
+  return bomRecordStoreInitPromise;
+}
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -25,6 +659,21 @@ auth.initializeDatabase().catch(err => {
 
 polymerIndexes.initializeDatabase().catch(err => {
   console.error("Failed to initialize polymer index database:", err);
+  process.exit(1);
+});
+
+ensureCustomerStoreReady().catch(err => {
+  console.error("Failed to initialize customer store:", err);
+  process.exit(1);
+});
+
+ensureBomListStoreReady().catch(err => {
+  console.error("Failed to initialize BOM list store:", err);
+  process.exit(1);
+});
+
+ensureBomRecordStoreReady().catch(err => {
+  console.error("Failed to initialize BOM record store:", err);
   process.exit(1);
 });
 
@@ -70,6 +719,22 @@ app.get("/bom-calculator", (req, res, next) => {
     });
   } catch (err) {
     console.error("[ERROR] BOM calculator route error:", err);
+    next(err);
+  }
+});
+
+app.get("/bom-recipe-browser", (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, "src", "frontend", "bom-recipe-browser.html");
+    console.log("[ROUTE] GET /bom-recipe-browser - Serving:", filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("[ERROR] Failed to send bom-recipe-browser.html:", err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error("[ERROR] BOM recipe browser route error:", err);
     next(err);
   }
 });
@@ -793,63 +1458,317 @@ app.get("/api/products/editable", (req, res) => {
 });
 
 // BOM Calculator endpoints
-app.get("/api/bom/lists", (req, res) => {
+app.get("/api/bom/lists", async (req, res) => {
   try {
-    const sourcesPath = path.join(__dirname, "data", "Sources.xlsx");
-    const workbook = XLSX.readFile(sourcesPath);
-    
-    if (!workbook.SheetNames.includes("Lists")) {
-      return res.status(404).json({ error: "Lists sheet not found in Sources.xlsx" });
+    const materialLists = await getMaterialListValues();
+    res.json(materialLists);
+  } catch (err) {
+    console.error("Error loading BOM material lists:", err);
+    res.status(500).json({ error: "Failed to load BOM lists", details: err.message });
+  }
+});
+
+app.get("/api/bom/description-lists", async (req, res) => {
+  try {
+    const lists = await getDescriptionListValues();
+    res.json({ lists });
+  } catch (err) {
+    console.error("Error loading BOM description lists:", err);
+    res.status(500).json({ error: "Failed to load description lists", details: err.message });
+  }
+});
+
+app.put("/api/bom/description-lists/:listKey", async (req, res) => {
+  try {
+    const { listKey } = req.params;
+    const { values } = req.body || {};
+
+    if (!Array.isArray(values)) {
+      return res.status(400).json({ error: "Request body must include a values array." });
     }
-    
-    const listsSheet = workbook.Sheets["Lists"];
-    const data = XLSX.utils.sheet_to_json(listsSheet, { header: 1, defval: "" });
-    
-    // First row contains headers
-    const headers = data[0];
-    
-    // Extract lists from columns
-    const list_sb = [];
-    const list_mb = [];
-    const list_pigment = [];
-    const list_additive = [];
-    const list_surfactant = [];
-    const surfactant_conc_map = {};
-    
-    // Start from row 1 (skip headers)
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (row[0] && row[0].trim()) list_sb.push(row[0].trim());
-      if (row[1] && row[1].trim()) list_mb.push(row[1].trim());
-      if (row[2] && row[2].trim()) list_pigment.push(row[2].trim());
-      if (row[3] && row[3].trim()) list_additive.push(row[3].trim());
-      if (row[4] && row[4].trim()) {
-        const surfactantName = row[4].trim();
-        list_surfactant.push(surfactantName);
 
-        const concValue = parseFloat(row[5]);
-        const hasValidConc = Number.isFinite(concValue);
-        const currentConc = surfactant_conc_map[surfactantName];
+    if (hasCaseInsensitiveDuplicates(values)) {
+      return res.status(400).json({ error: "Duplicate values are not allowed." });
+    }
 
-        if (hasValidConc && (currentConc === undefined || currentConc === "")) {
-          surfactant_conc_map[surfactantName] = concValue;
-        } else if (!(surfactantName in surfactant_conc_map)) {
-          surfactant_conc_map[surfactantName] = "";
+    const normalized = normalizeUniqueStrings(values);
+    if (normalized.length === 0) {
+      return res.status(400).json({ error: "List cannot be empty." });
+    }
+
+    const updatedValues = await saveDescriptionListValuesWithoutDeletion(listKey, normalized);
+    res.json({ success: true, values: updatedValues });
+  } catch (err) {
+    if (err.code === "DESCRIPTION_LIST_UNKNOWN") {
+      return res.status(404).json({ error: "Description list was not found." });
+    }
+
+    if (err.code === "DESCRIPTION_LIST_READONLY") {
+      return res.status(400).json({ error: "This list is read-only and cannot be edited." });
+    }
+
+    if (err.code === "DESCRIPTION_LIST_REMOVAL_NOT_ALLOWED") {
+      return res.status(400).json({
+        error: "Removing existing values is not allowed. You can rename existing entries or add new ones."
+      });
+    }
+
+    if (err.message && err.message.includes("UNIQUE constraint failed")) {
+      return res.status(400).json({ error: "Duplicate values are not allowed." });
+    }
+
+    console.error("Error saving BOM description list:", err);
+    res.status(500).json({ error: "Failed to save description list", details: err.message });
+  }
+});
+
+app.get("/api/bom/customers", async (req, res) => {
+  try {
+    const customers = await getCustomerNames();
+    res.json({ customers });
+  } catch (err) {
+    console.error("Error loading customer list from database:", err);
+    res.status(500).json({ error: "Failed to load customer list", details: err.message });
+  }
+});
+
+app.put("/api/bom/customers", async (req, res) => {
+  try {
+    const { customers } = req.body || {};
+    if (!Array.isArray(customers)) {
+      return res.status(400).json({ error: "Request body must include a customers array." });
+    }
+
+    if (hasCaseInsensitiveDuplicates(customers)) {
+      return res.status(400).json({ error: "Duplicate customer names are not allowed." });
+    }
+
+    const normalized = normalizeUniqueStrings(customers);
+    if (normalized.length === 0) {
+      return res.status(400).json({ error: "Customer list cannot be empty." });
+    }
+
+    const savedCustomers = await saveCustomerNamesWithoutDeletion(normalized);
+    res.json({ success: true, customers: savedCustomers });
+  } catch (err) {
+    if (err.code === "CUSTOMER_REMOVAL_NOT_ALLOWED") {
+      return res.status(400).json({
+        error: "Removing existing customers is not allowed. You can rename existing entries or add new ones."
+      });
+    }
+
+    if (err.message && err.message.includes("UNIQUE constraint failed")) {
+      return res.status(400).json({ error: "Duplicate customer names are not allowed." });
+    }
+
+    console.error("Error saving customer list to database:", err);
+    res.status(500).json({ error: "Failed to save customer list", details: err.message });
+  }
+});
+
+// ==================== BOM RECORD ENDPOINTS ====================
+
+app.post("/api/bom/records", auth.authMiddleware, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const { record, materials } = req.body || {};
+    if (!record || typeof record !== 'object') {
+      return res.status(400).json({ error: 'Request body must include a record object.' });
+    }
+    if (!Array.isArray(materials)) {
+      return res.status(400).json({ error: 'Request body must include a materials array.' });
+    }
+
+    // Validate PD ID - must be numeric only
+    if (record.pd_id && !/^\d+$/.test(String(record.pd_id).trim())) {
+      return res.status(400).json({ error: 'PD ID must contain only numeric characters.' });
+    }
+
+    await db.run('BEGIN');
+    try {
+      // Generate explicit parent ID so child inserts never depend on driver-specific lastID behavior.
+      let recordId = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = (Date.now() * 1000) + Math.floor(Math.random() * 1000);
+        const existing = await db.get('SELECT id FROM bom_records WHERE id = ?', [candidate]);
+        if (!existing) {
+          recordId = candidate;
+          break;
         }
       }
+      if (!recordId) {
+        throw new Error('Unable to allocate BOM record ID.');
+      }
+
+      const result = await db.run(`
+        INSERT INTO bom_records (
+          id,
+          sap_id, pd_id, customer, market_segment, application, smms, mono_bico,
+          structure, bico_ratio_desc, main_raw_mat, treatment, color, bonding,
+          customer_bw, belt_bw, mb_grams, line, belt_speed, siko_percent, repro_percent,
+          max_usable_width, usable_width, edge_trim_percent, web_loss_percent,
+          other_scrap_percent, total_scrap_percent, gross_yield_percent,
+          s_beams, m_beams, sb_throughput, mb_throughput, total_throughput, production_time,
+          cores, slit_width, length_meters, roll_diameter,
+          target_production, target_unit, notes, author, created_by
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `, [
+        recordId,
+        record.sap_id || null, record.pd_id || null, record.customer || null,
+        record.market_segment || null, record.application || null, record.smms || null,
+        record.mono_bico || null, record.structure || null, record.bico_ratio_desc || null,
+        record.main_raw_mat || null, record.treatment || null, record.color || null,
+        record.bonding || null, record.customer_bw || null, record.belt_bw || null,
+        record.mb_grams || null, record.line || null, record.belt_speed || null,
+        record.siko_percent || null, record.repro_percent || null,
+        record.max_usable_width || null, record.usable_width || null,
+        record.edge_trim_percent || null, record.web_loss_percent || null,
+        record.other_scrap_percent || null, record.total_scrap_percent || null,
+        record.gross_yield_percent || null, record.s_beams || null, record.m_beams || null,
+        record.sb_throughput || null, record.mb_throughput || null,
+        record.total_throughput || null, record.production_time || null,
+        record.cores || null, record.slit_width || null, record.length_meters || null,
+        record.roll_diameter || null, record.target_production || null,
+        record.target_unit || null, record.notes || null, req.user.name || 'Unknown', req.user.id
+      ]);
+
+      if (!result || result.changes !== 1) {
+        throw new Error('Failed to insert BOM record header.');
+      }
+
+      for (let i = 0; i < materials.length; i++) {
+        const m = materials[i] || {};
+        const materialLabel = m.material_label || '';
+        const materialName = m.material_name || '';
+        const materialPercentage = Number.isFinite(Number(m.percentage)) ? Number(m.percentage) : 0;
+
+        try {
+          await db.run(
+            'INSERT INTO bom_record_materials (record_id, sort_order, material_label, material_name, percentage) VALUES (?, ?, ?, ?, ?)',
+            [recordId, i, materialLabel, materialName, materialPercentage]
+          );
+        } catch (insertErr) {
+          throw new Error(`Material insert failed at index ${i} (recordId=${recordId}, label=${materialLabel || '<empty>'}, name=${materialName || '<empty>'}): ${insertErr.message}`);
+        }
+      }
+
+      await db.run('COMMIT');
+      res.status(201).json({ success: true, id: recordId });
+    } catch (innerErr) {
+      await db.run('ROLLBACK').catch(() => {});
+      throw innerErr;
     }
-    
-    res.json({
-      list_sb,
-      list_mb,
-      list_pigment,
-      list_additive,
-      list_surfactant,
-      surfactant_conc_map
-    });
   } catch (err) {
-    console.error("Error loading BOM lists:", err);
-    res.status(500).json({ error: "Failed to load BOM lists", details: err.message });
+    console.error('Error saving BOM record:', err);
+    res.status(500).json({ error: 'Failed to save BOM record', details: err.message });
+  }
+});
+
+app.get("/api/bom/records", auth.authMiddleware, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const rows = await db.all(`
+      SELECT id, pd_id, customer, line, customer_bw, author,
+             created_at, updated_at, created_by
+      FROM bom_records
+      ORDER BY created_at DESC
+    `);
+    res.json({ records: rows });
+  } catch (err) {
+    console.error('Error listing BOM records:', err);
+    res.status(500).json({ error: 'Failed to list BOM records', details: err.message });
+  }
+});
+
+app.get("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid record ID.' });
+
+    const record = await db.get('SELECT * FROM bom_records WHERE id = ?', [id]);
+    if (!record) return res.status(404).json({ error: 'Record not found.' });
+
+    const materials = await db.all(
+      'SELECT material_label, material_name, percentage, sort_order FROM bom_record_materials WHERE record_id = ? ORDER BY sort_order',
+      [id]
+    );
+    res.json({ record, materials });
+  } catch (err) {
+    console.error('Error loading BOM record:', err);
+    res.status(500).json({ error: 'Failed to load BOM record', details: err.message });
+  }
+});
+
+app.put("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid record ID.' });
+
+    const { record, materials } = req.body || {};
+    if (!record || typeof record !== 'object') {
+      return res.status(400).json({ error: 'Request body must include a record object.' });
+    }
+    if (!Array.isArray(materials)) {
+      return res.status(400).json({ error: 'Request body must include a materials array.' });
+    }
+
+    const existing = await db.get('SELECT id FROM bom_records WHERE id = ?', [id]);
+    if (!existing) return res.status(404).json({ error: 'Record not found.' });
+
+    await db.run('BEGIN');
+    try {
+      await db.run(`
+        UPDATE bom_records SET
+          sap_id=?, pd_id=?, customer=?, market_segment=?, application=?, smms=?, mono_bico=?,
+          structure=?, bico_ratio_desc=?, main_raw_mat=?, treatment=?, color=?, bonding=?,
+          customer_bw=?, belt_bw=?, mb_grams=?, line=?, belt_speed=?, siko_percent=?, repro_percent=?,
+          max_usable_width=?, usable_width=?, edge_trim_percent=?, web_loss_percent=?,
+          other_scrap_percent=?, total_scrap_percent=?, gross_yield_percent=?,
+          s_beams=?, m_beams=?, sb_throughput=?, mb_throughput=?, total_throughput=?, production_time=?,
+          cores=?, slit_width=?, length_meters=?, roll_diameter=?,
+          target_production=?, target_unit=?, notes=?,
+          updated_at=CURRENT_TIMESTAMP
+        WHERE id=?
+      `, [
+        record.sap_id || null, record.pd_id || null, record.customer || null,
+        record.market_segment || null, record.application || null, record.smms || null,
+        record.mono_bico || null, record.structure || null, record.bico_ratio_desc || null,
+        record.main_raw_mat || null, record.treatment || null, record.color || null,
+        record.bonding || null, record.customer_bw || null, record.belt_bw || null,
+        record.mb_grams || null, record.line || null, record.belt_speed || null,
+        record.siko_percent || null, record.repro_percent || null,
+        record.max_usable_width || null, record.usable_width || null,
+        record.edge_trim_percent || null, record.web_loss_percent || null,
+        record.other_scrap_percent || null, record.total_scrap_percent || null,
+        record.gross_yield_percent || null, record.s_beams || null, record.m_beams || null,
+        record.sb_throughput || null, record.mb_throughput || null,
+        record.total_throughput || null, record.production_time || null,
+        record.cores || null, record.slit_width || null, record.length_meters || null,
+        record.roll_diameter || null, record.target_production || null,
+        record.target_unit || null, record.notes || null, id
+      ]);
+
+      await db.run('DELETE FROM bom_record_materials WHERE record_id = ?', [id]);
+
+      for (let i = 0; i < materials.length; i++) {
+        const m = materials[i];
+        await db.run(
+          'INSERT INTO bom_record_materials (record_id, sort_order, material_label, material_name, percentage) VALUES (?,?,?,?,?)',
+          [id, i, m.material_label || '', m.material_name || '', m.percentage || 0]
+        );
+      }
+
+      await db.run('COMMIT');
+      res.json({ success: true, id });
+    } catch (innerErr) {
+      await db.run('ROLLBACK').catch(() => {});
+      throw innerErr;
+    }
+  } catch (err) {
+    console.error('Error updating BOM record:', err);
+    res.status(500).json({ error: 'Failed to update BOM record', details: err.message });
   }
 });
 
@@ -947,6 +1866,7 @@ app.listen(PORT, () => {
   console.log(`  - GET / → /login.html (redirect)`);
   console.log(`  - GET /dashboard → index.html`);
   console.log(`  - GET /bom-calculator → bom-calculator.html`);
+  console.log(`  - GET /bom-recipe-browser → bom-recipe-browser.html`);
   console.log(`  - GET /products → products-editor.html`);
   console.log(``);
   console.log(`API endpoints:`);

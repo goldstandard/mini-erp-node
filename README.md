@@ -34,7 +34,11 @@ Test credentials (created by setup script):
 - Authenticated web app with role and group based access controls
 - Cost dashboard with filters, currency conversion, and export
 - Product editor (search, duplicate, update, delete)
-- BOM calculator with list-driven dropdowns and throughput calculations
+- BOM calculator with list-driven dropdowns, throughput calculations, and recipe persistence
+- BOM list management backed by SQLite tables (no runtime Excel dependency for dropdown lists)
+- BOM recipe save flow with mandatory field validation before database write
+- BOM snapshot storage includes Description fields, Calculation Results material percentages,
+  minimum batch size/unit, and commentary notes
 - **Polymer index management:**
   - Define index names with variants (Min/Mid/Max) and metadata (unit, currency, publish day)
   - Import historical values from CSV/Excel (up to 10 MB batch)
@@ -66,68 +70,15 @@ API root:
 ## Project Structure
 
 ```text
-mini-erp-node/
-├── API.md
-├── DEPLOYMENT.md
-├── POLYMER_INDEXES_DOCUMENTATION.md
-├── INDEX_VARIANT_IMPLEMENTATION.md
-├── server.js
-├── package.json
-├── scripts/
-│   ├── setup.js
-│   ├── setup-groups.js
-│   ├── create-admin.js
-│   ├── seed-admin.js
-│   ├── cleanup-indexes.js
-│   ├── import-raffia-data.js
-│   ├── migrate-users-to-groups.js
-│   ├── migrate-unit-currency.js
-│   ├── remove-source-field.js
-│   └── send-index-reminders.js
-└── src/
-    ├── backend/
-    │   ├── auth.js
-    │   ├── costing.js
-    │   ├── fx.js
-    │   ├── lines.js
-    │   ├── materials.js
-    │   ├── products.js
-    │   ├── products-editor.js
-    │   ├── polymer-indexes.js
-    │   ├── auth/
-    │   │   └── providers/ (OAuth/LDAP provider configs)
-    │   ├── constants/ (database schema, permissions)
-    │   ├── db/
-    │   │   └── connection.js (SQLite setup)
-    │   ├── middleware/ (auth, logging, error handlers)
-    │   ├── models/ (database models)
-    │   ├── routes/ (API endpoints)
-    │   │   ├── auth.js
-    │   │   └── users.js
-    │   └── utils/
-    │       └── auditLog.js
-    ├── frontend/
-    │   ├── index.html (cost dashboard)
-    │   ├── bom-calculator.html
-    │   ├── products-editor.html
-    │   ├── polymer-indexes.html
-    │   ├── login.html
-    │   ├── admin-access.html (admin group/user manager)
-    │   ├── polymer-index-admin.html (polymer index definitions)
-    │   ├── request-access.html (user access request form)
-    │   ├── app.js (dashboard controller)
-    │   ├── auth.js (auth utilities)
-    │   ├── script.js (shared utilities)
-    │   └── styles.css
-    └── data/
-        └── mini_erp.db
+o
 ```
 
 ## Data and Database Notes
 
-- Application SQLite database is at `src/data/mini_erp.db`
+- Application SQLite database is at `data/mini_erp.db`
 - Source Excel files for costing are in `data/`
 - Polymer index values are stored separately from index definitions
+- BOM calculator persistence uses tables such as `bom_records` and `bom_record_materials`
 
 ## Security Notes
 
