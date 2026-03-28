@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FX Rates Management</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .fx-rates-container {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 30px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .fx-rates-header {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      gap: 10px;
+      margin-bottom: 30px;
+      border-bottom: 3px solid #2b6cb0;
+      padding-bottom: 15px;
+    }
+
+    .fx-rates-header h1 {
+      margin: 0;
+      font-size: 28px;
+      color: #1e3a8a;
+    }
+
+    .fx-rates-header p {
+      color: #555;
+      margin: 0;
+    }
+
+    .back-link {
+      padding: 8px 16px;
+      background: #e0e0e0;
+      border-radius: 6px;
+      color: #333;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .back-link:hover {
+      background: #d0d0d0;
+    }
+
+    .fx-rates-controls {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fx-period-selector {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fx-period-selector select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      background-color: #f9f9f9;
+    }
+
+    .btn-import {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-import:hover {
+      background-color: #45a049;
+    }
+
+    .btn-import:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+    .file-input-wrapper {
+      display: none;
+    }
+
+    .fx-rates-table-wrapper {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .fx-rates-table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+    }
+
+    .fx-rates-table thead {
+      background-color: #f5f5f5;
+      border-bottom: 2px solid #ddd;
+    }
+
+    .fx-rates-table th {
+      padding: 12px;
+      text-align: center;
+      font-weight: 600;
+      color: white;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      cursor: default;
+      white-space: nowrap;
+    }
+
+    .fx-rates-table td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .fx-rates-table tbody tr:hover {
+      background-color: #f9f9f9;
+    }
+
+    .btn-delete {
+      padding: 6px 12px;
+      background-color: #f44336;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .btn-delete:hover {
+      background-color: #da190b;
+    }
+
+    .budget-col {
+      background-color: #dcefd2;
+      font-weight: 700;
+      color: #1f5130;
+    }
+
+    .fx-ccy-col {
+      font-weight: 700;
+      color: #0f4f8a;
+    }
+
+    .rate-empty {
+      color: #a0a0a0;
+    }
+
+    .rate-derived {
+      font-style: italic;
+      color: #2f4f4f;
+    }
+
+    .empty-message {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+      font-size: 16px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+      background-color: white;
+      margin: 50px auto;
+      padding: 30px;
+      border-radius: 4px;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 15px;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: #999;
+    }
+
+    .close-btn:hover {
+      color: #333;
+    }
+
+    .import-form-group {
+      margin-bottom: 20px;
+    }
+
+    .import-form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .import-form-group input[type="file"] {
+      display: block;
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .import-options {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .import-options label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      font-weight: normal;
+    }
+
+    .import-options input[type="checkbox"] {
+      cursor: pointer;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+      border-top: 1px solid #ddd;
+      padding-top: 15px;
+    }
+
+    .btn-cancel {
+      padding: 10px 20px;
+      background-color: #ddd;
+      color: #333;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn-cancel:hover {
+      background-color: #ccc;
+    }
+
+    .btn-submit {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn-submit:hover {
+      background-color: #45a049;
+    }
+
+    .btn-submit:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+    .alert {
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+      border-left: 4px solid;
+    }
+
+    .alert-success {
+      background-color: #dff0d8;
+      border-color: #5cb85c;
+      color: #3c763d;
+    }
+
+    .alert-error {
+      background-color: #f2dede;
+      border-color: #f44336;
+      color: #a94442;
+    }
+
+    .alert-info {
+      background-color: #d9edf7;
+      border-color: #2196F3;
+      color: #31708f;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #4CAF50;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .import-result-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    .import-result-table th,
+    .import-result-table td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .import-result-table th {
+      background-color: #f5f5f5;
+      font-weight: 600;
+    }
+
+    .status-success {
+      color: #5cb85c;
+      font-weight: 600;
+    }
+
+    .status-skipped {
+      color: #f0ad4e;
+      font-weight: 600;
+    }
+
+    .status-error {
+      color: #d9534f;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="fx-rates-container">
+    <header class="app-header">
+      <div class="app-branding">
+        <img src="/data/PFN_logo.png" alt="PFN" class="company-logo" />
+        <div class="app-title-wrap">
+          <h1>FX Rates Management</h1>
+          <p>Yearly matrix view (Budget + months 1-12)</p>
+        </div>
+      </div>
+      <div class="app-top-actions">
+        <button class="action-btn btn-nav" onclick="window.location.href='/dashboard'">Back to Dashboard</button>
+        <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;">Change Password</button>
+        <button id="adminBtn" class="action-btn btn-admin" style="display:none;">Admin</button>
+        <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
+      </div>
+    </header>
+
+    <div id="alertContainer"></div>
+
+    <div class="fx-rates-controls">
+      <div class="fx-period-selector">
+        <label for="yearSelect" style="font-weight: 600;">Select Year:</label>
+        <select id="yearSelect">
+          <option value="">-- Select a year --</option>
+        </select>
+      </div>
+      <button id="importFxButton" class="btn-import" onclick="openImportModal()">
+        📤 Import FX Rates
+      </button>
+    </div>
+
+    <div class="fx-rates-table-wrapper">
+      <table class="fx-rates-table">
+        <thead>
+          <tr>
+            <th>Currency 1</th>
+            <th>Currency 2</th>
+            <th>FX_ccy</th>
+            <th class="budget-col" id="budgetHeader">Budget</th>
+            <th>1</th>
+            <th>2</th>
+            <th>3</th>
+            <th>4</th>
+            <th>5</th>
+            <th>6</th>
+            <th>7</th>
+            <th>8</th>
+            <th>9</th>
+            <th>10</th>
+            <th>11</th>
+            <th>12</th>
+          </tr>
+        </thead>
+        <tbody id="ratesTableBody">
+          <tr>
+            <td colspan="16" class="empty-message">Select a year to view rates</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div id="importModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Import FX Rates</h2>
+        <button class="close-btn" onclick="closeImportModal()">&times;</button>
+      </div>
+
+      <div id="importAlertContainer"></div>
+
+      <div class="import-form-group">
+        <label for="fileInput">Select File (.csv or .xlsx):</label>
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
+        <small style="color: #666;">File should contain columns: Year, Month (1-12 or budget), FX_pair (or CurrencyPair), Rate (or FX_Rate)</small>
+      </div>
+
+      <div class="import-form-group">
+        <div class="import-options">
+          <label>
+            <input type="checkbox" id="overwriteCheckbox">
+            Overwrite existing rates for selected months
+          </label>
+        </div>
+      </div>
+
+      <div id="importResultContainer"></div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeImportModal()">Cancel</button>
+        <button class="btn-submit" id="submitImportBtn" onclick="submitImport()">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <script src="/auth.js"></script>
+  <script>
+    let fxAccessPermissions = { read: true, modify: false };
+
+    // Check authentication
+    async function checkAuth() {
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+        if (response.status === 401) {
+          window.location.href = '/login.html';
+          return false;
+        }
+
+        const permissionsResponse = await fetch('/api/auth/me/access-permissions', {
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+
+        if (permissionsResponse.ok) {
+          const permissionsData = await permissionsResponse.json();
+          fxAccessPermissions = permissionsData.pages && permissionsData.pages['fx-rates']
+            ? permissionsData.pages['fx-rates']
+            : { read: true, modify: false };
+        }
+
+        if (!fxAccessPermissions.read) {
+          alert('You do not have read access to FX Rates.');
+          window.location.href = '/dashboard';
+          return false;
+        }
+
+        applyFxModifyAccessState();
+        return true;
+      } catch (err) {
+        console.error('Auth check failed:', err);
+        return false;
+      }
+    }
+
+    function applyFxModifyAccessState() {
+      const importButton = document.getElementById('importFxButton');
+      if (!importButton) return;
+
+      if (fxAccessPermissions.modify) {
+        importButton.disabled = false;
+        importButton.style.display = '';
+        importButton.title = '';
+      } else {
+        importButton.disabled = true;
+        importButton.style.display = 'none';
+        importButton.title = 'Modify access is required for import';
+      }
+    }
+
+    // Initialize page
+    async function initPage() {
+      const isAuthorized = await checkAuth();
+      if (!isAuthorized) {
+        return;
+      }
+
+      await auth.configureHeaderButtons();
+      await loadYears();
+    }
+
+    function formatRate(rate) {
+      const numericRate = typeof rate === 'number'
+        ? rate
+        : (rate === null || rate === undefined || rate === '' ? NaN : Number(rate));
+      if (!Number.isFinite(numericRate)) return '';
+      return numericRate.toFixed(3);
+    }
+
+    function renderRateCell(value, source, isBudget) {
+      const numericValue = typeof value === 'number'
+        ? value
+        : (value === null || value === undefined || value === '' ? NaN : Number(value));
+
+      if (!Number.isFinite(numericValue)) {
+        return `<td class="${isBudget ? 'budget-col ' : ''}rate-empty"></td>`;
+      }
+      const derivedClass = source && source !== 'imported' ? ' rate-derived' : '';
+      const sourceTitle = source && source !== 'imported' ? ` title="Calculated from existing pairs (${source})"` : '';
+      return `<td class="${isBudget ? 'budget-col ' : ''}${derivedClass}"${sourceTitle}>${formatRate(numericValue)}</td>`;
+    }
+
+    // Load available years
+    async function loadYears() {
+      try {
+        const response = await fetch('/api/fx-rates/periods', {
+          headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('authToken')
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to load periods');
+
+        const data = await response.json();
+        const select = document.getElementById('yearSelect');
+
+        const years = Array.from(new Set((data.periods || []).map(p => Number(p.year)).filter(y => Number.isFinite(y))));
+        years.sort((a, b) => b - a);
+
+        let html = '<option value="">-- Select a year --</option>';
+        years.forEach(year => {
+          html += `<option value="${year}">${year}</option>`;
+        });
+        select.innerHTML = html;
+
+        const currentYear = new Date().getFullYear();
+        if (years.includes(currentYear)) {
+          select.value = String(currentYear);
+          await loadYearMatrix(currentYear);
+        } else if (years.length > 0) {
+          select.value = String(years[0]);
+          await loadYearMatrix(years[0]);
+        }
+      } catch (err) {
+        showAlert('Error loading years: ' + err.message, 'error');
+      }
+    }
+
+    // Handle year selection
+    document.getElementById('yearSelect').addEventListener('change', async (e) => {
+      const value = e.target.value;
+      if (!value) {
+        document.getElementById('ratesTableBody').innerHTML = 
+          '<tr><td colspan="16" class="empty-message">Select a year to view rates</td></tr>';
+        document.getElementById('budgetHeader').textContent = 'Budget';
+        return;
+      }
+
+      await loadYearMatrix(parseInt(value, 10));
+    });
+
+    // Load matrix for a year
+    async function loadYearMatrix(year) {
+      try {
+        const response = await fetch(`/api/fx-rates-matrix/${year}`, {
+          headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('authToken')
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to load rates');
+
+        const data = await response.json();
+        const tbody = document.getElementById('ratesTableBody');
+        const budgetLabel = String(year).slice(-2);
+        document.getElementById('budgetHeader').textContent = `Budget '${budgetLabel}`;
+
+        const allowedCurrencies = new Set(['CZK', 'USD', 'EUR', 'ZAR']);
+        const rows = (data.rows || []).filter((row) => (
+          allowedCurrencies.has(String(row.currency1 || '').toUpperCase()) &&
+          allowedCurrencies.has(String(row.currency2 || '').toUpperCase())
+        ));
+
+        if (rows.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="16" class="empty-message">No rates found for selected year</td></tr>';
+          return;
+        }
+
+        let html = '';
+        rows.forEach(row => {
+          const budgetValue = row.budget;
+          html += `
+            <tr>
+              <td>${row.currency1}</td>
+              <td>${row.currency2}</td>
+              <td class="fx-ccy-col">${row.currency_pair}</td>
+              ${renderRateCell(budgetValue, row.sources?.budget, true)}
+              ${renderRateCell(row.months?.['1'], row.sources?.['1'], false)}
+              ${renderRateCell(row.months?.['2'], row.sources?.['2'], false)}
+              ${renderRateCell(row.months?.['3'], row.sources?.['3'], false)}
+              ${renderRateCell(row.months?.['4'], row.sources?.['4'], false)}
+              ${renderRateCell(row.months?.['5'], row.sources?.['5'], false)}
+              ${renderRateCell(row.months?.['6'], row.sources?.['6'], false)}
+              ${renderRateCell(row.months?.['7'], row.sources?.['7'], false)}
+              ${renderRateCell(row.months?.['8'], row.sources?.['8'], false)}
+              ${renderRateCell(row.months?.['9'], row.sources?.['9'], false)}
+              ${renderRateCell(row.months?.['10'], row.sources?.['10'], false)}
+              ${renderRateCell(row.months?.['11'], row.sources?.['11'], false)}
+              ${renderRateCell(row.months?.['12'], row.sources?.['12'], false)}
+            </tr>
+          `;
+        });
+
+        tbody.innerHTML = html;
+      } catch (err) {
+        showAlert('Error loading rates: ' + err.message, 'error');
+      }
+    }
+
+    // Import modal functions
+    function openImportModal() {
+      if (!fxAccessPermissions.modify) {
+        showAlert('You do not have modify access for FX Rates.', 'error');
+        return;
+      }
+      document.getElementById('importModal').style.display = 'block';
+      document.getElementById('fileInput').value = '';
+      document.getElementById('overwriteCheckbox').checked = false;
+      document.getElementById('importResultContainer').innerHTML = '';
+      document.getElementById('importAlertContainer').innerHTML = '';
+    }
+
+    function closeImportModal() {
+      document.getElementById('importModal').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+      const modal = document.getElementById('importModal');
+      if (event.target === modal) {
+        modal.style.display = 'none';
+      }
+    }
+
+    // Submit import
+    async function submitImport() {
+      if (!fxAccessPermissions.modify) {
+        showImportAlert('You do not have modify access for FX Rates.', 'error');
+        return;
+      }
+
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        showImportAlert('Please select a file', 'error');
+        return;
+      }
+
+      try {
+        document.getElementById('submitImportBtn').disabled = true;
+        document.getElementById('submitImportBtn').innerHTML = '<div class="loading-spinner"></div>Processing...';
+
+        // Parse file
+        const text = await file.text();
+        let rows;
+
+        if (file.name.endsWith('.csv')) {
+          rows = parseCSV(text);
+        } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+          rows = await parseExcel(file);
+        } else {
+          throw new Error('Unsupported file format');
+        }
+
+        if (rows.length === 0) {
+          throw new Error('File is empty');
+        }
+
+        const overwrite = document.getElementById('overwriteCheckbox').checked;
+
+        // Send to server
+        const response = await fetch('/api/fx-rates/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + localStorage.getItem('authToken')
+          },
+          body: JSON.stringify({ rows, overwrite })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Import failed');
+        }
+
+        // Display results
+        displayImportResults(result.results);
+        showImportAlert('Import completed successfully!', 'success');
+
+        // Reload periods
+        setTimeout(() => {
+          loadYears();
+          closeImportModal();
+        }, 1500);
+      } catch (err) {
+        showImportAlert('Error: ' + err.message, 'error');
+      } finally {
+        document.getElementById('submitImportBtn').disabled = false;
+        document.getElementById('submitImportBtn').innerHTML = 'Import';
+      }
+    }
+
+    function displayImportResults(results) {
+      const container = document.getElementById('importResultContainer');
+      
+      let html = '<table class="import-result-table"><thead><tr><th>Period</th><th>Status</th><th>Details</th></tr></thead><tbody>';
+      
+      results.forEach(r => {
+        const normalizedStatus = r.status || (r.success ? 'success' : (r.skipped ? 'skipped' : 'error'));
+        const statusClass = normalizedStatus === 'success' ? 'status-success' : (normalizedStatus === 'skipped' ? 'status-skipped' : 'status-error');
+        const details = r.skipped
+          ? 'Skipped to avoid overwrite'
+          : (Number.isFinite(Number(r.inserted)) ? `${r.inserted} rates inserted` : (r.message || 'No details'));
+        
+        html += `
+          <tr>
+            <td>${r.period}</td>
+            <td class="${statusClass}">${String(normalizedStatus).toUpperCase()}</td>
+            <td>${details}</td>
+          </tr>
+        `;
+      });
+      
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    function parseCSV(text) {
+      const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+      const header = lines.shift()?.split(',').map(x => x.trim()) || [];
+      
+      const data = [];
+      lines.forEach(line => {
+        const cols = [];
+        let cur = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (ch === ',' && !inQuotes) {
+            cols.push(cur);
+            cur = '';
+          } else {
+            cur += ch;
+          }
+        }
+        cols.push(cur);
+        
+        const row = {};
+        header.forEach((h, i) => {
+          row[h] = (cols[i] ?? '').trim();
+        });
+        data.push(row);
+      });
+      
+      return data;
+    }
+
+    async function parseExcel(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(worksheet);
+            resolve(rows);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function showAlert(message, type) {
+      const container = document.getElementById('alertContainer');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.textContent = message;
+      container.innerHTML = '';
+      container.appendChild(alert);
+      setTimeout(() => alert.remove(), 5000);
+    }
+
+    function showImportAlert(message, type) {
+      const container = document.getElementById('importAlertContainer');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.textContent = message;
+      container.innerHTML = '';
+      container.appendChild(alert);
+    }
+
+    // Initialize on page load
+    window.addEventListener('load', initPage);
+  </script>
+
+  <!-- XLSX library for Excel parsing (served locally from node_modules) -->
+  <script src="/vendor/xlsx.full.min.js"></script>
+</body>
+</html>

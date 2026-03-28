@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - Access Management - Mini ERP</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
     <style>
         body {
             background-color: #f5f5f5;
@@ -504,17 +504,161 @@
             border-radius: 4px;
             font-size: 14px;
         }
+
+        .access-permissions-card {
+            background: #f8fafc;
+            border: 1px solid #d9e2ec;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+
+        .access-permissions-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .access-permissions-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .access-permissions-header h3 {
+            margin: 0;
+            color: #1f2933;
+            font-size: 18px;
+        }
+
+        .access-permissions-note {
+            margin: 0;
+            color: #52606d;
+            font-size: 13px;
+        }
+
+        .access-matrix-wrapper {
+            overflow: auto;
+            border: 1px solid #d9e2ec;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .access-matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            min-width: 980px;
+        }
+
+        .access-matrix-table th,
+        .access-matrix-table td {
+            border: 1px solid #d9e2ec;
+            padding: 8px;
+            font-size: 13px;
+            text-align: center;
+            vertical-align: middle;
+            transition: background-color 0.2s ease;
+        }
+
+        .access-matrix-table th {
+            background: #f0f4f8;
+            color: #334e68;
+            white-space: nowrap;
+        }
+
+        .access-matrix-table .group-col {
+            text-align: left;
+            min-width: 160px;
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #f8fafc;
+        }
+
+        .access-matrix-table th.group-col {
+            z-index: 3;
+            background: #e4edf4;
+        }
+
+        .access-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .access-save-cell {
+            white-space: nowrap;
+            position: sticky;
+            right: 0;
+            z-index: 2;
+            background: #f8fafc;
+        }
+
+        .access-matrix-table th.access-save-cell {
+            background: #e4edf4;
+            z-index: 3;
+        }
+
+        .btn-save-permissions {
+            background-color: #1f9d55;
+            color: white;
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+
+        .btn-save-permissions:hover {
+            background-color: #18884a;
+        }
+
+        .btn-save-permissions.dirty {
+            background-color: #c2410c;
+            box-shadow: 0 0 0 2px rgba(194, 65, 12, 0.2);
+        }
+
+        .access-matrix-table tr.access-row-dirty td {
+            background: #fff7ed;
+        }
+
+        .access-matrix-table tr.access-row-dirty td.group-col,
+        .access-matrix-table tr.access-row-dirty td.access-save-cell {
+            background: #ffedd5;
+        }
+
+        .matrix-help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            margin-left: 5px;
+            border-radius: 50%;
+            background: #334e68;
+            color: #ffffff;
+            font-size: 10px;
+            line-height: 1;
+            cursor: help;
+        }
     </style>
 </head>
 <body style="background-color: #f5f5f5;">
     <div class="admin-container">
-        <div class="header">
-            <h1>🔧 Admin - Access Management</h1>
-            <div class="header-buttons">
-                <button class="return-btn" onclick="returnToDashboard()">Return to Dashboard</button>
-                <button class="logout-btn" onclick="logout()">Logout</button>
+        <header class="app-header" style="background: white; border-radius: 8px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-bottom: none; margin-bottom: 15px;">
+            <div class="app-branding">
+                <img src="/data/PFN_logo.png" alt="PFN" class="company-logo" />
+                <div class="app-title-wrap">
+                    <h1>Admin - Access Management</h1>
+                    <p>Requests, groups, users, and audit permissions</p>
+                </div>
             </div>
-        </div>
+            <div class="app-top-actions">
+                <button class="action-btn btn-nav" onclick="returnToDashboard()">Back to Dashboard</button>
+                <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;">Change Password</button>
+                <button class="action-btn btn-logout" onclick="logout()">Logout</button>
+            </div>
+        </header>
 
         <div id="alertSuccess" class="alert alert-success"></div>
         <div id="alertError" class="alert alert-error"></div>
@@ -556,6 +700,34 @@
             <button class="btn-primary" onclick="showCreateGroupModal()" style="margin-bottom: 20px;">
                 + Create New Group
             </button>
+
+            <div class="access-permissions-card">
+                <div class="access-permissions-header">
+                    <div>
+                        <h3>Access Permissions</h3>
+                        <p class="access-permissions-note">Správa práv Read / Modify pro jednotlivé stránky podle uživatelských skupin.</p>
+                    </div>
+                    <div class="access-permissions-actions">
+                        <button id="saveAllAccessPermissionsBtn" type="button" class="btn-save-permissions" onclick="saveAllAccessPermissions()">Save All</button>
+                    </div>
+                </div>
+                <div id="accessPermissionsLoading" class="loading" style="display:none">⏳ Loading access permissions...</div>
+                <div id="accessPermissionsContent"></div>
+            </div>
+
+            <div class="access-permissions-card">
+                <div class="access-permissions-header">
+                    <div>
+                        <h3>Recipe Approval Region Matrix</h3>
+                        <p class="access-permissions-note">Nastaveni schvalovatelu receptur podle regionu (CZ, EG, RSA). Uzivatele se nacitaji dynamicky ze skupin Admin a Recipe Approvals.</p>
+                    </div>
+                    <div class="access-permissions-actions">
+                        <button id="saveRecipeApprovalRegionMatrixBtn" type="button" class="btn-save-permissions" onclick="saveRecipeApprovalRegionMatrix()">Save</button>
+                    </div>
+                </div>
+                <div id="recipeApprovalRegionMatrixLoading" class="loading" style="display:none">⏳ Loading recipe approval region matrix...</div>
+                <div id="recipeApprovalRegionMatrixContent"></div>
+            </div>
 
             <div id="groupsLoading" class="loading" style="display:none">
                 ⏳ Loading groups...
@@ -642,8 +814,8 @@
                 <textarea id="denyReason" placeholder="Enter reason for denial..."></textarea>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeDenyModal()">Cancel</button>
-                <button class="btn-deny" onclick="confirmDeny()">Deny</button>
+                <button type="button" class="btn-cancel" onclick="closeDenyModal()">Cancel</button>
+                <button type="button" class="btn-deny" onclick="confirmDeny()">Deny</button>
             </div>
         </div>
     </div>
@@ -665,8 +837,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeCreateGroupModal()">Cancel</button>
-                <button class="btn-primary" onclick="createGroup()">Create Group</button>
+                <button type="button" class="btn-cancel" onclick="closeCreateGroupModal()">Cancel</button>
+                <button type="button" class="btn-primary" onclick="createGroup()">Create Group</button>
             </div>
         </div>
     </div>
@@ -688,8 +860,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeEditGroupModal()">Cancel</button>
-                <button class="btn-primary" onclick="confirmEditGroup()">Update Group</button>
+                <button type="button" class="btn-cancel" onclick="closeEditGroupModal()">Cancel</button>
+                <button type="button" class="btn-primary" onclick="confirmEditGroup()">Update Group</button>
             </div>
         </div>
     </div>
@@ -715,8 +887,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeEditUserModal()">Cancel</button>
-                <button class="btn-primary" onclick="confirmEditUser()">Update User</button>
+                <button type="button" class="btn-cancel" onclick="closeEditUserModal()">Cancel</button>
+                <button type="button" class="btn-primary" onclick="confirmEditUser()">Update User</button>
             </div>
         </div>
     </div>
@@ -730,15 +902,15 @@
             <div class="modal-body">
                 <div class="form-group">
                     <label for="newUserEmail">Email *</label>
-                    <input type="email" id="newUserEmail" placeholder="user@pfnonwovens.com" required />
+                    <input type="email" id="newUserEmail" name="newUserEmail" placeholder="user@pfnonwovens.com" autocomplete="off" autocapitalize="off" spellcheck="false" data-bwignore="true" data-lpignore="true" data-1p-ignore="true" />
                 </div>
                 <div class="form-group">
                     <label for="newUserName">Full Name *</label>
-                    <input type="text" id="newUserName" placeholder="John Doe" required />
+                    <input type="text" id="newUserName" name="newUserName" placeholder="John Doe" autocomplete="off" autocapitalize="words" spellcheck="false" data-bwignore="true" data-lpignore="true" data-1p-ignore="true" />
                 </div>
                 <div class="form-group">
                     <label for="newUserPassword">Password *</label>
-                    <input type="password" id="newUserPassword" placeholder="Secure password" required />
+                    <input type="password" id="newUserPassword" name="newUserPassword" placeholder="Secure password" autocomplete="new-password" data-bwignore="true" data-lpignore="true" data-1p-ignore="true" />
                 </div>
                 <div class="form-group">
                     <label for="newUserGroup">Assign to Group</label>
@@ -746,18 +918,69 @@
                         <option value="">-- No Group --</option>
                     </select>
                 </div>
+                <div id="createUserInlineError" class="alert alert-error" style="display:none; margin-bottom: 0;"></div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeCreateUserModal()">Cancel</button>
-                <button class="btn-primary" onclick="confirmCreateUser()">Create User</button>
+                <button type="button" class="btn-cancel" onclick="closeCreateUserModal()">Cancel</button>
+                <button type="button" class="btn-primary" onclick="confirmCreateUser()">Create User</button>
             </div>
         </div>
     </div>
 
 
+    <script src="/auth.js"></script>
     <script>
         let currentDenyRequestId = null;
         const token = localStorage.getItem('authToken');
+        let accessPermissionPages = [];
+        let accessPermissionMatrix = [];
+        let isSavingAllAccessPermissions = false;
+        let recipeApprovalRegions = [];
+        let recipeApprovalRegionMatrix = [];
+        let hasUnsavedRecipeApprovalRegionChanges = false;
+
+        const ACCESS_PERMISSION_TOOLTIPS = {
+            dashboard: {
+                read: 'Read: otevreni dashboardu a zobrazeni KPI/prehledu.',
+                modify: 'Modify: zadne zapisove akce; stejny rozsah jako Read.'
+            },
+            'bom-calculator': {
+                read: 'Read: zobrazeni BOM kalkulatoru a nacteni dat.',
+                modify: 'Modify: ukladani a upravy kalkulovanych BOM zaznamu.'
+            },
+            'bom-recipe-browser': {
+                read: 'Read: zobrazeni recipe summary a filtrovani zaznamu.',
+                modify: 'Modify: schvalovani/revize receptur a zapis stavu.'
+            },
+            'recipe-edit-clone': {
+                read: 'Read: zobrazeni detailni tabulky receptur vcetne technickych udaju a BOM.',
+                modify: 'Modify: editace existujicich receptur, klonovani a ukladani zmen.'
+            },
+            'recipe-approval': {
+                read: 'Read: zobrazeni fronty receptur s Recipe Approved = No a jejich technickych detailu.',
+                modify: 'Modify: schvalit, doporucit upravu nebo zamitnout recepturu vcetne komentaru.'
+            },
+            'rm-prices': {
+                read: 'Read: zobrazeni raw material cen.',
+                modify: 'Modify: import a ulozeni raw material cen.'
+            },
+            'polymer-indexes': {
+                read: 'Read: zobrazeni polymer indexu.',
+                modify: 'Modify: update polymer index hodnot a administrace.'
+            },
+            'fx-rates': {
+                read: 'Read: zobrazeni FX rates a period.',
+                modify: 'Modify: import/ulozeni FX rates.'
+            },
+            'line-rates': {
+                read: 'Read: zobrazeni line rates.',
+                modify: 'Modify: uprava line rates a jejich ulozeni.'
+            },
+            'admin-access': {
+                read: 'Read: otevreni admin sekce Access Management.',
+                modify: 'Modify: schvalovani pristupu, sprava skupin/uzivatelu a opravneni.'
+            }
+        };
 
         function checkAuth() {
             if (!token) {
@@ -772,6 +995,20 @@
             setTimeout(() => {
                 alertElement.style.display = 'none';
             }, 4000);
+        }
+
+        function showCreateUserInlineError(message) {
+            const el = document.getElementById('createUserInlineError');
+            if (!el) return;
+            el.textContent = message;
+            el.style.display = 'block';
+        }
+
+        function clearCreateUserInlineError() {
+            const el = document.getElementById('createUserInlineError');
+            if (!el) return;
+            el.textContent = '';
+            el.style.display = 'none';
         }
 
         function switchTab(tabName) {
@@ -967,6 +1204,8 @@
                 }
 
                 const groups = await response.json();
+                await loadAccessPermissionsMatrix();
+                await loadRecipeApprovalRegionMatrix();
                 loading.style.display = 'none';
 
                 if (groups.length === 0) {
@@ -1014,6 +1253,444 @@
                 loading.style.display = 'none';
                 showAlert('alertError', '❌ Error: ' + err.message, 'error');
             }
+        }
+
+        async function loadAccessPermissionsMatrix() {
+            const loading = document.getElementById('accessPermissionsLoading');
+            const content = document.getElementById('accessPermissionsContent');
+
+            loading.style.display = 'block';
+            content.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/admin/access-permissions/matrix', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load access permissions matrix');
+                }
+
+                const data = await response.json();
+                accessPermissionPages = Array.isArray(data.pages) ? data.pages : [];
+                accessPermissionMatrix = Array.isArray(data.matrix) ? data.matrix : [];
+
+                loading.style.display = 'none';
+                renderAccessPermissionsMatrix();
+            } catch (err) {
+                loading.style.display = 'none';
+                content.innerHTML = '<p class="error-text">Unable to load Access Permissions matrix.</p>';
+                console.error('Access matrix load failed:', err);
+            }
+        }
+
+        async function loadRecipeApprovalRegionMatrix() {
+            const loading = document.getElementById('recipeApprovalRegionMatrixLoading');
+            const content = document.getElementById('recipeApprovalRegionMatrixContent');
+            const saveBtn = document.getElementById('saveRecipeApprovalRegionMatrixBtn');
+
+            loading.style.display = 'block';
+            content.innerHTML = '';
+            hasUnsavedRecipeApprovalRegionChanges = false;
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.classList.remove('dirty');
+                saveBtn.textContent = 'Save';
+            }
+
+            try {
+                const response = await fetch('/api/admin/recipe-approval-region-matrix', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load recipe approval region matrix');
+                }
+
+                const data = await response.json();
+                recipeApprovalRegions = Array.isArray(data.regions) ? data.regions : [];
+                recipeApprovalRegionMatrix = Array.isArray(data.matrix) ? data.matrix : [];
+
+                loading.style.display = 'none';
+                renderRecipeApprovalRegionMatrix();
+            } catch (err) {
+                loading.style.display = 'none';
+                content.innerHTML = '<p class="error-text">Unable to load Recipe Approval Region matrix.</p>';
+                console.error('Recipe approval region matrix load failed:', err);
+            }
+        }
+
+        function renderRecipeApprovalRegionMatrix() {
+            const content = document.getElementById('recipeApprovalRegionMatrixContent');
+            const saveBtn = document.getElementById('saveRecipeApprovalRegionMatrixBtn');
+
+            if (!Array.isArray(recipeApprovalRegionMatrix) || recipeApprovalRegionMatrix.length === 0) {
+                content.innerHTML = '<p class="no-users">No users found in Admin or Recipe Approvals groups.</p>';
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                    saveBtn.classList.remove('dirty');
+                }
+                return;
+            }
+
+            let html = '<div class="access-matrix-wrapper"><table class="access-matrix-table"><thead>';
+            html += '<tr><th class="group-col">Approver</th>';
+            recipeApprovalRegions.forEach((region) => {
+                html += `<th>${escapeHtml(region)}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            recipeApprovalRegionMatrix.forEach((row) => {
+                const displayName = row.name || row.email || row.userId;
+                const subInfo = row.email ? ` (${row.email})` : '';
+                html += `<tr data-approver-id="${row.userId}">`;
+                html += `<td class="group-col"><strong>${escapeHtml(displayName)}</strong><br><small>${escapeHtml(subInfo.trim())}</small></td>`;
+
+                recipeApprovalRegions.forEach((region) => {
+                    const checked = row.regions && row.regions[region] ? 'checked' : '';
+                    html += `<td><input type="checkbox" class="access-checkbox" data-user-id="${row.userId}" data-region="${region}" ${checked} onchange="onRecipeApprovalRegionCheckboxChanged(this)"></td>`;
+                });
+
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            content.innerHTML = html;
+
+            if (saveBtn) {
+                saveBtn.disabled = !hasUnsavedRecipeApprovalRegionChanges;
+                saveBtn.classList.toggle('dirty', hasUnsavedRecipeApprovalRegionChanges);
+                saveBtn.textContent = hasUnsavedRecipeApprovalRegionChanges ? 'Save *' : 'Save';
+            }
+        }
+
+        function onRecipeApprovalRegionCheckboxChanged(checkbox) {
+            const userId = checkbox.dataset.userId;
+            const region = checkbox.dataset.region;
+
+            const row = recipeApprovalRegionMatrix.find((item) => String(item.userId) === String(userId));
+            if (!row) return;
+            if (!row.regions || typeof row.regions !== 'object') {
+                row.regions = {};
+            }
+
+            row.regions[region] = checkbox.checked;
+            hasUnsavedRecipeApprovalRegionChanges = true;
+            renderRecipeApprovalRegionMatrix();
+        }
+
+        async function saveRecipeApprovalRegionMatrix() {
+            if (!hasUnsavedRecipeApprovalRegionChanges) {
+                showAlert('alertInfo', 'ℹ️ No unsaved Recipe Approval Region changes.');
+                return;
+            }
+
+            const saveBtn = document.getElementById('saveRecipeApprovalRegionMatrixBtn');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving...';
+            }
+
+            try {
+                const response = await fetch('/api/admin/recipe-approval-region-matrix', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        matrix: recipeApprovalRegionMatrix
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to save recipe approval region matrix');
+                }
+
+                recipeApprovalRegions = Array.isArray(data.regions) ? data.regions : recipeApprovalRegions;
+                recipeApprovalRegionMatrix = Array.isArray(data.matrix) ? data.matrix : recipeApprovalRegionMatrix;
+                hasUnsavedRecipeApprovalRegionChanges = false;
+                renderRecipeApprovalRegionMatrix();
+                showAlert('alertSuccess', '✅ Recipe approval region matrix saved successfully');
+            } catch (err) {
+                showAlert('alertError', `❌ ${err.message}`, 'error');
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save';
+                }
+            }
+        }
+
+        function renderAccessPermissionsMatrix() {
+            const content = document.getElementById('accessPermissionsContent');
+            updateSaveAllButtonState();
+
+            if (!Array.isArray(accessPermissionMatrix) || accessPermissionMatrix.length === 0) {
+                content.innerHTML = '<p class="no-users">No groups available. Create a group to configure access permissions.</p>';
+                return;
+            }
+
+            let html = '<div class="access-matrix-wrapper"><table class="access-matrix-table"><thead>';
+            html += '<tr><th class="group-col" rowspan="2">Group</th>';
+
+            accessPermissionPages.forEach((page) => {
+                const readTooltip = escapeHtml(getPermissionTooltipText(page, 'read'));
+                const modifyTooltip = escapeHtml(getPermissionTooltipText(page, 'modify'));
+                const pageTitle = escapeHtml(page.title || page.key);
+                const pageHelpText = escapeHtml(`Read: ${readTooltip} | Modify: ${modifyTooltip}`);
+                html += `<th colspan="2">${pageTitle}<span class="matrix-help-icon" title="${pageHelpText}">?</span></th>`;
+            });
+
+            html += '<th class="access-save-cell" rowspan="2">Actions</th></tr><tr>';
+
+            accessPermissionPages.forEach((page) => {
+                const readTooltip = escapeHtml(getPermissionTooltipText(page, 'read'));
+                const modifyTooltip = escapeHtml(getPermissionTooltipText(page, 'modify'));
+                html += `<th title="${readTooltip}">Read</th><th title="${modifyTooltip}">Modify</th>`;
+            });
+
+            html += '</tr></thead><tbody>';
+
+            accessPermissionMatrix.forEach((group) => {
+                const rowClass = group.hasUnsavedAccessChanges ? 'access-row-dirty' : '';
+                const saveBtnClass = group.hasUnsavedAccessChanges ? 'btn-save-permissions dirty' : 'btn-save-permissions';
+                const saveBtnTitle = group.hasUnsavedAccessChanges ? 'Neulozene zmeny - klikni pro ulozeni' : 'Ulozit opravneni pro tuto skupinu';
+                html += `<tr data-group-id="${group.id}" class="${rowClass}">`;
+                html += `<td class="group-col"><strong>${escapeHtml(group.name)}</strong></td>`;
+
+                accessPermissionPages.forEach((page) => {
+                    const pageState = group.pagePermissions && group.pagePermissions[page.key]
+                        ? group.pagePermissions[page.key]
+                        : { read: false, modify: false };
+
+                    const readChecked = pageState.read ? 'checked' : '';
+                    const modifyChecked = pageState.modify ? 'checked' : '';
+
+                    html += `<td><input type="checkbox" class="access-checkbox" data-group-id="${group.id}" data-page-key="${page.key}" data-access-level="read" ${readChecked} onchange="onAccessPermissionCheckboxChanged(this)"></td>`;
+                    html += `<td><input type="checkbox" class="access-checkbox" data-group-id="${group.id}" data-page-key="${page.key}" data-access-level="modify" ${modifyChecked} onchange="onAccessPermissionCheckboxChanged(this)"></td>`;
+                });
+
+                html += `<td class="access-save-cell"><button class="${saveBtnClass}" title="${saveBtnTitle}" onclick="saveGroupAccessPermissions('${group.id}')">Save</button></td>`;
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            content.innerHTML = html;
+        }
+
+        function getDirtyAccessPermissionGroupsCount() {
+            if (!Array.isArray(accessPermissionMatrix)) {
+                return 0;
+            }
+
+            return accessPermissionMatrix.filter((group) => !!group.hasUnsavedAccessChanges).length;
+        }
+
+        function updateSaveAllButtonState() {
+            const saveAllBtn = document.getElementById('saveAllAccessPermissionsBtn');
+            if (!saveAllBtn) {
+                return;
+            }
+
+            const hasGroups = Array.isArray(accessPermissionMatrix) && accessPermissionMatrix.length > 0;
+            const dirtyCount = getDirtyAccessPermissionGroupsCount();
+
+            if (isSavingAllAccessPermissions) {
+                saveAllBtn.disabled = true;
+                saveAllBtn.textContent = 'Saving...';
+                return;
+            }
+
+            saveAllBtn.disabled = !hasGroups || dirtyCount === 0;
+            saveAllBtn.textContent = dirtyCount > 0 ? `Save All (${dirtyCount})` : 'Save All';
+        }
+
+        function getPermissionTooltipText(page, accessLevel) {
+            const pageKey = (page && page.key) ? String(page.key) : '';
+            const tooltipConfig = ACCESS_PERMISSION_TOOLTIPS[pageKey] || {};
+            const configured = tooltipConfig[accessLevel];
+
+            if (configured) {
+                return configured;
+            }
+
+            const readableTitle = (page && page.title) ? String(page.title) : pageKey;
+            if (accessLevel === 'modify') {
+                return `Modify: uprava a ukladani zmen na strance ${readableTitle}.`;
+            }
+
+            return `Read: otevreni a prohlizeni stranky ${readableTitle}.`;
+        }
+
+        function onAccessPermissionCheckboxChanged(checkbox) {
+            const groupId = checkbox.dataset.groupId;
+            const pageKey = checkbox.dataset.pageKey;
+            const accessLevel = checkbox.dataset.accessLevel;
+
+            const group = accessPermissionMatrix.find((item) => String(item.id) === String(groupId));
+            if (!group) return;
+
+            if (!group.pagePermissions || typeof group.pagePermissions !== 'object') {
+                group.pagePermissions = {};
+            }
+
+            if (!group.pagePermissions[pageKey]) {
+                group.pagePermissions[pageKey] = { read: false, modify: false };
+            }
+
+            group.pagePermissions[pageKey][accessLevel] = checkbox.checked;
+
+            if (accessLevel === 'modify' && checkbox.checked) {
+                group.pagePermissions[pageKey].read = true;
+                const readCheckbox = document.querySelector(`input[data-group-id="${groupId}"][data-page-key="${pageKey}"][data-access-level="read"]`);
+                if (readCheckbox) {
+                    readCheckbox.checked = true;
+                }
+            }
+
+            if (accessLevel === 'read' && !checkbox.checked) {
+                group.pagePermissions[pageKey].modify = false;
+                const modifyCheckbox = document.querySelector(`input[data-group-id="${groupId}"][data-page-key="${pageKey}"][data-access-level="modify"]`);
+                if (modifyCheckbox) {
+                    modifyCheckbox.checked = false;
+                }
+            }
+
+            markGroupAccessPermissionsDirty(groupId, true);
+        }
+
+        function markGroupAccessPermissionsDirty(groupId, isDirty) {
+            const group = accessPermissionMatrix.find((item) => String(item.id) === String(groupId));
+            if (!group) {
+                return;
+            }
+
+            group.hasUnsavedAccessChanges = !!isDirty;
+
+            const row = document.querySelector(`tr[data-group-id="${groupId}"]`);
+            if (!row) {
+                return;
+            }
+
+            row.classList.toggle('access-row-dirty', !!isDirty);
+
+            const saveBtn = row.querySelector('.btn-save-permissions');
+            if (saveBtn) {
+                saveBtn.classList.toggle('dirty', !!isDirty);
+                saveBtn.title = isDirty
+                    ? 'Neulozene zmeny - klikni pro ulozeni'
+                    : 'Ulozit opravneni pro tuto skupinu';
+            }
+
+            updateSaveAllButtonState();
+        }
+
+        async function saveGroupAccessPermissions(groupId, options = {}) {
+            const { showSuccessAlert = true, rerenderAfterSave = true } = options;
+            const group = accessPermissionMatrix.find((item) => String(item.id) === String(groupId));
+            if (!group) {
+                showAlert('alertError', '❌ Group not found in matrix', 'error');
+                return false;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/groups/${groupId}/access-permissions`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        pagePermissions: group.pagePermissions || {}
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to save access permissions');
+                }
+
+                const index = accessPermissionMatrix.findIndex((item) => String(item.id) === String(groupId));
+                if (index >= 0 && data.group) {
+                    data.group.hasUnsavedAccessChanges = false;
+                    accessPermissionMatrix[index] = data.group;
+                } else {
+                    markGroupAccessPermissionsDirty(groupId, false);
+                }
+
+                markGroupAccessPermissionsDirty(groupId, false);
+
+                if (showSuccessAlert) {
+                    showAlert('alertSuccess', `✅ Access permissions saved for group "${group.name}"`);
+                }
+                if (rerenderAfterSave) {
+                    renderAccessPermissionsMatrix();
+                }
+                return true;
+            } catch (err) {
+                showAlert('alertError', `❌ ${err.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function saveAllAccessPermissions() {
+            if (isSavingAllAccessPermissions) {
+                return;
+            }
+
+            if (!Array.isArray(accessPermissionMatrix) || accessPermissionMatrix.length === 0) {
+                showAlert('alertInfo', 'ℹ️ There are no groups to save.');
+                return;
+            }
+
+            const dirtyGroups = accessPermissionMatrix.filter((group) => !!group.hasUnsavedAccessChanges);
+            if (dirtyGroups.length === 0) {
+                showAlert('alertInfo', 'ℹ️ No unsaved Access Permissions changes.');
+                updateSaveAllButtonState();
+                return;
+            }
+
+            isSavingAllAccessPermissions = true;
+            const saveAllBtn = document.getElementById('saveAllAccessPermissionsBtn');
+            if (saveAllBtn) {
+                saveAllBtn.disabled = true;
+                saveAllBtn.textContent = 'Saving...';
+            }
+
+            let successCount = 0;
+            for (const group of dirtyGroups) {
+                const ok = await saveGroupAccessPermissions(group.id, {
+                    showSuccessAlert: false,
+                    rerenderAfterSave: false
+                });
+
+                if (!ok) {
+                    isSavingAllAccessPermissions = false;
+                    if (saveAllBtn) {
+                        saveAllBtn.disabled = false;
+                        saveAllBtn.textContent = 'Save All';
+                    }
+                    renderAccessPermissionsMatrix();
+                    return;
+                }
+
+                successCount += 1;
+            }
+
+            isSavingAllAccessPermissions = false;
+            if (saveAllBtn) {
+                saveAllBtn.disabled = false;
+                saveAllBtn.textContent = 'Save All';
+            }
+
+            renderAccessPermissionsMatrix();
+            showAlert('alertSuccess', `✅ Access permissions saved for ${successCount} group(s).`);
         }
 
         async function loadGroupUsers(groupId) {
@@ -1197,6 +1874,7 @@
 
         async function openCreateUserModal(groupId) {
             currentCreateUserGroupId = groupId;
+            clearCreateUserInlineError();
             
             // Clear form
             document.getElementById('newUserEmail').value = '';
@@ -1217,9 +1895,9 @@
                 
                 groups.forEach(group => {
                     const option = document.createElement('option');
-                    option.value = group.id;
+                    option.value = String(group.id);
                     option.textContent = group.name;
-                    if (group.id === groupId) {
+                    if (String(group.id) === String(groupId)) {
                         option.selected = true;
                     }
                     groupSelect.appendChild(option);
@@ -1235,16 +1913,42 @@
         function closeCreateUserModal() {
             document.getElementById('createUserModal').classList.remove('active');
             currentCreateUserGroupId = null;
+            clearCreateUserInlineError();
         }
 
         async function confirmCreateUser() {
+            clearCreateUserInlineError();
             const email = document.getElementById('newUserEmail').value.trim();
             const fullName = document.getElementById('newUserName').value.trim();
             const password = document.getElementById('newUserPassword').value.trim();
-            const groupId = document.getElementById('newUserGroup').value || null;
+            const groupIdRaw = String(document.getElementById('newUserGroup').value || '').trim();
+            const groupId = groupIdRaw || null;
 
             if (!email || !fullName || !password) {
-                showAlert('alertError', '❌ Email, full name, and password are required', 'error');
+                const msg = '❌ Email, full name, and password are required';
+                showAlert('alertError', msg, 'error');
+                showCreateUserInlineError(msg);
+                return;
+            }
+
+            if (!email.toLowerCase().endsWith('@pfnonwovens.com')) {
+                const msg = '❌ Only @pfnonwovens.com email addresses are allowed';
+                showAlert('alertError', msg, 'error');
+                showCreateUserInlineError(msg);
+                return;
+            }
+
+            if (password.length < 8) {
+                const msg = '❌ Password must be at least 8 characters';
+                showAlert('alertError', msg, 'error');
+                showCreateUserInlineError(msg);
+                return;
+            }
+
+            if (groupIdRaw && !groupId) {
+                const msg = '❌ Invalid group selection';
+                showAlert('alertError', msg, 'error');
+                showCreateUserInlineError(msg);
                 return;
             }
 
@@ -1263,17 +1967,32 @@
                     })
                 });
 
-                const data = await response.json();
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch {
+                    data = {};
+                }
 
                 if (response.ok) {
                     showAlert('alertSuccess', `✅ User created successfully (${data.user.email})`);
                     closeCreateUserModal();
                     loadGroups();
                 } else {
-                    showAlert('alertError', '❌ ' + data.error, 'error');
+                    const serverError = data && data.error ? data.error : `Request failed (${response.status})`;
+                    const msg = '❌ ' + serverError;
+                    showAlert('alertError', msg, 'error');
+                    showCreateUserInlineError(msg);
+                    console.error('Create user failed:', {
+                        status: response.status,
+                        payload: { email, fullName, hasPassword: !!password, groupId },
+                        response: data
+                    });
                 }
             } catch (err) {
-                showAlert('alertError', '❌ Error: ' + err.message, 'error');
+                const msg = '❌ Error: ' + err.message;
+                showAlert('alertError', msg, 'error');
+                showCreateUserInlineError(msg);
             }
         }
 
@@ -1681,6 +2400,7 @@
 
         // Initial load
         checkAuth();
+        auth.configureHeaderButtons({ adminBtnId: 'adminButtonNotUsed' });
         loadAccessRequests();
     </script>
 </body>

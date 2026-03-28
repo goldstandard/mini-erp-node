@@ -11,23 +11,41 @@ if (!fs.existsSync(dataDir)) {
 class Database {
   constructor() {
     this.db = null;
+    this.initPromise = null;
   }
 
   init() {
-    return new Promise((resolve, reject) => {
+    if (this.db) {
+      return Promise.resolve();
+    }
+
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    this.initPromise = new Promise((resolve, reject) => {
       this.db = new sqlite3.Database(dbPath, (err) => {
         if (err) {
           console.error('Error opening database:', err);
+          this.db = null;
+          this.initPromise = null;
           reject(err);
         } else {
           console.log('Connected to SQLite database');
-          this.db.run('PRAGMA foreign_keys = ON', (err) => {
-            if (err) reject(err);
-            else resolve();
+          this.db.run('PRAGMA foreign_keys = ON', (pragmaErr) => {
+            if (pragmaErr) {
+              this.db = null;
+              this.initPromise = null;
+              reject(pragmaErr);
+            } else {
+              resolve();
+            }
           });
         }
       });
     });
+
+    return this.initPromise;
   }
 
   run(sql, params = []) {

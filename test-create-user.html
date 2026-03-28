@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create User Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; }
+        button { padding: 10px 20px; margin-top: 10px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        #log { background: #f5f5f5; padding: 10px; margin-top: 20px; min-height: 100px; border: 1px solid #ccc; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Create User Test</h1>
+    
+    <div class="form-group">
+        <label for="email">Email *</label>
+        <input type="email" id="email" placeholder="user@pfnonwovens.com" value="test-direct@pfnonwovens.com" />
+    </div>
+    
+    <div class="form-group">
+        <label for="fullName">Full Name *</label>
+        <input type="text" id="fullName" placeholder="John Doe" value="Direct Test User" />
+    </div>
+    
+    <div class="form-group">
+        <label for="password">Password *</label>
+        <input type="password" id="password" placeholder="Password" value="DirectTest123!" />
+    </div>
+    
+    <div class="form-group">
+        <label for="groupId">Group</label>
+        <select id="groupId">
+            <option value="">Loading groups...</option>
+        </select>
+    </div>
+    
+    <button type="button" onclick="testCreateUser()">Create User (Test)</button>
+    
+    <div id="log"></div>
+    
+    <script>
+        const token = localStorage.getItem('authToken');
+        
+        function log(msg) {
+            const logEl = document.getElementById('log');
+            const line = document.createElement('div');
+            line.textContent = new Date().toLocaleTimeString() + ': ' + msg;
+            logEl.appendChild(line);
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(msg);
+        }
+        
+        async function loadGroups() {
+            log('Loading groups...');
+            try {
+                const resp = await fetch('/api/admin/groups', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const groups = await resp.json();
+                log('Loaded ' + groups.length + ' groups');
+                
+                const select = document.getElementById('groupId');
+                select.innerHTML = '<option value="">-- No Group --</option>';
+                groups.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g.id;
+                    opt.textContent = g.name;
+                    select.appendChild(opt);
+                });
+                if (groups.length > 0) {
+                    select.value = groups[0].id;
+                }
+            } catch (err) {
+                log('ERROR loading groups: ' + err.message);
+            }
+        }
+        
+        async function testCreateUser() {
+            log('testCreateUser() CALLED');
+            const email = document.getElementById('email').value.trim();
+            const fullName = document.getElementById('fullName').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const groupId = document.getElementById('groupId').value || null;
+            
+            log('Form values: email=' + email + ', name=' + fullName + ', group=' + groupId);
+            
+            if (!email || !fullName || !password) {
+                log('VALIDATION ERROR: Missing required fields');
+                return;
+            }
+            
+            try {
+                log('Sending POST to /api/admin/users...');
+                const resp = await fetch('/api/admin/users', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, fullName, password, groupId })
+                });
+                
+                const data = await resp.json();
+                log('Response status: ' + resp.status);
+                log('Response: ' + JSON.stringify(data));
+                
+                if (resp.ok) {
+                    log('SUCCESS: User created with ID ' + data.user.id);
+                } else {
+                    log('ERROR: ' + data.error);
+                }
+            } catch (err) {
+                log('EXCEPTION: ' + err.message);
+            }
+        }
+        
+        // Initialize
+        if (!token) {
+            log('ERROR: No auth token. Go to login first.');
+        } else {
+            log('Page loaded. Token: ' + token.substring(0, 20) + '...');
+            loadGroups();
+        }
+    </script>
+</body>
+</html>

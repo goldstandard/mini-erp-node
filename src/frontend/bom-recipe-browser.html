@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>BOM Recipe Browser</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="/styles.css" />
   <style>
     .browser-container {
       max-width: 1400px;
@@ -284,60 +284,177 @@
       margin-bottom: 20px;
       border: 1px solid #fcc;
     }
+
+    .summary-divider {
+      margin: 24px 0;
+      border: 0;
+      border-top: 1px solid #d9e2ec;
+    }
+
+    .recipe-summary-block h2 {
+      margin-top: 0;
+    }
+
+    .table-top-scroll {
+      overflow-x: auto;
+      overflow-y: hidden;
+      height: 14px;
+      margin-bottom: 6px;
+      display: none;
+    }
+
+    .table-top-scroll-inner {
+      height: 1px;
+    }
+
+    body.compact .browser-container {
+      padding: 12px;
+    }
+
+    body.compact .browser-header {
+      margin-bottom: 16px;
+    }
+
+    body.compact .recipes-table th,
+    body.compact .recipes-table td {
+      padding: 8px;
+      font-size: 13px;
+    }
+
+    body.compact .browser-toolbar .search-box {
+      padding: 7px 10px;
+      font-size: 13px;
+    }
   </style>
 </head>
 
 <body>
   <div class="container">
-    <header>
-      <div class="header-logo-text-group">
-        <img src="/data/PFN_logo.png" alt="PFNonwovens" class="company-logo" />
-        <div class="header-center">
+    <header class="app-header">
+      <div class="app-branding">
+        <img src="/data/PFN_logo.png" alt="PFN" class="company-logo" />
+        <div class="app-title-wrap">
           <h1>BOM Recipe Browser</h1>
-          <p class="subtitle">View and manage saved BOM recipes</p>
+          <p>View and manage saved BOM recipes</p>
         </div>
-        <img src="/data/PFN_logo.png" alt="PFNonwovens" class="company-logo company-logo-right" />
       </div>
-      <div class="header-right">
-        <button id="logoutBtn" class="logout-btn" title="Logout" onclick="auth.logout()">Logout</button>
+      <div class="app-top-actions">
+        <button class="action-btn btn-nav" onclick="window.location.href='/dashboard'">Back to Dashboard</button>
+        <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;">Change Password</button>
+        <button id="adminBtn" class="action-btn btn-admin" style="display:none;">Admin</button>
+        <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
       </div>
     </header>
 
     <div class="browser-container">
       <div class="browser-header">
         <h1>Saved BOM Recipes</h1>
-        <div class="browser-toolbar">
-          <input
-            type="text"
-            id="searchInput"
-            class="search-box"
-            placeholder="Search by PD ID, Customer, or Line..."
-          />
-          <button class="btn-back" onclick="window.location.href='/dashboard'">← Back to Dashboard</button>
-        </div>
+        <div class="browser-toolbar"></div>
       </div>
 
-      <div id="errorMsg" class="error" style="display: none;"></div>
+      <section class="recipe-summary-block">
+        <h2>Recipe Summary</h2>
 
-      <div id="loadingMsg" class="loading" style="display: none;">Loading recipes...</div>
+        <section class="control-panel">
+          <div class="control-top">
+            <div class="control-top-left">
+              <div class="control-group">
+                <label for="rsCurrencySelect">Display Currency:</label>
+                <select id="rsCurrencySelect">
+                  <option value="USD">USD</option>
+                  <option value="CZK">CZK</option>
+                  <option value="EUR">EUR</option>
+                  <option value="ZAR">ZAR</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
 
-      <div id="recipesList" class="recipes-list" style="display: none;">
-        <table class="recipes-table">
-          <thead>
-            <tr>
-              <th style="width: 12%;">PD ID</th>
-              <th style="width: 18%;">Customer</th>
-              <th style="width: 12%;">Line</th>
-              <th style="width: 12%;">Customer BW</th>
-              <th style="width: 18%;">Author</th>
-              <th style="width: 13%;">Created</th>
-            </tr>
-          </thead>
-          <tbody id="recipesTableBody"></tbody>
-        </table>
-      </div>
+              <div class="control-group">
+                <label for="rsViewToggle">View Mode:</label>
+                <select id="rsViewToggle">
+                  <option value="aggregated">Aggregated (Summary)</option>
+                  <option value="detailed">Detailed (Full Breakdown)</option>
+                </select>
+              </div>
+            </div>
+          </div>
 
-      <div id="noRecipes" class="no-recipes" style="display: none;">No recipes found.</div>
+          <div class="filter-section">
+            <h3>Filters</h3>
+            <div class="filter-row">
+              <div class="filter-item"><label for="rsFilterSapId">SAP ID:</label><select id="rsFilterSapId" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterPfnId">PD ID:</label><select id="rsFilterPfnId" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterCustomer">Customer:</label><select id="rsFilterCustomer" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterMarketSegment">Market Segment:</label><select id="rsFilterMarketSegment" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterApplication">Application:</label><select id="rsFilterApplication" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterSSMS">S/SMS:</label><select id="rsFilterSSMS" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterBonding">Bonding:</label><select id="rsFilterBonding" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterBasisWeight">Basis Weight:</label><select id="rsFilterBasisWeight" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterSlitWidth">Slit Width:</label><select id="rsFilterSlitWidth" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterTreatment">Treatment:</label><select id="rsFilterTreatment" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterAuthor">Author:</label><select id="rsFilterAuthor" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterLine">Line:</label><select id="rsFilterLine" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterCountry">Country:</label><select id="rsFilterCountry" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterOverconsumption">Overconsumption:</label><select id="rsFilterOverconsumption" multiple size="1"></select></div>
+            </div>
+
+            <div class="button-group">
+              <button id="rsLoadBtn" class="btn-primary">Load Summary</button>
+              <button id="rsClearBtn" class="btn-secondary">Clear Filters</button>
+              <button id="rsExportCsvBtn" class="btn-secondary">Export CSV</button>
+              <button id="rsExportXlsxBtn" class="btn-secondary">Export Excel</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="rsSummaryStats" class="summary-stats" style="display: none;">
+          <div class="stat-card"><h4>Total Records</h4><p id="rsStatRecords">0</p></div>
+          <div class="stat-card"><h4>Avg Material Cost</h4><p id="rsStatAvgMaterial">0</p></div>
+          <div class="stat-card"><h4>Avg Process Cost</h4><p id="rsStatAvgProcess">0</p></div>
+          <div class="stat-card"><h4>Avg Total Cost</h4><p id="rsStatAvgTotal">0</p></div>
+        </section>
+
+        <section id="rsAggregatedView" class="view-section" style="display: none;">
+          <h3>Recipe Summary</h3>
+          <div id="rsTopScrollbar" class="table-top-scroll" aria-hidden="true">
+            <div id="rsTopScrollbarInner" class="table-top-scroll-inner"></div>
+          </div>
+          <div id="rsTableWrapper" class="table-wrapper">
+            <table id="rsCostTable">
+              <thead>
+                <tr>
+                  <th>Recipe Approved</th>
+                  <th>SAP ID</th>
+                  <th>PD ID</th>
+                  <th>Customer</th>
+                  <th>Market Segment</th>
+                  <th>Application</th>
+                  <th>S/SMS</th>
+                  <th>Bonding</th>
+                  <th>Basis Weight</th>
+                  <th>Slit Width</th>
+                  <th>Treatment</th>
+                  <th>Author</th>
+                  <th>Gross Yield %</th>
+                  <th>Throughput</th>
+                  <th>Line</th>
+                  <th>Country</th>
+                  <th>Material Cost</th>
+                  <th>Process Cost</th>
+                  <th>Total Cost</th>
+                  <th>Currency</th>
+                </tr>
+              </thead>
+              <tbody id="rsCostTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="rsDetailedView" class="view-section" style="display: none;">
+          <h3>Detailed Recipe Cost Breakdown</h3>
+          <div id="rsDetailedContent"></div>
+        </section>
+      </section>
     </div>
   </div>
 
@@ -349,242 +466,702 @@
     </div>
   </div>
 
-  <script src="auth.js"></script>
+  <script src="/auth.js"></script>
   <script>
-    let allRecipes = [];
+    let recipeSummaryData = [];
+    let recipeSummaryCurrency = 'USD';
+    let recipeSummaryViewMode = 'aggregated';
+    let recipeSummarySortColumn = null;
+    let recipeSummarySortDirection = 'asc';
+    let recipeSummaryScrollSyncBound = false;
 
-    async function loadRecipes() {
-      const loadingMsg = document.getElementById('loadingMsg');
-      const recipesList = document.getElementById('recipesList');
-      const noRecipes = document.getElementById('noRecipes');
-      const errorMsg = document.getElementById('errorMsg');
+    const recipeSummaryFilterMap = [
+      { id: 'rsFilterSapId', query: 'sapId' },
+      { id: 'rsFilterPfnId', query: 'pfnId' },
+      { id: 'rsFilterCustomer', query: 'customer' },
+      { id: 'rsFilterMarketSegment', query: 'marketSegment' },
+      { id: 'rsFilterApplication', query: 'application' },
+      { id: 'rsFilterSSMS', query: 's_sms' },
+      { id: 'rsFilterBonding', query: 'bonding' },
+      { id: 'rsFilterBasisWeight', query: 'basisWeight' },
+      { id: 'rsFilterSlitWidth', query: 'slitWidth' },
+      { id: 'rsFilterTreatment', query: 'treatment' },
+      { id: 'rsFilterAuthor', query: 'author' },
+      { id: 'rsFilterLine', query: 'lineId' },
+      { id: 'rsFilterCountry', query: 'country' },
+      { id: 'rsFilterOverconsumption', query: 'overconsumption' }
+    ];
 
-      loadingMsg.style.display = 'block';
-      recipesList.style.display = 'none';
-      noRecipes.style.display = 'none';
-      errorMsg.style.display = 'none';
-
-      try {
-        const response = await fetch('/api/bom/records', {
-          headers: {
-            'Authorization': `Bearer ${auth.getToken()}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to load recipes: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('API Response:', data);
-        allRecipes = data.records || [];
-        console.log('Loaded recipes:', allRecipes);
-
-        displayRecipes(allRecipes);
-      } catch (err) {
-        console.error('Error loading recipes:', err);
-        errorMsg.textContent = 'Error loading recipes: ' + err.message;
-        errorMsg.style.display = 'block';
-      } finally {
-        loadingMsg.style.display = 'none';
-      }
+    function formatAmount(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(2) : '0.00';
     }
 
-    function displayRecipes(recipes) {
-      const recipesList = document.getElementById('recipesList');
-      const noRecipes = document.getElementById('noRecipes');
-      const tbody = document.getElementById('recipesTableBody');
+    function enforceCompactMode() {
+      document.body.classList.add('compact');
+      localStorage.setItem('compactMode', '1');
+    }
 
-      tbody.innerHTML = '';
+    function normalizeComparable(value) {
+      if (value === null || value === undefined) return '';
+      return String(value).toLowerCase();
+    }
 
-      if (recipes.length === 0) {
-        recipesList.style.display = 'none';
-        noRecipes.style.display = 'block';
-        return;
-      }
+    function getRecipeSummarySortValue(item, columnIndex) {
+      const map = {
+        0: item.recipeApproved,
+        1: item.sapId,
+        2: item.pfnId,
+        3: item.customer,
+        4: item.marketSegment,
+        5: item.application,
+        6: item.s_sms,
+        7: item.bonding,
+        8: item.basisWeight,
+        9: item.slitWidth,
+        10: item.treatment,
+        11: item.author,
+        12: (item.grossYield || 0) * 100,
+        13: item.throughput,
+        14: item.lineId,
+        15: item.country,
+        16: item.materialCostNet,
+        17: item.processCost,
+        18: item.totalCost,
+        19: item.currency
+      };
+      const value = map[columnIndex];
+      return value === null || value === undefined ? '' : value;
+    }
 
-      recipesList.style.display = 'block';
-      noRecipes.style.display = 'none';
+    function sortRecipeSummaryData() {
+      if (recipeSummarySortColumn === null) return;
+      recipeSummaryData.sort((a, b) => {
+        const aVal = getRecipeSummarySortValue(a, recipeSummarySortColumn);
+        const bVal = getRecipeSummarySortValue(b, recipeSummarySortColumn);
 
-      recipes.forEach(recipe => {
-        const row = document.createElement('tr');
-        const createdDate = new Date(recipe.created_at).toLocaleDateString('cs-CZ', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
-
-        row.innerHTML = `
-          <td>${escapeHtml(recipe.pd_id || 'N/A')}</td>
-          <td>${escapeHtml(recipe.customer || 'N/A')}</td>
-          <td>${escapeHtml(recipe.line || 'N/A')}</td>
-          <td>${recipe.customer_bw ? recipe.customer_bw + ' g/m²' : 'N/A'}</td>
-          <td>${escapeHtml(recipe.author || 'N/A')}</td>
-          <td>${createdDate}</td>
-        `;
-        row.onclick = () => viewRecipeDetail(recipe.id);
-        tbody.appendChild(row);
+        let cmp = 0;
+        if (typeof aVal === 'number' || typeof bVal === 'number') {
+          cmp = (Number(aVal) || 0) - (Number(bVal) || 0);
+        } else {
+          cmp = String(aVal).localeCompare(String(bVal), undefined, { sensitivity: 'base', numeric: true });
+        }
+        return recipeSummarySortDirection === 'asc' ? cmp : -cmp;
       });
     }
 
-    async function viewRecipeDetail(recordId) {
-      const modal = document.getElementById('detailModal');
-      const contentDiv = document.getElementById('detailContent');
+    function attachRecipeSummaryHeaderSort() {
+      const headerRow = document.querySelector('#rsCostTable thead tr');
+      if (!headerRow) return;
+      const headers = headerRow.querySelectorAll('th');
 
-      contentDiv.innerHTML = '<div class="loading">Loading recipe details...</div>';
-      modal.classList.add('show');
+      headers.forEach((th, idx) => {
+        const clone = th.cloneNode(true);
+        const text = clone.textContent.replace(/\s*[▲▼]\s*$/g, '').trim();
+        clone.textContent = idx === recipeSummarySortColumn
+          ? `${text}${recipeSummarySortDirection === 'asc' ? ' ▲' : ' ▼'}`
+          : text;
+        clone.style.cursor = 'pointer';
+        th.parentNode.replaceChild(clone, th);
 
-      try {
-        const response = await fetch(`/api/bom/records/${recordId}`, {
-          headers: {
-            'Authorization': `Bearer ${auth.getToken()}`
+        clone.addEventListener('click', () => {
+          if (recipeSummarySortColumn === idx) {
+            recipeSummarySortDirection = recipeSummarySortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            recipeSummarySortColumn = idx;
+            recipeSummarySortDirection = 'asc';
           }
+          renderRecipeSummaryAggregated();
         });
-
-        if (!response.ok) {
-          throw new Error(`Failed to load recipe: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const { record, materials } = data;
-
-        renderRecipeDetail(record, materials);
-      } catch (err) {
-        console.error('Error loading recipe:', err);
-        contentDiv.innerHTML = `<div class="error">Error loading recipe: ${err.message}</div>`;
-      }
+      });
     }
 
-    function renderRecipeDetail(record, materials) {
-      const contentDiv = document.getElementById('detailContent');
+    function syncRecipeSummaryTopScrollbarWidth() {
+      const topScroll = document.getElementById('rsTopScrollbar');
+      const topInner = document.getElementById('rsTopScrollbarInner');
+      const tableWrapper = document.getElementById('rsTableWrapper');
+      const table = document.getElementById('rsCostTable');
+      if (!topScroll || !topInner || !tableWrapper || !table) return;
 
-      const basicFields = [
-        { label: 'PD ID', value: record.pd_id },
-        { label: 'SAP ID', value: record.sap_id },
-        { label: 'Customer', value: record.customer },
-        { label: 'Line', value: record.line },
-        { label: 'Market Segment', value: record.market_segment },
-        { label: 'Application', value: record.application },
-        { label: 'S/SMS', value: record.smms },
-        { label: 'Mono/Bico', value: record.mono_bico },
-        { label: 'Structure', value: record.structure },
-        { label: 'BICO Ratio', value: record.bico_ratio_desc },
-        { label: 'Main RawMat', value: record.main_raw_mat },
-        { label: 'Treatment', value: record.treatment },
-        { label: 'Color', value: record.color },
-        { label: 'Bonding', value: record.bonding },
-        { label: 'Customer BW', value: record.customer_bw ? record.customer_bw + ' g/m²' : 'N/A' },
-        { label: 'Belt BW', value: record.belt_bw ? record.belt_bw + ' g/m²' : 'N/A' },
-        { label: 'MB Grams', value: record.mb_grams ? record.mb_grams + ' g' : 'N/A' }
-      ];
+      topInner.style.width = `${table.scrollWidth}px`;
+      topScroll.style.display = tableWrapper.scrollWidth > tableWrapper.clientWidth ? 'block' : 'none';
+    }
 
-      const processFields = [
-        { label: 'Belt Speed', value: record.belt_speed ? record.belt_speed + ' m/min' : 'N/A' },
-        { label: 'SIKO %', value: record.siko_percent ? record.siko_percent + '%' : 'N/A' },
-        { label: 'Repro %', value: record.repro_percent ? record.repro_percent + '%' : 'N/A' },
-        { label: 'Max Usable Width', value: record.max_usable_width ? record.max_usable_width + ' mm' : 'N/A' },
-        { label: 'Usable Width', value: record.usable_width ? record.usable_width + ' mm' : 'N/A' },
-        { label: 'Edge Trim %', value: record.edge_trim_percent ? record.edge_trim_percent + '%' : 'N/A' },
-        { label: 'Web Loss %', value: record.web_loss_percent ? record.web_loss_percent + '%' : 'N/A' },
-        { label: 'Other Scrap %', value: record.other_scrap_percent ? record.other_scrap_percent + '%' : 'N/A' },
-        { label: 'Total Scrap %', value: record.total_scrap_percent ? record.total_scrap_percent + '%' : 'N/A' },
-        { label: 'Gross Yield %', value: record.gross_yield_percent ? record.gross_yield_percent + '%' : 'N/A' },
-        { label: 'S Beams', value: record.s_beams || 'N/A' },
-        { label: 'M Beams', value: record.m_beams || 'N/A' },
-        { label: 'SB Throughput', value: record.sb_throughput ? record.sb_throughput + ' kg/h' : 'N/A' },
-        { label: 'MB Throughput', value: record.mb_throughput ? record.mb_throughput + ' kg/h' : 'N/A' },
-        { label: 'Total Throughput', value: record.total_throughput ? record.total_throughput + ' kg/h' : 'N/A' },
-        { label: 'Production Time', value: record.production_time ? record.production_time + ' h' : 'N/A' }
-      ];
+    function setupRecipeSummaryTopScrollbar() {
+      const topScroll = document.getElementById('rsTopScrollbar');
+      const tableWrapper = document.getElementById('rsTableWrapper');
+      if (!topScroll || !tableWrapper) return;
 
-      const productFields = [
-        { label: 'Cores', value: record.cores },
-        { label: 'Slit Width', value: record.slit_width ? record.slit_width + ' mm' : 'N/A' },
-        { label: 'Length', value: record.length_meters ? record.length_meters + ' m' : 'N/A' },
-        { label: 'Roll Diameter', value: record.roll_diameter ? record.roll_diameter + ' mm' : 'N/A' },
-        { label: 'Target Production', value: record.target_production ? record.target_production + ' ' + (record.target_unit || '') : 'N/A' },
-        { label: 'Notes', value: record.notes }
-      ];
+      if (!recipeSummaryScrollSyncBound) {
+        let isSyncing = false;
 
-      const detailHTMl = `
-        <h2>Recipe: ${escapeHtml(record.pd_id || 'Unknown')}</h2>
+        topScroll.addEventListener('scroll', () => {
+          if (isSyncing) return;
+          isSyncing = true;
+          tableWrapper.scrollLeft = topScroll.scrollLeft;
+          isSyncing = false;
+        });
 
-        <h3>Basic Information</h3>
-        <div class="detail-grid">
-          ${basicFields.map(field => `
-            <div class="detail-field">
-              <div class="detail-label">${escapeHtml(field.label)}</div>
-              <div class="detail-value">${escapeHtml(String(field.value || 'N/A'))}</div>
-            </div>
-          `).join('')}
+        tableWrapper.addEventListener('scroll', () => {
+          if (isSyncing) return;
+          isSyncing = true;
+          topScroll.scrollLeft = tableWrapper.scrollLeft;
+          isSyncing = false;
+        });
+
+        window.addEventListener('resize', syncRecipeSummaryTopScrollbarWidth);
+        recipeSummaryScrollSyncBound = true;
+      }
+
+      topScroll.scrollLeft = tableWrapper.scrollLeft;
+      syncRecipeSummaryTopScrollbarWidth();
+    }
+
+    function rsFxConvert(usdVal, fxRates, currency) {
+      if (usdVal == null) return 0;
+      const rate = (fxRates && fxRates['USD' + currency]) || 1;
+      return (usdVal || 0) * rate;
+    }
+
+    function rsFmtComp(key) {
+      return key.replace(/USD/g, '').replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+    }
+
+    function showRecipeSummaryCostDetail(item) {
+      const modal = document.getElementById('detailModal');
+      const content = document.getElementById('detailContent');
+      const d = item.details || {};
+      const materials = Array.isArray(d.materials) ? d.materials : [];
+      const cur = item.currency || recipeSummaryCurrency;
+      const fx = item.fxRates || {};
+
+      let html = `
+        <h2 style="margin:0 0 20px 0;color:#667eea;">Cost Details</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:25px;">
+          <div><strong>SAP ID:</strong> ${escapeHtml(item.sapId || '-')}</div>
+          <div><strong>PD ID:</strong> ${escapeHtml(item.pfnId || '-')}</div>
+          <div><strong>Customer:</strong> ${escapeHtml(item.customer || '-')}</div>
+          <div><strong>Market Segment:</strong> ${escapeHtml(item.marketSegment || '-')}</div>
+          <div><strong>Application:</strong> ${escapeHtml(item.application || '-')}</div>
+          <div><strong>S/SMS:</strong> ${escapeHtml(item.s_sms || '-')}</div>
+          <div><strong>Bonding:</strong> ${escapeHtml(item.bonding || '-')}</div>
+          <div><strong>Basis Weight:</strong> ${escapeHtml(item.basisWeight || '-')}</div>
+          <div><strong>Slit Width:</strong> ${escapeHtml(item.slitWidth || '-')}</div>
+          <div><strong>Treatment:</strong> ${escapeHtml(item.treatment || '-')}</div>
+          <div><strong>Author:</strong> ${escapeHtml(item.author || '-')}</div>
+          <div><strong>Gross Yield:</strong> ${((item.grossYield || 1) * 100).toFixed(2)}%</div>
+          <div><strong>Throughput:</strong> ${item.throughput ? Math.round(item.throughput) : '-'}</div>
+          <div><strong>Overconsumption:</strong> ${((item.overconsumption || 0) * 100).toFixed(2)}%</div>
+          <div><strong>Line:</strong> ${escapeHtml(item.lineId || '-')}</div>
+          <div><strong>Country:</strong> ${escapeHtml(item.country || '-')}</div>
+          <div><strong>Currency:</strong> ${escapeHtml(cur)}</div>
         </div>
 
-        <h3>Process Parameters</h3>
-        <div class="detail-grid">
-          ${processFields.map(field => `
-            <div class="detail-field">
-              <div class="detail-label">${escapeHtml(field.label)}</div>
-              <div class="detail-value">${escapeHtml(String(field.value || 'N/A'))}</div>
-            </div>
-          `).join('')}
-        </div>
+        <h3 style="color:#667eea;margin-top:0;">Cost Summary</h3>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+          <tr style="background:#f0f0f0;">
+            <td style="padding:10px;border:1px solid #ccc;font-weight:bold;">Material Cost (Net):</td>
+            <td style="padding:10px;border:1px solid #ccc;text-align:right;font-weight:bold;color:#667eea;">${formatAmount(item.materialCostNet || 0)} ${escapeHtml(cur)}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px;border:1px solid #ccc;font-weight:bold;">Process Cost:</td>
+            <td style="padding:10px;border:1px solid #ccc;text-align:right;font-weight:bold;color:#764ba2;">${formatAmount(item.processCost || 0)} ${escapeHtml(cur)}</td>
+          </tr>
+          <tr style="background:#f0f0f0;">
+            <td style="padding:10px;border:1px solid #ccc;font-weight:bold;">Total Cost:</td>
+            <td style="padding:10px;border:1px solid #ccc;text-align:right;font-weight:bold;font-size:1.2em;color:#333;">${formatAmount(item.totalCost || 0)} ${escapeHtml(cur)}</td>
+          </tr>
+        </table>
 
-        <h3>Product Specifications</h3>
-        <div class="detail-grid">
-          ${productFields.map(field => `
-            <div class="detail-field">
-              <div class="detail-label">${escapeHtml(field.label)}</div>
-              <div class="detail-value">${escapeHtml(String(field.value || 'N/A'))}</div>
-            </div>
-          `).join('')}
-        </div>
+        <h3 style="color:#667eea;">Material Breakdown</h3>
+      `;
 
-        ${materials.length > 0 ? `
-          <div class="materials-section">
-            <h3>Formula Materials</h3>
-            <table class="materials-table">
-              <thead>
+      if (materials.length > 0) {
+        html += `
+          <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+            <thead style="background:#e8eaf6;">
+              <tr>
+                <th style="padding:10px;border:1px solid #ccc;text-align:left;">Material</th>
+                <th style="padding:10px;border:1px solid #ccc;text-align:center;">Base %</th>
+                <th style="padding:10px;border:1px solid #ccc;text-align:center;">With OC %</th>
+                <th style="padding:10px;border:1px solid #ccc;text-align:right;">Price</th>
+                <th style="padding:10px;border:1px solid #ccc;text-align:right;">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${materials.map((m) => `
+                <tr style="border:1px solid #ccc;">
+                  <td style="padding:10px;border:1px solid #ccc;">${escapeHtml(m.material || '-')}</td>
+                  <td style="padding:10px;border:1px solid #ccc;text-align:center;">${((m.basePct || 0) * 100).toFixed(2)}%</td>
+                  <td style="padding:10px;border:1px solid #ccc;text-align:center;">${((m.effectivePct || 0) * 100).toFixed(2)}%</td>
+                  <td style="padding:10px;border:1px solid #ccc;text-align:right;">${m.missingPrice ? '<span style="color:#c0392b;font-weight:600;">N/A</span>' : `${formatAmount(rsFxConvert(m.priceUSD, fx, cur))} ${escapeHtml(cur)}`}</td>
+                  <td style="padding:10px;border:1px solid #ccc;text-align:right;font-weight:bold;">${m.missingPrice ? '<span style="color:#c0392b;font-weight:600;">N/A (missing price)</span>' : `${formatAmount(rsFxConvert(m.finalCost, fx, cur))} ${escapeHtml(cur)}`}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <p><strong>Base Material Cost (gross, includes overconsumption):</strong> ${formatAmount(rsFxConvert(d.finalMaterialCostPerKgUSD, fx, cur))} ${escapeHtml(cur)}</p>
+          <p><strong>Gross Yield:</strong> ${((d.grossYield || 1) * 100).toFixed(2)}% (Scrap: ${((d.scrapFraction || 0) * 100).toFixed(2)}%)</p>
+          <p><strong>Net Material Cost (after scrap):</strong> ${formatAmount(rsFxConvert(d.netMaterialCostPerKgUSD, fx, cur))} ${escapeHtml(cur)}</p>
+        `;
+      } else {
+        html += `<p style="color:#999;text-align:center;">No materials in BOM</p>`;
+      }
+
+      if (d.process) {
+        html += `
+          <h3 style="color:#667eea;">Process Cost Components</h3>
+          <p><strong>Hours per Ton:</strong> ${(d.process.hoursPerTon || 0).toFixed(4)}</p>
+
+          <h4 style="margin-top:15px;">Hourly Costs:</h4>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+            <thead style="background:#e8eaf6;">
+              <tr style="font-weight:bold;">
+                <th style="padding:10px;border:1px solid #ccc;text-align:left;">Component</th>
+                <th style="padding:10px;border:1px solid #ccc;text-align:right;">Hourly Line Cost</th>
+                <th style="padding:10px;border:1px solid #ccc;text-align:right;">Per kg</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(d.process.hourlyComponents || {}).map(([k, v]) => {
+                const perKg = d.process.hoursPerTon > 0 ? (v * d.process.hoursPerTon) / 1000 : 0;
+                return `
+                  <tr style="border:1px solid #ccc;">
+                    <td style="padding:10px;border:1px solid #ccc;">${rsFmtComp(k)}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatAmount(rsFxConvert(v, fx, cur))} ${escapeHtml(cur)}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatAmount(rsFxConvert(perKg, fx, cur))} ${escapeHtml(cur)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+
+          <h4 style="margin-top:15px;">Per-Ton Costs:</h4>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+            <thead style="background:#e8eaf6;">
+              <tr style="font-weight:bold;">
+                <th style="padding:10px;border:1px solid #ccc;text-align:left;">Component</th>
+                <th style="padding:10px;border:1px solid #ccc;text-align:right;">Per Ton</th>
+                <th style="padding:10px;border:1px solid #ccc;text-align:right;">Per kg</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(d.process.perTonComponents || {}).map(([k, v]) => {
+                const perKg = v / 1000;
+                return `
+                  <tr style="border:1px solid #ccc;">
+                    <td style="padding:10px;border:1px solid #ccc;">${rsFmtComp(k)}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatAmount(rsFxConvert(v, fx, cur))} ${escapeHtml(cur)}</td>
+                    <td style="padding:10px;border:1px solid #ccc;text-align:right;">${formatAmount(rsFxConvert(perKg, fx, cur))} ${escapeHtml(cur)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+
+          <p><strong>Hourly Contribution:</strong> ${formatAmount(rsFxConvert(d.process.hourlyCostContribution, fx, cur))} ${escapeHtml(cur)}/kg</p>
+          <p><strong>Per-Ton Contribution:</strong> ${formatAmount(rsFxConvert(d.process.perTonCostContribution, fx, cur))} ${escapeHtml(cur)}/kg</p>
+        `;
+      }
+
+      const savedSnapshot = item.savedSnapshot;
+      if (savedSnapshot && savedSnapshot.item) {
+        const snapItem = savedSnapshot.item;
+        const snapCur = snapItem.currency || savedSnapshot.currency || 'USD';
+        const snapDetails = snapItem.details || {};
+        const snapMaterials = Array.isArray(snapDetails.materials) ? snapDetails.materials : [];
+        const snapGeneratedAt = savedSnapshot.generatedAt ? new Date(savedSnapshot.generatedAt).toLocaleString('cs-CZ') : '-';
+
+        html += `
+          <hr style="margin:24px 0;border:none;border-top:2px solid #e0e0e0;" />
+          <h3 style="color:#2e7d32;">Snapshot at Recipe Creation (Fixed Historical Values)</h3>
+          <p style="margin-top:6px;"><strong>Snapshot timestamp:</strong> ${escapeHtml(snapGeneratedAt)}</p>
+          <p><strong>Snapshot currency:</strong> ${escapeHtml(snapCur)} (stored at creation-time FX and tariff values)</p>
+
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+            <tr style="background:#f1f8e9;">
+              <td style="padding:10px;border:1px solid #c5e1a5;font-weight:bold;">Material Cost (Net):</td>
+              <td style="padding:10px;border:1px solid #c5e1a5;text-align:right;font-weight:bold;">${formatAmount(snapItem.materialCostNet || 0)} ${escapeHtml(snapCur)}</td>
+            </tr>
+            <tr>
+              <td style="padding:10px;border:1px solid #c5e1a5;font-weight:bold;">Process Cost:</td>
+              <td style="padding:10px;border:1px solid #c5e1a5;text-align:right;font-weight:bold;">${formatAmount(snapItem.processCost || 0)} ${escapeHtml(snapCur)}</td>
+            </tr>
+            <tr style="background:#f1f8e9;">
+              <td style="padding:10px;border:1px solid #c5e1a5;font-weight:bold;">Total Cost:</td>
+              <td style="padding:10px;border:1px solid #c5e1a5;text-align:right;font-weight:bold;">${formatAmount(snapItem.totalCost || 0)} ${escapeHtml(snapCur)}</td>
+            </tr>
+          </table>
+        `;
+
+        if (snapMaterials.length > 0) {
+          html += `
+            <h4 style="margin-top:8px;">Snapshot Material Breakdown</h4>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+              <thead style="background:#f1f8e9;">
                 <tr>
-                  <th>Material</th>
-                  <th>Name</th>
-                  <th>Percentage</th>
+                  <th style="padding:8px;border:1px solid #c5e1a5;text-align:left;">Material</th>
+                  <th style="padding:8px;border:1px solid #c5e1a5;text-align:center;">With OC %</th>
+                  <th style="padding:8px;border:1px solid #c5e1a5;text-align:right;">Cost</th>
                 </tr>
               </thead>
               <tbody>
-                ${materials.map(m => `
+                ${snapMaterials.map((m) => `
                   <tr>
-                    <td>${escapeHtml(m.material_label)}</td>
-                    <td>${escapeHtml(m.material_name)}</td>
-                    <td>${m.percentage}%</td>
+                    <td style="padding:8px;border:1px solid #c5e1a5;">${escapeHtml(m.material || '-')}</td>
+                    <td style="padding:8px;border:1px solid #c5e1a5;text-align:center;">${((m.effectivePct || 0) * 100).toFixed(2)}%</td>
+                    <td style="padding:8px;border:1px solid #c5e1a5;text-align:right;">${m.missingPrice ? 'N/A' : `${formatAmount(m.finalCost || 0)} ${escapeHtml(snapCur)}`}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
+          `;
+        }
+      }
+
+      content.innerHTML = html;
+      modal.classList.add('show');
+    }
+
+    function getSelectValues(id) {
+      const el = document.getElementById(id);
+      if (!el) return [];
+      return Array.from(el.selectedOptions).map((opt) => opt.value).filter(Boolean);
+    }
+
+    function attachExpandableMultiSelect(id, maxVisible = 12) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.size = 1;
+      el.addEventListener('focus', () => {
+        const optionCount = Math.max(4, el.options.length);
+        el.size = Math.min(maxVisible, optionCount);
+      });
+      el.addEventListener('blur', () => {
+        el.size = 1;
+      });
+      el.addEventListener('mousedown', (event) => {
+        if (el.size === 1) {
+          event.preventDefault();
+          const optionCount = Math.max(4, el.options.length);
+          el.size = Math.min(maxVisible, optionCount);
+          el.focus();
+        }
+      });
+    }
+
+    function setSelectOptions(id, values, formatter) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const html = (values || []).map((value) => {
+        const label = formatter ? formatter(value) : value;
+        return `<option value="${escapeHtml(String(value))}">${escapeHtml(String(label))}</option>`;
+      }).join('');
+      el.innerHTML = html;
+    }
+
+    async function loadRecipeSummaryMetadata() {
+      try {
+        const response = await fetch('/api/bom/recipe-summary/metadata', {
+          headers: {
+            'Authorization': `Bearer ${auth.getToken()}`
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to load recipe summary metadata: ${response.status}`);
+        }
+
+        const meta = await response.json();
+        setSelectOptions('rsFilterSapId', meta.sapIds || []);
+        setSelectOptions('rsFilterPfnId', meta.pfnIds || []);
+        setSelectOptions('rsFilterCustomer', meta.customers || []);
+        setSelectOptions('rsFilterMarketSegment', meta.marketSegments || []);
+        setSelectOptions('rsFilterApplication', meta.applications || []);
+        setSelectOptions('rsFilterSSMS', meta.smsOptions || []);
+        setSelectOptions('rsFilterBonding', meta.bondings || []);
+        setSelectOptions('rsFilterBasisWeight', meta.basisWeights || []);
+        setSelectOptions('rsFilterSlitWidth', meta.slitWidths || []);
+        setSelectOptions('rsFilterTreatment', meta.treatments || []);
+        setSelectOptions('rsFilterAuthor', meta.authors || []);
+        setSelectOptions('rsFilterLine', meta.lineIds || []);
+        setSelectOptions('rsFilterCountry', meta.countries || []);
+        setSelectOptions('rsFilterOverconsumption', meta.overconsumptions || [], (v) => `${Number(v).toFixed(2)}%`);
+
+        const currencySelect = document.getElementById('rsCurrencySelect');
+        if (currencySelect && Array.isArray(meta.currencies) && meta.currencies.length > 0) {
+          currencySelect.innerHTML = meta.currencies
+            .map((c) => `<option value="${escapeHtml(String(c))}">${escapeHtml(String(c))}</option>`)
+            .join('');
+          currencySelect.value = 'USD';
+        }
+
+        recipeSummaryFilterMap.forEach(({ id }) => attachExpandableMultiSelect(id));
+      } catch (err) {
+        console.error('Error loading recipe summary metadata:', err);
+      }
+    }
+
+    function updateRecipeSummaryStats(data) {
+      const stats = document.getElementById('rsSummaryStats');
+      if (!data.length) {
+        stats.style.display = 'none';
+        return;
+      }
+      stats.style.display = 'grid';
+
+      const avgMaterial = data.reduce((sum, item) => sum + (item.materialCostNet || 0), 0) / data.length;
+      const avgProcess = data.reduce((sum, item) => sum + (item.processCost || 0), 0) / data.length;
+      const avgTotal = data.reduce((sum, item) => sum + (item.totalCost || 0), 0) / data.length;
+
+      document.getElementById('rsStatRecords').textContent = String(data.length);
+      document.getElementById('rsStatAvgMaterial').textContent = `${formatAmount(avgMaterial)} ${recipeSummaryCurrency}`;
+      document.getElementById('rsStatAvgProcess').textContent = `${formatAmount(avgProcess)} ${recipeSummaryCurrency}`;
+      document.getElementById('rsStatAvgTotal').textContent = `${formatAmount(avgTotal)} ${recipeSummaryCurrency}`;
+    }
+
+    function renderRecipeSummaryAggregated() {
+      const tbody = document.getElementById('rsCostTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (!recipeSummaryData.length) {
+        tbody.innerHTML = "<tr><td colspan='20' style='text-align:center;color:#999;'>No recipe summary data found.</td></tr>";
+        attachRecipeSummaryHeaderSort();
+        return;
+      }
+
+      sortRecipeSummaryData();
+
+      recipeSummaryData.forEach((item) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(item.recipeApproved || '-')}</td>
+          <td>${escapeHtml(item.sapId || '-')}</td>
+          <td>${escapeHtml(item.pfnId || '-')}</td>
+          <td>${escapeHtml(item.customer || '-')}</td>
+          <td>${escapeHtml(item.marketSegment || '-')}</td>
+          <td>${escapeHtml(item.application || '-')}</td>
+          <td>${escapeHtml(item.s_sms || '-')}</td>
+          <td>${escapeHtml(item.bonding || '-')}</td>
+          <td>${escapeHtml(item.basisWeight ?? '-')}</td>
+          <td>${escapeHtml(item.slitWidth ?? '-')}</td>
+          <td>${escapeHtml(item.treatment || '-')}</td>
+          <td>${escapeHtml(item.author || '-')}</td>
+          <td>${formatAmount((item.grossYield || 0) * 100)}</td>
+          <td>${item.throughput ? Math.round(item.throughput) : '-'}</td>
+          <td>${escapeHtml(item.lineId || '-')}</td>
+          <td>${escapeHtml(item.country || '-')}</td>
+          <td>${formatAmount(item.materialCostNet || 0)}</td>
+          <td>${formatAmount(item.processCost || 0)}</td>
+          <td><strong>${formatAmount(item.totalCost || 0)}</strong></td>
+          <td>${escapeHtml(item.currency || recipeSummaryCurrency)}</td>
+        `;
+        tr.addEventListener('click', () => showRecipeSummaryCostDetail(item));
+        tbody.appendChild(tr);
+      });
+
+      attachRecipeSummaryHeaderSort();
+      setupRecipeSummaryTopScrollbar();
+    }
+
+    function renderRecipeSummaryDetailed() {
+      const container = document.getElementById('rsDetailedContent');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!recipeSummaryData.length) {
+        container.innerHTML = "<p style='text-align:center;color:#999;padding:24px;'>No recipe summary data found.</p>";
+        return;
+      }
+
+      recipeSummaryData.forEach((item) => {
+        const section = document.createElement('div');
+        section.className = 'detailed-section';
+        section.style.cssText = 'background:#f9f9f9;padding:16px;margin-bottom:16px;border-radius:8px;border-left:4px solid #2b6cb0;';
+
+        const d = item.details || {};
+        const materials = Array.isArray(d.materials) ? d.materials : [];
+
+        section.innerHTML = `
+          <h4 style="margin:0 0 10px 0;">${escapeHtml(item.sapId || '-')} / ${escapeHtml(item.pfnId || '-')} | ${escapeHtml(item.customer || '-')} | ${escapeHtml(item.lineId || '-')} (${escapeHtml(item.country || '-')})</h4>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:12px;">
+            <div><strong>Material Cost:</strong> ${formatAmount(item.materialCostNet || 0)} ${escapeHtml(item.currency || recipeSummaryCurrency)}</div>
+            <div><strong>Process Cost:</strong> ${formatAmount(item.processCost || 0)} ${escapeHtml(item.currency || recipeSummaryCurrency)}</div>
+            <div><strong>Total Cost:</strong> ${formatAmount(item.totalCost || 0)} ${escapeHtml(item.currency || recipeSummaryCurrency)}</div>
+            <div><strong>Overconsumption:</strong> ${formatAmount((item.overconsumption || 0) * 100)}%</div>
           </div>
-        ` : ''}
+          <div style="overflow:auto;">
+            <table style="width:100%;border-collapse:collapse;background:#fff;">
+              <thead>
+                <tr style="background:#e8eaf6;">
+                  <th style="padding:8px;border:1px solid #d7dbe6;text-align:left;">Material</th>
+                  <th style="padding:8px;border:1px solid #d7dbe6;text-align:right;">Base %</th>
+                  <th style="padding:8px;border:1px solid #d7dbe6;text-align:right;">With OC %</th>
+                  <th style="padding:8px;border:1px solid #d7dbe6;text-align:right;">Cost (${escapeHtml(item.currency || recipeSummaryCurrency)})</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${materials.map((m) => `
+                  <tr>
+                    <td style="padding:8px;border:1px solid #d7dbe6;">${escapeHtml(m.material || '-')}</td>
+                    <td style="padding:8px;border:1px solid #d7dbe6;text-align:right;">${formatAmount((m.basePct || 0) * 100)}%</td>
+                    <td style="padding:8px;border:1px solid #d7dbe6;text-align:right;">${formatAmount((m.effectivePct || 0) * 100)}%</td>
+                    <td style="padding:8px;border:1px solid #d7dbe6;text-align:right;">${m.missingPrice ? '<span style="color:#c0392b;font-weight:600;">N/A (missing price)</span>' : formatAmount((m.finalCost || 0) * ((item.fxRates && item.fxRates['USD' + (item.currency || recipeSummaryCurrency)]) || 1))}</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="4" style="padding:8px;border:1px solid #d7dbe6;text-align:center;color:#999;">No materials in BOM</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        `;
 
-        <div class="metadata">
-          Author: ${escapeHtml(record.author || 'Unknown')}<br>
-          Created: ${new Date(record.created_at).toLocaleString('cs-CZ')}<br>
-          Updated: ${new Date(record.updated_at).toLocaleString('cs-CZ')}
-        </div>
+        container.appendChild(section);
+      });
+    }
 
-        <div class="modal-actions">
-          <button class="btn-secondary" onclick="closeDetailModal()">Close</button>
-          <button class="btn-primary" onclick="loadRecipeInCalculator(${record.id})">Open in Calculator</button>
-        </div>
-      `;
+    function renderRecipeSummary() {
+      const aggregated = document.getElementById('rsAggregatedView');
+      const detailed = document.getElementById('rsDetailedView');
 
-      document.getElementById('detailContent').innerHTML = detailHTMl;
+      if (recipeSummaryViewMode === 'aggregated') {
+        aggregated.style.display = 'block';
+        detailed.style.display = 'none';
+        renderRecipeSummaryAggregated();
+        requestAnimationFrame(syncRecipeSummaryTopScrollbarWidth);
+      } else {
+        aggregated.style.display = 'none';
+        detailed.style.display = 'block';
+        renderRecipeSummaryDetailed();
+      }
+    }
+
+    async function loadRecipeSummary() {
+      recipeSummaryCurrency = document.getElementById('rsCurrencySelect')?.value || 'USD';
+      const params = new URLSearchParams();
+      params.append('currency', recipeSummaryCurrency);
+
+      recipeSummaryFilterMap.forEach(({ id, query }) => {
+        getSelectValues(id).forEach((value) => params.append(query, value));
+      });
+
+      try {
+        const response = await fetch(`/api/bom/recipe-summary?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${auth.getToken()}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load recipe summary: ${response.status}`);
+        }
+
+        recipeSummaryData = await response.json();
+        updateRecipeSummaryStats(recipeSummaryData);
+        renderRecipeSummary();
+      } catch (err) {
+        console.error('Error loading recipe summary:', err);
+      }
+    }
+
+    async function exportRecipeSummary(format) {
+      recipeSummaryCurrency = document.getElementById('rsCurrencySelect')?.value || 'USD';
+      const params = new URLSearchParams();
+      params.append('currency', recipeSummaryCurrency);
+      params.append('format', format);
+
+      recipeSummaryFilterMap.forEach(({ id, query }) => {
+        getSelectValues(id).forEach((value) => params.append(query, value));
+      });
+
+      try {
+        const response = await fetch(`/api/bom/recipe-summary/export?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${auth.getToken()}`
+          }
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Export failed: ${response.status} ${text}`);
+        }
+
+        const blob = await response.blob();
+        const safeDate = new Date().toISOString().slice(0, 10);
+        const ext = format === 'xlsx' ? 'xlsx' : 'csv';
+        const fileName = `recipe-summary-${safeDate}.${ext}`;
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error('Error exporting recipe summary:', err);
+        alert(`Export failed: ${err.message}`);
+      }
+    }
+
+    function clearRecipeSummaryFilters() {
+      recipeSummaryFilterMap.forEach(({ id }) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        Array.from(el.options).forEach((opt) => {
+          opt.selected = false;
+        });
+      });
+
+      const currencySelect = document.getElementById('rsCurrencySelect');
+      const viewToggle = document.getElementById('rsViewToggle');
+      if (currencySelect) currencySelect.value = 'USD';
+      if (viewToggle) viewToggle.value = 'aggregated';
+      recipeSummaryCurrency = 'USD';
+      recipeSummaryViewMode = 'aggregated';
+      loadRecipeSummary();
+    }
+
+    function setupRecipeSummaryListeners() {
+      const currencySelect = document.getElementById('rsCurrencySelect');
+      const viewToggle = document.getElementById('rsViewToggle');
+      const loadBtn = document.getElementById('rsLoadBtn');
+      const clearBtn = document.getElementById('rsClearBtn');
+      const exportCsvBtn = document.getElementById('rsExportCsvBtn');
+      const exportXlsxBtn = document.getElementById('rsExportXlsxBtn');
+
+      if (currencySelect) {
+        currencySelect.addEventListener('change', () => {
+          recipeSummaryCurrency = currencySelect.value;
+          loadRecipeSummary();
+        });
+      }
+
+      if (viewToggle) {
+        viewToggle.addEventListener('change', () => {
+          recipeSummaryViewMode = viewToggle.value;
+          renderRecipeSummary();
+        });
+      }
+
+      if (loadBtn) {
+        loadBtn.addEventListener('click', loadRecipeSummary);
+      }
+
+      if (clearBtn) {
+        clearBtn.addEventListener('click', clearRecipeSummaryFilters);
+      }
+
+      if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', () => exportRecipeSummary('csv'));
+      }
+
+      if (exportXlsxBtn) {
+        exportXlsxBtn.addEventListener('click', () => exportRecipeSummary('xlsx'));
+      }
     }
 
     function closeDetailModal() {
       document.getElementById('detailModal').classList.remove('show');
-    }
-
-    function loadRecipeInCalculator(recordId) {
-      // TODO: Implement loading recipe into calculator
-      alert(`Loading recipe ${recordId} in calculator - to be implemented`);
     }
 
     function escapeHtml(text) {
@@ -592,18 +1169,6 @@
       div.textContent = text;
       return div.innerHTML;
     }
-
-    // Search functionality
-    document.getElementById('searchInput').addEventListener('input', function(e) {
-      const searchText = e.target.value.toLowerCase();
-      const filtered = allRecipes.filter(recipe => {
-        const pd = (recipe.pd_id || '').toLowerCase();
-        const customer = (recipe.customer || '').toLowerCase();
-        const line = (recipe.line || '').toLowerCase();
-        return pd.includes(searchText) || customer.includes(searchText) || line.includes(searchText);
-      });
-      displayRecipes(filtered);
-    });
 
     // Close modal on background click
     document.getElementById('detailModal').addEventListener('click', function(e) {
@@ -619,7 +1184,12 @@
         window.location.href = '/login.html';
         return;
       }
-      loadRecipes();
+
+      auth.configureHeaderButtons();
+      enforceCompactMode();
+      setupRecipeSummaryListeners();
+      setupRecipeSummaryTopScrollbar();
+      loadRecipeSummaryMetadata().then(loadRecipeSummary);
     });
   </script>
 </body>

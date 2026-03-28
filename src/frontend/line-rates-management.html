@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Line Rates Management</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/vendor/xlsx.full.min.js"></script>
+  <style>
+    .page-wrap { max-width: 1600px; margin: 0 auto; padding: 16px; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 14px; }
+    .toolbar .field { display: flex; flex-direction: column; gap: 4px; }
+    .toolbar input, .toolbar select { padding: 7px 9px; border: 1px solid #cfd8e3; border-radius: 6px; min-width: 120px; }
+    .btn { border: none; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #1f5fbf; color: #fff; }
+    .btn-secondary { background: #e9eef8; color: #1d355d; }
+    .status { min-height: 22px; margin-bottom: 8px; font-weight: 600; }
+    .status.ok { color: #1b5e20; }
+    .status.error { color: #b71c1c; }
+    .table-wrap { overflow: auto; border: 1px solid #dbe3f0; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { border-bottom: 1px solid #ecf0f6; padding: 6px 7px; font-size: 12px; }
+    td { text-align: center; white-space: nowrap; }
+    th { position: sticky; top: 0; background: #dce8f8; color: #102a43; z-index: 1; font-weight: 700; text-align: center; white-space: normal; line-height: 1.2; }
+    td:first-child { text-align: left; font-weight: 600; white-space: normal; }
+    .summary-wrap { margin-top: 10px; overflow: auto; border: 1px solid #dbe3f0; border-radius: 8px; }
+    .summary-table th { background: #eef3fb; }
+    .summary-table td:first-child { min-width: 210px; }
+    .import-card { margin-top: 16px; border: 1px solid #dbe3f0; border-radius: 8px; padding: 12px; background: #fafcff; }
+    .muted { color: #586780; font-size: 0.92em; }
+    .hidden { display: none; }
+    .delta-pos { color: #1b5e20; font-weight: 700; }
+    .delta-neg { color: #b71c1c; font-weight: 700; }
+    .toolbar-sections { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; margin-bottom: 14px; }
+    .toolbar-section { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border: 1px solid #d4e0f0; border-radius: 8px; background: #f7faff; }
+    .toolbar-section .toolbar { margin-bottom: 0; }
+    .toolbar-section-label { font-size: 11px; font-weight: 700; color: #586780; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+    .toolbar-section-delta { border-color: #b5c9e8; background: #f0f5fd; }
+    .toolbar-arrow { align-self: flex-end; padding-bottom: 9px; font-size: 16px; color: #586780; line-height: 1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <div class="app-branding">
+        <img src="/data/PFN_logo.png" alt="PFN" class="company-logo" />
+        <div class="app-title-wrap">
+          <h1>Line Operating Rates Management</h1>
+          <p>Annual operating rates matrix (lines horizontally, rate categories vertically)</p>
+        </div>
+      </div>
+      <div class="app-top-actions">
+        <button class="action-btn btn-nav" onclick="window.location.href='/dashboard'">Back to Dashboard</button>
+        <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;">Change Password</button>
+        <button id="adminBtn" class="action-btn btn-admin" style="display:none;">Admin</button>
+        <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="page-wrap">
+      <div class="toolbar-sections">
+        <div class="toolbar-section">
+          <div class="toolbar-section-label">Single Year View</div>
+          <div class="toolbar">
+            <div class="field">
+              <label for="yearSelect">Year</label>
+              <select id="yearSelect"></select>
+            </div>
+            <button class="btn btn-primary" style="align-self:flex-end;" onclick="loadYearRates()">Load Year</button>
+            <button class="btn btn-secondary" style="align-self:flex-end;" onclick="exportYearRatesCsv()">Export CSV</button>
+            <button class="btn btn-secondary" style="align-self:flex-end;" onclick="exportYearRatesExcel()">Export Excel</button>
+          </div>
+        </div>
+
+        <div class="toolbar-section toolbar-section-delta">
+          <div class="toolbar-section-label">Year Comparison (&Delta;)</div>
+          <div class="toolbar">
+            <div class="field">
+              <label for="deltaFromYearSelect">Base Year</label>
+              <select id="deltaFromYearSelect"></select>
+            </div>
+            <span class="toolbar-arrow">&rarr;</span>
+            <div class="field">
+              <label for="deltaToYearSelect">Compare To</label>
+              <select id="deltaToYearSelect"></select>
+            </div>
+            <div class="field">
+              <label for="deltaModeSelect">Display as</label>
+              <select id="deltaModeSelect" onchange="onDeltaModeChange()">
+                <option value="absolute">Absolute (&Delta;)</option>
+                <option value="percent">Percent (%)</option>
+              </select>
+            </div>
+            <button class="btn btn-secondary" style="align-self:flex-end;" onclick="loadDeltaRates()">Load Delta</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="status" class="status"></div>
+      <div id="summary" class="muted"></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Line</th>
+              <th>Country</th>
+              <th>Currency</th>
+              <th>Energy</th>
+              <th>Wages</th>
+              <th>Maintenance</th>
+              <th>Other Costs</th>
+              <th>SGA and Overhead</th>
+              <th>Cores</th>
+              <th>Packaging</th>
+              <th>Pallets</th>
+            </tr>
+          </thead>
+          <tbody id="ratesBody"></tbody>
+        </table>
+      </div>
+
+      <div class="summary-wrap">
+        <table class="summary-table">
+          <thead id="summaryHead"></thead>
+          <tbody id="summaryBody"></tbody>
+        </table>
+      </div>
+
+      <div id="importCard" class="import-card hidden">
+        <h3 style="margin-top:0;">Import Annual Rates</h3>
+        <div class="toolbar" style="margin-bottom: 8px;">
+          <div class="field">
+            <label for="importYear">Import Year</label>
+            <input id="importYear" type="number" min="2000" max="9999" />
+          </div>
+          <div class="field">
+            <label for="importFile">Lines File</label>
+            <input id="importFile" type="file" accept=".xlsx,.xls,.csv" />
+          </div>
+          <div class="field" style="flex-direction: row; align-items: center; gap: 8px; padding-top: 20px;">
+            <input id="overwriteExisting" type="checkbox" />
+            <label for="overwriteExisting">Overwrite existing values for same year</label>
+          </div>
+          <button class="btn btn-primary" onclick="importYearRates()">Import</button>
+        </div>
+        <div class="muted">Expected structure: the same matrix format as Lines.xlsx (line IDs in the first row, fields in the first column).</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/auth.js"></script>
+  <script>
+    let canManage = false;
+    let currentYearRatesRows = [];
+    let currentLoadedYear = null;
+    let currentCompareYear = null;
+    let currentViewMode = 'single';
+    let currentDeltaMode = 'absolute';
+
+    function setStatus(message, type = '') {
+      const el = document.getElementById('status');
+      el.textContent = message || '';
+      el.className = `status ${type}`.trim();
+    }
+
+    function safeNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function formatNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 0, minimumFractionDigits: 0 }) : '';
+    }
+
+    function formatSignedNumber(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '';
+      if (Math.abs(n) < 0.5) return '0';
+      const rounded = Math.round(n);
+      return rounded > 0 ? `+${rounded.toLocaleString()}` : rounded.toLocaleString();
+    }
+
+    function formatSignedPercent(delta, fromValue) {
+      if (!Number.isFinite(delta)) return '';
+      if (!Number.isFinite(fromValue) || fromValue === 0) return delta !== 0 ? 'n/a' : '0%';
+      const pct = Math.round((delta / fromValue) * 1000) / 10;
+      return pct > 0 ? `+${pct.toLocaleString()}%` : `${pct.toLocaleString()}%`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function parseYear(value) {
+      const y = Number(value);
+      return Number.isInteger(y) && y >= 2000 && y <= 9999 ? y : null;
+    }
+
+    function getLineLabel(row) {
+      const line = String(row.line_id || '').trim();
+      const country = String(row.country || '').trim();
+      const currency = String(row.currency || '').trim();
+      return [line, country, currency].filter(Boolean).join(' | ');
+    }
+
+    function getLineKey(row) {
+      const line = String(row.line_id || '').trim().toUpperCase();
+      const country = String(row.country || '').trim().toUpperCase();
+      const currency = String(row.currency || '').trim().toUpperCase();
+      return `${line}__${country}__${currency}`;
+    }
+
+    function getRateCategories() {
+      return [
+        { label: 'Energy', key: 'energy' },
+        { label: 'Wages', key: 'wages' },
+        { label: 'Maintenance', key: 'maintenance' },
+        { label: 'Other Costs', key: 'other_costs' },
+        { label: 'SGA and Overhead', key: 'sga_and_overhead' },
+        { label: 'Cores', key: 'cores' },
+        { label: 'Packaging', key: 'packaging' },
+        { label: 'Pallets', key: 'pallets' }
+      ];
+    }
+
+    function buildTransposedExportMatrix(rows) {
+      const lineHeaders = rows.map((row) => getLineLabel(row));
+
+      const header = ['Rate Category', ...lineHeaders];
+      const matrix = [header];
+
+      getRateCategories().forEach((category) => {
+        const rowValues = rows.map((lineRate) => {
+          const n = Number(lineRate[category.key]);
+          return Number.isFinite(n) ? Math.round(n) : '';
+        });
+        matrix.push([category.label, ...rowValues]);
+      });
+
+      return matrix;
+    }
+
+    function buildDeltaExportMatrix(rows, mode) {
+      const lineHeaders = rows.map((row) => getLineLabel(row));
+      const isPercent = mode === 'percent';
+      const header = [isPercent ? 'Rate Category (% Change)' : 'Rate Category Delta', ...lineHeaders];
+      const matrix = [header];
+
+      getRateCategories().forEach((category) => {
+        const rowValues = rows.map((lineRate) => {
+          const delta = safeNumber(lineRate[category.key]);
+          if (isPercent) {
+            const fromVal = safeNumber(lineRate[category.key + '_from']);
+            if (fromVal === 0) return delta !== 0 ? 'n/a' : '0%';
+            const pct = Math.round((delta / fromVal) * 1000) / 10;
+            return pct > 0 ? `+${pct}%` : `${pct}%`;
+          }
+          return Number.isFinite(delta) ? Math.round(delta) : '';
+        });
+        matrix.push([isPercent ? `${category.label} (%)` : `${category.label} (Delta)`, ...rowValues]);
+      });
+
+      return matrix;
+    }
+
+    function downloadTextFile(fileName, content, mimeType) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeCsvCell(value) {
+      const text = String(value ?? '');
+      if (/[,"\n\r]/.test(text)) {
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
+    }
+
+    function exportYearRatesCsv() {
+      if (!Array.isArray(currentYearRatesRows) || currentYearRatesRows.length === 0) {
+        setStatus('No loaded data to export. Please load a year first.', 'error');
+        return;
+      }
+
+      const year = currentLoadedYear || parseYear(document.getElementById('yearSelect').value);
+      const compareYear = currentCompareYear;
+      const isDelta = currentViewMode === 'delta';
+      const matrix = isDelta ? buildDeltaExportMatrix(currentYearRatesRows, currentDeltaMode) : buildTransposedExportMatrix(currentYearRatesRows);
+      const csv = matrix.map((row) => row.map(escapeCsvCell).join(',')).join('\r\n');
+      const modeTag = isDelta && currentDeltaMode === 'percent' ? '-pct' : '';
+      const fileName = isDelta ? `line-rates-delta${modeTag}-${year}-to-${compareYear}.csv` : `line-rates-${year}.csv`;
+      const statusText = isDelta ? `CSV export ready for delta ${compareYear} - ${year}.` : `CSV export ready for year ${year}.`;
+      downloadTextFile(fileName, csv, 'text/csv;charset=utf-8;');
+      setStatus(statusText, 'ok');
+    }
+
+    function exportYearRatesExcel() {
+      if (!Array.isArray(currentYearRatesRows) || currentYearRatesRows.length === 0) {
+        setStatus('No loaded data to export. Please load a year first.', 'error');
+        return;
+      }
+
+      const year = currentLoadedYear || parseYear(document.getElementById('yearSelect').value);
+      const compareYear = currentCompareYear;
+      const isDelta = currentViewMode === 'delta';
+      const matrix = isDelta ? buildDeltaExportMatrix(currentYearRatesRows, currentDeltaMode) : buildTransposedExportMatrix(currentYearRatesRows);
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.aoa_to_sheet(matrix);
+      const modeTag = isDelta && currentDeltaMode === 'percent' ? '-pct' : '';
+      const sheetName = isDelta ? `Delta${modeTag}-${year}-${compareYear}` : `LineRates-${year}`;
+      const fileName = isDelta ? `line-rates-delta${modeTag}-${year}-to-${compareYear}.xlsx` : `line-rates-${year}.xlsx`;
+      const statusText = isDelta ? `Excel export ready for delta ${compareYear} - ${year}.` : `Excel export ready for year ${year}.`;
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      XLSX.writeFile(workbook, fileName);
+      setStatus(statusText, 'ok');
+    }
+
+    async function fetchYearRows(year) {
+      const response = await fetch(`/api/line-rates/${year}`, {
+        headers: { Authorization: `Bearer ${auth.getToken()}` }
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to load line rates for year ${year}`);
+      }
+
+      const body = await response.json();
+      return Array.isArray(body.rows) ? body.rows : [];
+    }
+
+    async function detectManagePermission() {
+      try {
+        const meResp = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${auth.getToken()}` } });
+        const me = meResp.ok ? await meResp.json() : null;
+
+        if (me && me.role === 'admin') {
+          canManage = true;
+        } else {
+          const groupsResp = await fetch('/api/auth/me/groups', { headers: { Authorization: `Bearer ${auth.getToken()}` } });
+          const groups = groupsResp.ok ? await groupsResp.json() : [];
+          canManage = (groups || []).some(g => Array.isArray(g.permissions) && g.permissions.includes('rm_prices:manage'));
+        }
+      } catch (_) {
+        canManage = false;
+      }
+
+      document.getElementById('importCard').classList.toggle('hidden', !canManage);
+    }
+
+    async function loadYears() {
+      const nowYear = new Date().getFullYear();
+      const yearSelect = document.getElementById('yearSelect');
+      const deltaFromYearSelect = document.getElementById('deltaFromYearSelect');
+      const deltaToYearSelect = document.getElementById('deltaToYearSelect');
+      const importYear = document.getElementById('importYear');
+
+      const response = await fetch('/api/line-rates/years', {
+        headers: { Authorization: `Bearer ${auth.getToken()}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to load available years');
+      }
+
+      const body = await response.json();
+      const years = Array.isArray(body.years) ? body.years.slice() : [];
+      if (!years.includes(nowYear)) years.unshift(nowYear);
+
+      years.sort((a, b) => b - a);
+
+      const optionsHtml = years.map(y => `<option value="${y}">${y}</option>`).join('');
+      yearSelect.innerHTML = optionsHtml;
+      deltaFromYearSelect.innerHTML = optionsHtml;
+      deltaToYearSelect.innerHTML = optionsHtml;
+      yearSelect.value = String(nowYear);
+      const prevYear = String(years.find(y => y < nowYear) || nowYear);
+      deltaFromYearSelect.value = prevYear;
+      deltaToYearSelect.value = String(nowYear);
+      importYear.value = String(nowYear);
+    }
+
+    function renderRows(rows, options = {}) {
+      const body = document.getElementById('ratesBody');
+      const tableHead = document.querySelector('.table-wrap table thead');
+      const isDelta = options.mode === 'delta';
+
+      if (!rows.length) {
+        tableHead.innerHTML = '<tr><th>Rate Category</th></tr>';
+        body.innerHTML = '<tr><td colspan="1" style="text-align:center;color:#667;">No line rates found for selected year.</td></tr>';
+        return;
+      }
+
+      const lineHeaders = rows.map((row) => {
+        const lineLabel = escapeHtml(row.line_id || '');
+        const country = escapeHtml(row.country || '');
+        const currency = escapeHtml(row.currency || '');
+        const meta = [country, currency].filter(Boolean).join(' / ');
+        return `<th>${lineLabel}${meta ? `<div class="muted">${meta}</div>` : ''}</th>`;
+      }).join('');
+
+      tableHead.innerHTML = `<tr><th>Rate Category</th>${lineHeaders}</tr>`;
+
+      const categories = getRateCategories();
+
+      body.innerHTML = categories.map((category) => `
+        <tr>
+          <td>${isDelta ? `${category.label} ${currentDeltaMode === 'percent' ? '(%)' : '(Δ)'}` : category.label}</td>
+          ${rows.map((row) => {
+            const value = row[category.key];
+            if (!isDelta) {
+              return `<td>${formatNumber(value)}</td>`;
+            }
+            const n = safeNumber(value);
+            const fromVal = safeNumber(row[category.key + '_from']);
+            const cls = n > 0 ? 'delta-pos' : (n < 0 ? 'delta-neg' : '');
+            const formatted = currentDeltaMode === 'percent'
+              ? formatSignedPercent(n, fromVal)
+              : formatSignedNumber(n);
+            return `<td class="${cls}">${formatted}</td>`;
+          }).join('')}
+        </tr>
+      `).join('');
+    }
+
+    function getLastAvailableYearRate(row) {
+      const months = row && typeof row.months === 'object' ? row.months : {};
+      for (let month = 12; month >= 1; month--) {
+        const value = Number(months[String(month)]);
+        if (Number.isFinite(value) && value > 0) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    async function fetchLatestYearUsdRates(year) {
+      const result = new Map();
+      result.set('USD', 1);
+
+      if (!year) {
+        return result;
+      }
+
+      try {
+        const response = await fetch(`/api/fx-rates-matrix/${year}`, {
+          headers: { Authorization: `Bearer ${auth.getToken()}` }
+        });
+
+        if (!response.ok) {
+          return result;
+        }
+
+        const body = await response.json();
+        const rows = Array.isArray(body.rows) ? body.rows : [];
+
+        rows.forEach((row) => {
+          const from = String(row.currency1 || '').toUpperCase();
+          const to = String(row.currency2 || '').toUpperCase();
+          const rate = getLastAvailableYearRate(row);
+          if (!Number.isFinite(rate) || rate <= 0) return;
+
+          if (to === 'USD') {
+            result.set(from, rate);
+          } else if (from === 'USD') {
+            result.set(to, 1 / rate);
+          }
+        });
+      } catch (_) {
+        // Keep best-effort USD map with at least USD=1.
+      }
+
+      return result;
+    }
+
+    async function renderRateSummaries(rows, year) {
+      const summaryHead = document.getElementById('summaryHead');
+      const summaryBody = document.getElementById('summaryBody');
+      const isDelta = currentViewMode === 'delta';
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        summaryHead.innerHTML = '<tr><th>Summary</th></tr>';
+        summaryBody.innerHTML = '<tr><td style="text-align:center;color:#667;">No summary available.</td></tr>';
+        return;
+      }
+
+      const lineHeaders = rows.map((row) => `<th>${escapeHtml(getLineLabel(row))}</th>`).join('');
+      summaryHead.innerHTML = `<tr><th>Summary</th>${lineHeaders}</tr>`;
+
+      const getHourlyLocal = (row) => (
+        safeNumber(row.energy) + safeNumber(row.wages) + safeNumber(row.maintenance) + safeNumber(row.other_costs) + safeNumber(row.sga_and_overhead)
+      );
+      const getPerTonLocal = (row) => (
+        safeNumber(row.cores) + safeNumber(row.packaging) + safeNumber(row.pallets)
+      );
+
+      if (isDelta) {
+        const isPercent = currentDeltaMode === 'percent';
+        const getHourlyFrom = (row) => (
+          safeNumber(row.energy_from) + safeNumber(row.wages_from) + safeNumber(row.maintenance_from) + safeNumber(row.other_costs_from) + safeNumber(row.sga_and_overhead_from)
+        );
+        const getPerTonFrom = (row) => (
+          safeNumber(row.cores_from) + safeNumber(row.packaging_from) + safeNumber(row.pallets_from)
+        );
+
+        const hourlyDeltaRow = rows.map((row) => {
+          const value = getHourlyLocal(row);
+          const cls = value > 0 ? 'delta-pos' : (value < 0 ? 'delta-neg' : '');
+          const formatted = isPercent ? formatSignedPercent(value, getHourlyFrom(row)) : formatSignedNumber(value);
+          return `<td class="${cls}">${formatted}</td>`;
+        }).join('');
+
+        const perTonDeltaRow = rows.map((row) => {
+          const value = getPerTonLocal(row);
+          const cls = value > 0 ? 'delta-pos' : (value < 0 ? 'delta-neg' : '');
+          const formatted = isPercent ? formatSignedPercent(value, getPerTonFrom(row)) : formatSignedNumber(value);
+          return `<td class="${cls}">${formatted}</td>`;
+        }).join('');
+
+        const hourlyLabel = isPercent ? 'Total hourly rate (% change)' : 'Total hourly rate (Δ)';
+        const perTonLabel = isPercent ? 'Total per-ton rate (% change)' : 'Total per-ton rate (Δ)';
+
+        summaryBody.innerHTML = `
+          <tr>
+            <td>${hourlyLabel}</td>
+            ${hourlyDeltaRow}
+          </tr>
+          <tr>
+            <td>${perTonLabel}</td>
+            ${perTonDeltaRow}
+          </tr>
+        `;
+        return;
+      }
+
+      const usdRates = await fetchLatestYearUsdRates(year);
+
+      const hourlyLocalRow = rows.map((row) => {
+        const currency = String(row.currency || '').toUpperCase();
+        return `<td>${formatNumber(getHourlyLocal(row))}${currency ? ` ${escapeHtml(currency)}` : ''}</td>`;
+      }).join('');
+
+      const hourlyUsdRow = rows.map((row) => {
+        const currency = String(row.currency || '').toUpperCase();
+        const rate = usdRates.get(currency);
+        if (!Number.isFinite(rate) || rate <= 0) {
+          return '<td>-</td>';
+        }
+        const usd = getHourlyLocal(row) * rate;
+        return `<td>${formatNumber(usd)} USD</td>`;
+      }).join('');
+
+      const perTonLocalRow = rows.map((row) => {
+        const currency = String(row.currency || '').toUpperCase();
+        return `<td>${formatNumber(getPerTonLocal(row))}${currency ? ` ${escapeHtml(currency)}` : ''}</td>`;
+      }).join('');
+
+      const perTonUsdRow = rows.map((row) => {
+        const currency = String(row.currency || '').toUpperCase();
+        const rate = usdRates.get(currency);
+        if (!Number.isFinite(rate) || rate <= 0) {
+          return '<td>-</td>';
+        }
+        const usd = getPerTonLocal(row) * rate;
+        return `<td>${formatNumber(usd)} USD</td>`;
+      }).join('');
+
+      summaryBody.innerHTML = `
+        <tr>
+          <td>Total hourly rate (line currency)</td>
+          ${hourlyLocalRow}
+        </tr>
+        <tr>
+          <td>Total hourly rate (USD)</td>
+          ${hourlyUsdRow}
+        </tr>
+        <tr>
+          <td>Total per-ton rate (line currency)</td>
+          ${perTonLocalRow}
+        </tr>
+        <tr>
+          <td>Total per-ton rate (USD)</td>
+          ${perTonUsdRow}
+        </tr>
+      `;
+    }
+
+    function buildDeltaRows(fromRows, toRows) {
+      const categories = getRateCategories();
+      const fromMap = new Map((fromRows || []).map((row) => [getLineKey(row), row]));
+      const toMap = new Map((toRows || []).map((row) => [getLineKey(row), row]));
+      const keys = Array.from(new Set([...fromMap.keys(), ...toMap.keys()])).sort();
+
+      return keys.map((key) => {
+        const fromRow = fromMap.get(key) || {};
+        const toRow = toMap.get(key) || {};
+        const row = {
+          line_id: toRow.line_id || fromRow.line_id || '',
+          country: toRow.country || fromRow.country || '',
+          currency: toRow.currency || fromRow.currency || ''
+        };
+
+        categories.forEach((category) => {
+          const fromVal = safeNumber(fromRow[category.key]);
+          const toVal = safeNumber(toRow[category.key]);
+          row[category.key] = toVal - fromVal;
+          row[category.key + '_from'] = fromVal;
+        });
+
+        return row;
+      });
+    }
+
+    async function onDeltaModeChange() {
+      currentDeltaMode = document.getElementById('deltaModeSelect').value;
+      if (currentViewMode === 'delta' && currentYearRatesRows.length > 0) {
+        renderRows(currentYearRatesRows, { mode: 'delta' });
+        await renderRateSummaries(currentYearRatesRows, null);
+      }
+    }
+
+    async function loadYearRates() {
+      try {
+        setStatus('Loading line rates...');
+        const selectedYear = parseYear(document.getElementById('yearSelect').value);
+        if (!selectedYear) {
+          throw new Error('Invalid year');
+        }
+
+        const rows = await fetchYearRows(selectedYear);
+        currentYearRatesRows = rows;
+        currentLoadedYear = selectedYear;
+        currentCompareYear = null;
+        currentViewMode = 'single';
+
+        renderRows(rows, { mode: 'single' });
+        await renderRateSummaries(rows, selectedYear);
+        document.getElementById('summary').textContent = `Year ${selectedYear}: ${rows.length} line rates loaded.`;
+        setStatus('Line rates loaded.', 'ok');
+      } catch (err) {
+        currentYearRatesRows = [];
+        currentLoadedYear = null;
+        currentCompareYear = null;
+        currentViewMode = 'single';
+        await renderRateSummaries([], null);
+        setStatus(err.message || 'Failed to load line rates.', 'error');
+      }
+    }
+
+    async function loadDeltaRates() {
+      try {
+        setStatus('Loading delta line rates...');
+
+        const fromYear = parseYear(document.getElementById('deltaFromYearSelect').value);
+        const toYear = parseYear(document.getElementById('deltaToYearSelect').value);
+        currentDeltaMode = document.getElementById('deltaModeSelect').value;
+        if (!fromYear || !toYear) {
+          throw new Error('Please select both years.');
+        }
+        if (fromYear === toYear) {
+          throw new Error('Please select two different years for delta view.');
+        }
+
+        const [fromRows, toRows] = await Promise.all([fetchYearRows(fromYear), fetchYearRows(toYear)]);
+        const deltaRows = buildDeltaRows(fromRows, toRows);
+
+        currentYearRatesRows = deltaRows;
+        currentLoadedYear = fromYear;
+        currentCompareYear = toYear;
+        currentViewMode = 'delta';
+
+        renderRows(deltaRows, { mode: 'delta' });
+        await renderRateSummaries(deltaRows, null);
+        document.getElementById('summary').textContent = `Delta view loaded: ${toYear} - ${fromYear} across ${deltaRows.length} lines.`;
+        setStatus('Delta line rates loaded.', 'ok');
+      } catch (err) {
+        currentYearRatesRows = [];
+        currentLoadedYear = null;
+        currentCompareYear = null;
+        currentViewMode = 'single';
+        await renderRateSummaries([], null);
+        setStatus(err.message || 'Failed to load delta line rates.', 'error');
+      }
+    }
+
+    function parseCsv(text) {
+      const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+      return lines.map((line) => {
+        const cols = [];
+        let cur = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (ch === ',' && !inQuotes) {
+            cols.push(cur);
+            cur = '';
+          } else {
+            cur += ch;
+          }
+        }
+
+        cols.push(cur);
+        return cols;
+      });
+    }
+
+    async function readFileToRawMatrix(file) {
+      if (!file) throw new Error('Please choose a file to import.');
+      const ext = file.name.toLowerCase();
+
+      if (ext.endsWith('.csv')) {
+        const text = await file.text();
+        return parseCsv(text);
+      }
+
+      if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      }
+
+      throw new Error('Unsupported file format. Please use .xlsx, .xls, or .csv.');
+    }
+
+    async function importYearRates() {
+      if (!canManage) {
+        setStatus('You do not have permission to import line rates.', 'error');
+        return;
+      }
+
+      try {
+        const year = parseYear(document.getElementById('importYear').value);
+        if (!year) {
+          throw new Error('Please provide a valid import year.');
+        }
+
+        const file = document.getElementById('importFile').files[0];
+        const overwrite = document.getElementById('overwriteExisting').checked;
+        const raw = await readFileToRawMatrix(file);
+
+        setStatus('Importing line rates...');
+
+        const response = await fetch('/api/line-rates/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${auth.getToken()}`
+          },
+          body: JSON.stringify({ year, raw, overwrite })
+        });
+
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.error || 'Import failed');
+        }
+
+        const result = body.result || {};
+        setStatus(
+          `Import finished: inserted ${safeNumber(result.inserted)}, updated ${safeNumber(result.updated)}, skipped ${safeNumber(result.skipped)}.`,
+          'ok'
+        );
+
+        await loadYears();
+        document.getElementById('yearSelect').value = String(year);
+        await loadYearRates();
+      } catch (err) {
+        setStatus(err.message || 'Import failed.', 'error');
+      }
+    }
+
+    (async function init() {
+      if (!auth.isAuthenticated()) {
+        auth.redirectToLogin();
+        return;
+      }
+
+      try {
+        await auth.configureHeaderButtons();
+        await detectManagePermission();
+        await loadYears();
+        await loadYearRates();
+      } catch (err) {
+        setStatus(err.message || 'Failed to initialize page.', 'error');
+      }
+    })();
+  </script>
+</body>
+</html>

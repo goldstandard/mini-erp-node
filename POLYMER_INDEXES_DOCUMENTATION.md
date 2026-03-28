@@ -54,7 +54,7 @@ Import behavior:
 - Index and variant are selected separately in the UI
 - Date and numeric value are required
 - Save writes or updates one point for that index/date
-- **Mid variant:** If you try to enter a Mid value directly and Min/Max exist for the same date, the Mid value is auto-computed as (Min + Max) / 2 and the direct Mid entry is rejected
+- **Mid variant:** Mid is a derived value managed by auto-calculation logic and is not intended as a direct input
 
 ## Historical Table Behavior
 
@@ -70,11 +70,14 @@ Import behavior:
 - `GET /api/admin/polymer-indexes`
 - `POST /api/admin/polymer-indexes`
 - `PUT /api/admin/polymer-indexes/:id`
+- `DELETE /api/admin/polymer-indexes/:id`
 - `GET /api/admin/polymer-indexes/:id/values`
 - `POST /api/admin/polymer-indexes/:id/values`
 - `POST /api/admin/polymer-indexes/import`
 - `GET /api/admin/polymer-indexes/reminders/due`
 - `GET /api/admin/polymer-indexes/data/by-week`
+- `DELETE /api/admin/polymer-indexes/data/all`
+- `POST /api/admin/polymer-indexes/recalculate-mid`
 
 All endpoints above require authentication and `user:manage` permission.
 
@@ -87,14 +90,14 @@ All endpoints above require authentication and `user:manage` permission.
 - Chart updates instantly as you click checkboxes
 - Chart timeframe always matches the year range selected at the top of the page
 
-## Mid Value Auto-Calculation
+## Derived Mid Value
 
-The Mid variant is now **automatically calculated** from Min and Max values:
+The Mid variant is a **derived value** automatically calculated from Min and Max values:
 
 - When Min and Max are both present for a given date, Mid is set to `(Min + Max) / 2`
-- Direct Mid writes are rejected if Min/Max already exist for that date
-- Import ignores Mid rows; they are recalculated based on imported Min/Max
-- Use the **one-time recalculate endpoint** to backfill Mid values after a bulk import
+- Direct Mid writes are not used as source-of-truth when Min/Max are present
+- Import ignores Mid rows; derived Mid is recalculated from imported Min/Max
+- Use the **recalculate endpoint** as a controlled backfill operation after bulk import
 
 ## Data Maintenance
 

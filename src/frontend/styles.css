@@ -12,6 +12,11 @@ body {
   color: #153e75;
 }
 
+:root {
+  --header-ink-900: #0e2a47;
+  --header-ink-600: #32557a;
+}
+
 .container {
   max-width: 1400px;
   margin: 0 auto;
@@ -77,6 +82,74 @@ header h1 {
   font-size: 2.5em;
   color: #1e3a8a;
   margin-bottom: 10px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #dbeaf9;
+  padding-bottom: 18px;
+}
+
+.app-branding {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.app-title-wrap h1 {
+  margin: 0;
+  font-size: 1.65rem;
+  color: var(--header-ink-900);
+  letter-spacing: 0.2px;
+}
+
+.app-title-wrap p {
+  margin: 2px 0 0;
+  color: var(--header-ink-600);
+  font-size: 0.92rem;
+}
+
+.app-top-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.action-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  font-family: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn-nav {
+  background: #5e6f85;
+}
+
+.btn-password {
+  background: #2667c9;
+}
+
+.btn-admin {
+  background: #d97706;
+}
+
+.btn-logout {
+  background: #cf3f4e;
 }
 
 /* Company logo in header */

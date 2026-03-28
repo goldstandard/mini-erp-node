@@ -21,7 +21,7 @@ Default seeded admin account:
 
 ## Database Paths
 
-- App database: `src/data/mini_erp.db`
+- App database: `data/mini_erp.db`
 - Source Excel data folder: `data/`
 
 ## Azure App Service (Recommended)
@@ -51,6 +51,8 @@ After deployment verify:
 - `GET /api/health` returns 200
 - Login flow works
 - Dashboard loads
+- BOM calculator and recipe browser load
+- Raw material prices page and availability matrix load
 - Polymer indexes page loads
 
 ## Backup and Restore
@@ -58,7 +60,7 @@ After deployment verify:
 Recommended backup targets:
 
 - Full project zip
-- `src/data/mini_erp.db`
+- `data/mini_erp.db`
 - deployment configuration
 
 Restore pattern:
@@ -67,6 +69,17 @@ Restore pattern:
 2. Restore database file
 3. Run `npm install`
 4. Start app and validate `/api/health`
+
+## Script Execution Policy
+
+The `scripts/` folder is part of the project and includes setup, migration, import, and analysis tooling.
+
+Operational guidance:
+
+- Run scripts from project root (`mini-erp-node/`) so relative paths resolve correctly.
+- Always back up `data/mini_erp.db` before write scripts.
+- Prefer dry-run style execution before persistence where supported (for example, `import-rawmat-prices.js` without `--apply`).
+- Treat controlled migration/backfill scripts as deliberate operations per environment.
 
 ## Security Checklist
 

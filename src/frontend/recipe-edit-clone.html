@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recipe Edit Clone</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    body {
+      margin: 0;
+      background: #f4f7fb;
+      color: #18324a;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+
+    .page {
+      max-width: 1700px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .panel {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 22px rgba(26, 52, 87, 0.12);
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      color: #1e4d83;
+      font-size: 1.2rem;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .filters .item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .filters label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #345f85;
+    }
+
+    .filters select {
+      width: 100%;
+      border: 1px solid #c7d7ea;
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 13px;
+      background: #fff;
+      min-height: 34px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-primary { background: #2c6cc7; color: #fff; }
+    .btn-secondary { background: #e5edf7; color: #1f4465; }
+    .btn-danger { background: #c73b3b; color: #fff; }
+    .btn-success { background: #1f7d3e; color: #fff; }
+
+    .status {
+      margin-top: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      min-height: 20px;
+    }
+
+    .status.error { color: #c62828; }
+    .status.ok { color: #1b5e20; }
+
+    .table-top-scroll {
+      overflow-x: auto;
+      overflow-y: hidden;
+      height: 14px;
+      margin-bottom: 6px;
+      display: none;
+    }
+
+    .table-top-scroll-inner {
+      height: 1px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid #dbe6f3;
+      border-radius: 10px;
+      max-height: 66vh;
+    }
+
+    table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: #fff;
+    }
+
+    th, td {
+      border: 1px solid #dde7f2;
+      padding: 6px 8px;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #1f5f9f;
+      color: #fff;
+      text-align: left;
+      font-size: 11px;
+      letter-spacing: 0.2px;
+    }
+
+    tbody tr:nth-child(even) { background: #f8fbff; }
+
+    .bom-cell {
+      min-width: 260px;
+      white-space: normal;
+      line-height: 1.35;
+    }
+
+    .actions-cell {
+      min-width: 125px;
+      display: flex;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-weight: 700;
+      font-size: 11px;
+      border: 1px solid transparent;
+    }
+
+    .pill-no { background: #fff6e5; color: #8f5a00; border-color: #efcf8f; }
+    .pill-yes { background: #e7f7eb; color: #0f6a2c; border-color: #9fd7ad; }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 28, 46, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2100;
+      padding: 16px;
+    }
+
+    .modal.show { display: flex; }
+
+    #editorModal .modal-content {
+      width: 85vw;
+      max-width: 85vw;
+      max-height: 94vh;
+      overflow: auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+      padding: 14px;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid #dfe8f3;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+    }
+
+    .modal-head h3 {
+      margin: 0;
+      color: #1c4f83;
+    }
+
+    .editor-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(170px, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .editor-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .editor-field label {
+      font-size: 11px;
+      color: #385f83;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }
+
+    .editor-field input,
+    .editor-field select,
+    .editor-field textarea {
+      border: 1px solid #c9d9eb;
+      border-radius: 7px;
+      padding: 6px;
+      font-size: 13px;
+    }
+
+    .editor-field textarea {
+      min-height: 60px;
+      resize: vertical;
+    }
+
+    .materials-editor {
+      border: 1px solid #dbe6f3;
+      border-radius: 9px;
+      overflow: auto;
+      margin-bottom: 8px;
+    }
+
+    .materials-editor table { min-width: 760px; }
+
+    .materials-total {
+      font-weight: 700;
+      font-size: 13px;
+      color: #103a61;
+      margin-bottom: 10px;
+    }
+
+    .materials-total.bad { color: #c62828; }
+
+    .muted {
+      color: #5f7e9b;
+      font-size: 12px;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 1280px) {
+      .filters { grid-template-columns: repeat(4, minmax(160px, 1fr)); }
+      .editor-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
+    }
+
+    @media (max-width: 820px) {
+      .filters { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+      .editor-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+      .actions-cell { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <div class="app-branding">
+        <img src="/data/PFN_logo.png" alt="PFN" class="company-logo" />
+        <div class="app-title-wrap">
+          <h1>Recipe Edit/Clone</h1>
+          <p>Edit approved recipes and clone recipes into new draft records</p>
+        </div>
+      </div>
+      <div class="app-top-actions">
+        <button class="action-btn btn-nav" onclick="window.location.href='/dashboard'">Back to Dashboard</button>
+        <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;">Change Password</button>
+        <button id="adminBtn" class="action-btn btn-admin" style="display:none;">Admin</button>
+        <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
+      </div>
+    </header>
+  </div>
+
+  <div class="page">
+    <section class="panel">
+      <h2>Filters</h2>
+      <div class="filters" id="filterGrid"></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="loadBtn">Load Data</button>
+        <button class="btn btn-secondary" id="clearBtn">Clear Filters</button>
+      </div>
+      <div id="pageStatus" class="status"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Recipes (fully expanded)</h2>
+      <div id="recTopScrollbar" class="table-top-scroll">
+        <div id="recTopScrollbarInner" class="table-top-scroll-inner"></div>
+      </div>
+      <div class="table-wrap" id="recTableWrapper">
+        <table id="recipesTable">
+          <thead>
+            <tr>
+              <th>Actions</th>
+              <th>Approved</th>
+              <th>SAP ID</th>
+              <th>PD ID</th>
+              <th>Customer</th>
+              <th>Market Segment</th>
+              <th>Application</th>
+              <th>S/SMS</th>
+              <th>Mono/Bico</th>
+              <th>Structure</th>
+              <th>Bico Ratio Desc</th>
+              <th>Main Raw Mat</th>
+              <th>Treatment</th>
+              <th>Color</th>
+              <th>Bonding</th>
+              <th>Customer BW</th>
+              <th>Belt BW</th>
+              <th>MB grams</th>
+              <th>Line</th>
+              <th>Country</th>
+              <th>Belt Speed</th>
+              <th>Siko %</th>
+              <th>Repro %</th>
+              <th>Max Usable Width</th>
+              <th>Usable Width</th>
+              <th>Edge Trim %</th>
+              <th>Web Loss %</th>
+              <th>Other Scrap %</th>
+              <th>Total Scrap %</th>
+              <th>Gross Yield %</th>
+              <th>S Beams</th>
+              <th>M Beams</th>
+              <th>SB Throughput</th>
+              <th>MB Throughput</th>
+              <th>Total Throughput</th>
+              <th>Production Time</th>
+              <th>Cores</th>
+              <th>Slit Width</th>
+              <th>Length Meters</th>
+              <th>Roll Diameter</th>
+              <th>Target Production</th>
+              <th>Target Unit</th>
+              <th>Overconsumption</th>
+              <th>Notes</th>
+              <th>Author</th>
+              <th>Created</th>
+              <th>Updated</th>
+              <th>BOM</th>
+            </tr>
+          </thead>
+          <tbody id="recipesBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="editorModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3 id="editorTitle">Recipe Editor</h3>
+        <div class="actions">
+          <button class="btn btn-secondary" onclick="closeEditor()">Close</button>
+        </div>
+      </div>
+
+      <div id="editorStatus" class="status"></div>
+
+      <div class="editor-grid" id="editorGrid"></div>
+
+      <div class="panel" style="margin: 0; padding: 10px;">
+        <h2 style="margin-bottom:8px;">BOM Materials</h2>
+        <div class="materials-editor">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:180px;">Label</th>
+                <th style="width:320px;">Material</th>
+                <th style="width:140px;">Percentage (%)</th>
+                <th style="width:120px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="materialsBody"></tbody>
+          </table>
+        </div>
+        <div id="materialsTotal" class="materials-total">Total: 0.00%</div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="addMaterialBtn">Add Material</button>
+        </div>
+      </div>
+
+      <div class="actions" style="justify-content:flex-end; margin-top: 10px;">
+        <button class="btn btn-primary hidden" id="requestApprovalBtn">Request Approval</button>
+        <button class="btn btn-success" id="saveEditorBtn">Save</button>
+      </div>
+      <div class="muted" style="margin-top:6px;">
+        Edit mode: existing PD ID cannot be changed if already filled. Copy mode: PD ID is cleared and saved as Approved = No.
+      </div>
+    </div>
+  </div>
+
+  <script src="/auth.js"></script>
+  <script>
+    const token = localStorage.getItem('authToken') || '';
+    let pagePermissions = {};
+    let currentUser = null;
+    let canModify = false;
+    let isAdminGroupMember = false;
+    let metadata = null;
+    let rows = [];
+    let recipeTableScrollSyncBound = false;
+
+    let editorMode = 'edit';
+    let currentRecordId = null;
+    let sourceRecordId = null;
+    let originalPdId = '';
+    let currentRecordRecipeApproved = 'No';
+
+    const FILTERS = [
+      { id: 'sapId', label: 'SAP ID', key: 'sapIds' },
+      { id: 'pfnId', label: 'PD ID', key: 'pfnIds' },
+      { id: 'customer', label: 'Customer', key: 'customers' },
+      { id: 'marketSegment', label: 'Market Segment', key: 'marketSegments' },
+      { id: 'application', label: 'Application', key: 'applications' },
+      { id: 's_sms', label: 'S/SMS', key: 'smsOptions' },
+      { id: 'bonding', label: 'Bonding', key: 'bondings' },
+      { id: 'basisWeight', label: 'Basis Weight', key: 'basisWeights' },
+      { id: 'slitWidth', label: 'Slit Width', key: 'slitWidths' },
+      { id: 'treatment', label: 'Treatment', key: 'treatments' },
+      { id: 'author', label: 'Author', key: 'authors' },
+      { id: 'lineId', label: 'Line', key: 'lineIds' },
+      { id: 'country', label: 'Country', key: 'countries' },
+      { id: 'recipeApproved', label: 'Recipe Approved', key: 'recipeApprovedValues' }
+    ];
+
+    const LABEL_TO_LIST_KEY = {
+      'Spunbond polymer': 'list_sb',
+      'Meltblown polymer': 'list_mb',
+      'Pigment': 'list_pigment',
+      'Additive': 'list_additive',
+      'Surfactant': 'list_surfactant'
+    };
+
+    const MATERIAL_LABEL_OPTIONS = [
+      'Spunbond polymer',
+      'Meltblown polymer',
+      'Recyclate',
+      'Regranulate',
+      'Pigment',
+      'Additive',
+      'Surfactant'
+    ];
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function setStatus(message, isError = false, targetId = 'pageStatus') {
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      el.textContent = message || '';
+      el.className = `status ${isError ? 'error' : 'ok'}`;
+    }
+
+    function formatNum(value, digits = 2) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(digits) : '';
+    }
+
+    function formatDate(value) {
+      if (!value) return '-';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return value;
+      return d.toLocaleString();
+    }
+
+    function getSelectedValues(selectId) {
+      const select = document.getElementById(selectId);
+      if (!select) return [];
+      return Array.from(select.selectedOptions).map((opt) => opt.value).filter(Boolean);
+    }
+
+    function buildQueryFromFilters() {
+      const params = new URLSearchParams();
+      FILTERS.forEach((f) => {
+        getSelectedValues(`filter-${f.id}`).forEach((v) => params.append(f.id, v));
+      });
+      return params.toString();
+    }
+
+    function buildFilterGrid() {
+      const grid = document.getElementById('filterGrid');
+      grid.innerHTML = FILTERS.map((f) => `
+        <div class="item">
+          <label for="filter-${f.id}">${escapeHtml(f.label)}</label>
+          <select id="filter-${f.id}" multiple size="1"></select>
+        </div>
+      `).join('');
+
+      FILTERS.forEach((f) => {
+        const select = document.getElementById(`filter-${f.id}`);
+        if (!select) return;
+        select.addEventListener('focus', () => {
+          select.size = Math.min(10, Math.max(4, select.options.length));
+        });
+        select.addEventListener('blur', () => {
+          select.size = 1;
+        });
+      });
+    }
+
+    function setSelectValues(selectId, values, selected = '') {
+      const el = document.getElementById(selectId);
+      if (!el) return;
+      const opts = (values || []).map((v) => String(v));
+      el.innerHTML = opts.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+      if (selected && opts.includes(String(selected))) {
+        el.value = String(selected);
+      }
+    }
+
+    function fillFilterOptions() {
+      const src = metadata?.filters || {};
+      FILTERS.forEach((f) => {
+        setSelectValues(`filter-${f.id}`, src[f.key] || []);
+      });
+    }
+
+    async function loadPagePermissions() {
+      const [meResponse, permissionsResponse, groupsResponse] = await Promise.all([
+        fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch('/api/auth/me/access-permissions', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch('/api/auth/me/groups', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      if (!meResponse.ok || !permissionsResponse.ok || !groupsResponse.ok) {
+        throw new Error('Unable to load page permissions.');
+      }
+
+      currentUser = await meResponse.json().catch(() => null);
+      const data = await permissionsResponse.json().catch(() => ({}));
+      const groups = await groupsResponse.json().catch(() => []);
+      pagePermissions = data.pages || {};
+      isAdminGroupMember = Array.isArray(groups) && groups.some((g) => String(g?.name || '').trim().toLowerCase() === 'admin');
+
+      const isAdmin = currentUser?.role === 'admin';
+      canModify = isAdmin || !!(pagePermissions['recipe-edit-clone'] && pagePermissions['recipe-edit-clone'].modify);
+      const canRead = isAdmin || !!(pagePermissions['recipe-edit-clone'] && pagePermissions['recipe-edit-clone'].read);
+      if (!canRead) throw new Error('You do not have read access to Recipe Edit/Clone page.');
+    }
+
+    async function loadMetadata() {
+      const response = await fetch('/api/bom/edit-clone/metadata', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Failed to load metadata.');
+      metadata = payload;
+      fillFilterOptions();
+    }
+
+    function bomCellHtml(materials, total) {
+      const lines = (materials || []).map((m) => {
+        return `${escapeHtml(m.material_label || '-')}: ${escapeHtml(m.material_name || '-')} (${formatNum(m.percentage, 2)}%)`;
+      });
+      lines.push(`<strong>Total: ${formatNum(total, 2)}%</strong>`);
+      return lines.join('<br>');
+    }
+
+    function approvedPill(value) {
+      const yes = String(value || '').toLowerCase() === 'yes';
+      return `<span class="pill ${yes ? 'pill-yes' : 'pill-no'}">${yes ? 'Yes' : 'No'}</span>`;
+    }
+
+    function renderRows() {
+      const body = document.getElementById('recipesBody');
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="47" style="text-align:center;color:#6b8198;">No recipes found.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map((r) => {
+        const actions = canModify
+          ? `<div class="actions-cell">
+               <button class="btn btn-primary" onclick="openEditor('edit', ${Number(r.id)})">Edit</button>
+               <button class="btn btn-secondary" onclick="openEditor('copy', ${Number(r.id)})">Copy</button>
+               ${isAdminGroupMember ? `<button class="btn btn-danger" onclick="deleteRecipe(${Number(r.id)})">Delete</button>` : ''}
+             </div>`
+          : `<span class="muted">Read only</span>`;
+
+        return `
+          <tr>
+            <td>${actions}</td>
+            <td>${approvedPill(r.recipe_approved)}</td>
+            <td>${escapeHtml(r.sap_id || '-')}</td>
+            <td>${escapeHtml(r.pd_id || '-')}</td>
+            <td>${escapeHtml(r.customer || '-')}</td>
+            <td>${escapeHtml(r.market_segment || '-')}</td>
+            <td>${escapeHtml(r.application || '-')}</td>
+            <td>${escapeHtml(r.smms || '-')}</td>
+            <td>${escapeHtml(r.mono_bico || '-')}</td>
+            <td>${escapeHtml(r.structure || '-')}</td>
+            <td>${escapeHtml(r.bico_ratio_desc || '-')}</td>
+            <td>${escapeHtml(r.main_raw_mat || '-')}</td>
+            <td>${escapeHtml(r.treatment || '-')}</td>
+            <td>${escapeHtml(r.color || '-')}</td>
+            <td>${escapeHtml(r.bonding || '-')}</td>
+            <td>${formatNum(r.customer_bw, 2)}</td>
+            <td>${formatNum(r.belt_bw, 2)}</td>
+            <td>${formatNum(r.mb_grams, 2)}</td>
+            <td>${escapeHtml(r.line || '-')}</td>
+            <td>${escapeHtml(r.country || '-')}</td>
+            <td>${formatNum(r.belt_speed, 2)}</td>
+            <td>${formatNum(r.siko_percent, 2)}</td>
+            <td>${formatNum(r.repro_percent, 2)}</td>
+            <td>${formatNum(r.max_usable_width, 2)}</td>
+            <td>${formatNum(r.usable_width, 2)}</td>
+            <td>${formatNum(r.edge_trim_percent, 2)}</td>
+            <td>${formatNum(r.web_loss_percent, 2)}</td>
+            <td>${formatNum(r.other_scrap_percent, 2)}</td>
+            <td>${formatNum(r.total_scrap_percent, 2)}</td>
+            <td>${formatNum(r.gross_yield_percent, 2)}</td>
+            <td>${formatNum(r.s_beams, 0)}</td>
+            <td>${formatNum(r.m_beams, 0)}</td>
+            <td>${formatNum(r.sb_throughput, 2)}</td>
+            <td>${formatNum(r.mb_throughput, 2)}</td>
+            <td>${formatNum(r.total_throughput, 2)}</td>
+            <td>${formatNum(r.production_time, 2)}</td>
+            <td>${escapeHtml(r.cores || '-')}</td>
+            <td>${formatNum(r.slit_width, 2)}</td>
+            <td>${formatNum(r.length_meters, 2)}</td>
+            <td>${formatNum(r.roll_diameter, 2)}</td>
+            <td>${formatNum(r.target_production, 2)}</td>
+            <td>${escapeHtml(r.target_unit || '-')}</td>
+            <td>${formatNum((Number(r.overconsumption) || 0) * 100, 2)}%</td>
+            <td>${escapeHtml(r.notes || '-')}</td>
+            <td>${escapeHtml(r.author || '-')}</td>
+            <td>${escapeHtml(formatDate(r.created_at))}</td>
+            <td>${escapeHtml(formatDate(r.updated_at))}</td>
+            <td class="bom-cell">${bomCellHtml(r.materials || [], r.material_total_percent || 0)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function loadRows() {
+      setStatus('Loading data...', false);
+      const qs = buildQueryFromFilters();
+      const response = await fetch(`/api/bom/edit-clone/rows${qs ? `?${qs}` : ''}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Failed to load rows.');
+      rows = Array.isArray(payload.rows) ? payload.rows : [];
+      renderRows();
+      syncRecipeTableTopScrollbarWidth();
+      setupRecipeTableTopScrollbar();
+      setStatus(`Loaded ${rows.length} row(s).`, false);
+    }
+
+    function syncRecipeTableTopScrollbarWidth() {
+      const topScroll = document.getElementById('recTopScrollbar');
+      const topInner = document.getElementById('recTopScrollbarInner');
+      const tableWrapper = document.getElementById('recTableWrapper');
+      const table = document.getElementById('recipesTable');
+      if (!topScroll || !topInner || !tableWrapper || !table) return;
+
+      topInner.style.width = `${table.scrollWidth}px`;
+      topScroll.style.display = tableWrapper.scrollWidth > tableWrapper.clientWidth ? 'block' : 'none';
+    }
+
+    function setupRecipeTableTopScrollbar() {
+      const topScroll = document.getElementById('recTopScrollbar');
+      const tableWrapper = document.getElementById('recTableWrapper');
+      if (!topScroll || !tableWrapper) return;
+
+      if (!recipeTableScrollSyncBound) {
+        let isSyncing = false;
+
+        topScroll.addEventListener('scroll', () => {
+          if (isSyncing) return;
+          isSyncing = true;
+          tableWrapper.scrollLeft = topScroll.scrollLeft;
+          isSyncing = false;
+        });
+
+        tableWrapper.addEventListener('scroll', () => {
+          if (isSyncing) return;
+          isSyncing = true;
+          topScroll.scrollLeft = tableWrapper.scrollLeft;
+          isSyncing = false;
+        });
+
+        window.addEventListener('resize', syncRecipeTableTopScrollbarWidth);
+        recipeTableScrollSyncBound = true;
+      }
+    }
+
+    function clearFilters() {
+      FILTERS.forEach((f) => {
+        const el = document.getElementById(`filter-${f.id}`);
+        if (!el) return;
+        Array.from(el.options).forEach((opt) => { opt.selected = false; });
+        el.size = 1;
+      });
+    }
+
+    function buildEditorGrid() {
+      const grid = document.getElementById('editorGrid');
+      grid.innerHTML = `
+        <div class="editor-field"><label>SAP ID</label><input id="ed_sap_id" type="text" /></div>
+        <div class="editor-field"><label>PD ID</label><input id="ed_pd_id" type="text" /></div>
+        <div class="editor-field"><label>Customer</label><select id="ed_customer"></select></div>
+        <div class="editor-field"><label>Market Segment</label><select id="ed_market_segment"></select></div>
+        <div class="editor-field"><label>Application</label><select id="ed_application"></select></div>
+
+        <div class="editor-field"><label>S/SMS</label><select id="ed_smms"></select></div>
+        <div class="editor-field"><label>Mono/Bico</label><select id="ed_mono_bico"></select></div>
+        <div class="editor-field"><label>Structure</label><select id="ed_structure"></select></div>
+        <div class="editor-field"><label>Bico Ratio Desc</label><select id="ed_bico_ratio_desc"></select></div>
+        <div class="editor-field"><label>Main Raw Mat</label><select id="ed_main_raw_mat"></select></div>
+
+        <div class="editor-field"><label>Treatment</label><select id="ed_treatment"></select></div>
+        <div class="editor-field"><label>Color</label><select id="ed_color"></select></div>
+        <div class="editor-field"><label>Bonding</label><select id="ed_bonding"></select></div>
+        <div class="editor-field"><label>Line</label><select id="ed_line"></select></div>
+        <div class="editor-field"><label>Target Unit</label><select id="ed_target_unit"></select></div>
+
+        <div class="editor-field"><label>Customer BW</label><input id="ed_customer_bw" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Belt BW</label><input id="ed_belt_bw" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>MB grams</label><input id="ed_mb_grams" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Belt Speed</label><input id="ed_belt_speed" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Siko %</label><input id="ed_siko_percent" type="number" step="0.01" /></div>
+
+        <div class="editor-field"><label>Repro %</label><input id="ed_repro_percent" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Max Usable Width</label><input id="ed_max_usable_width" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Usable Width</label><input id="ed_usable_width" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Edge Trim %</label><input id="ed_edge_trim_percent" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Web Loss %</label><input id="ed_web_loss_percent" type="number" step="0.01" /></div>
+
+        <div class="editor-field"><label>Other Scrap %</label><input id="ed_other_scrap_percent" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Total Scrap %</label><input id="ed_total_scrap_percent" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Gross Yield %</label><input id="ed_gross_yield_percent" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>S Beams</label><input id="ed_s_beams" type="number" step="1" /></div>
+        <div class="editor-field"><label>M Beams</label><input id="ed_m_beams" type="number" step="1" /></div>
+
+        <div class="editor-field"><label>SB Throughput</label><input id="ed_sb_throughput" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>MB Throughput</label><input id="ed_mb_throughput" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Total Throughput</label><input id="ed_total_throughput" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Production Time</label><input id="ed_production_time" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Cores</label><input id="ed_cores" type="text" /></div>
+
+        <div class="editor-field"><label>Slit Width</label><input id="ed_slit_width" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Length Meters</label><input id="ed_length_meters" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Roll Diameter</label><input id="ed_roll_diameter" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Target Production</label><input id="ed_target_production" type="number" step="0.01" /></div>
+        <div class="editor-field"><label>Overconsumption (%)</label><input id="ed_overconsumption" type="number" step="0.01" /></div>
+
+        <div class="editor-field" style="grid-column: span 5;"><label>Notes</label><textarea id="ed_notes"></textarea></div>
+      `;
+
+      const editor = metadata?.editor || {};
+      const desc = editor.descriptionLists || {};
+      setSelectValues('ed_customer', editor.customers || []);
+      setSelectValues('ed_market_segment', desc.marketSegment || []);
+      setSelectValues('ed_application', desc.application || []);
+      setSelectValues('ed_smms', desc.smms || []);
+      setSelectValues('ed_mono_bico', desc.monoBico || editor.monoBicoOptions || []);
+      setSelectValues('ed_structure', desc.structure || editor.structures || []);
+      setSelectValues('ed_bico_ratio_desc', desc.bicoRatioDesc || editor.bicoRatios || []);
+      setSelectValues('ed_main_raw_mat', desc.mainRawMat || editor.mainRawMats || []);
+      setSelectValues('ed_treatment', desc.treatment || []);
+      setSelectValues('ed_color', desc.color || editor.colors || []);
+      setSelectValues('ed_bonding', desc.bonding || editor.bondings || []);
+      setSelectValues('ed_line', editor.lineIds || []);
+      setSelectValues('ed_target_unit', editor.targetUnits || ['tons', 'kg']);
+    }
+
+    function getEditorValue(id) {
+      const el = document.getElementById(id);
+      return el ? (el.value || '').trim() : '';
+    }
+
+    function setEditorValue(id, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const text = value == null ? '' : String(value);
+      if (el.tagName === 'SELECT') {
+        const options = Array.from(el.options).map((o) => o.value);
+        if (text && !options.includes(text)) {
+          const option = document.createElement('option');
+          option.value = text;
+          option.textContent = text;
+          el.appendChild(option);
+        }
+      }
+      el.value = text;
+    }
+
+    function toNumberOrNull(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function isSurfactantLabel(label) {
+      return String(label || '').trim().toLowerCase() === 'surfactant';
+    }
+
+    function addMaterialRow(material = {}) {
+      const body = document.getElementById('materialsBody');
+      const row = document.createElement('tr');
+      row.className = 'material-row';
+      row.innerHTML = `
+        <td><select class="mat-label"></select></td>
+        <td class="mat-name-cell"></td>
+        <td><input class="mat-pct" type="number" min="0" step="0.01" /></td>
+        <td><button class="btn btn-danger mat-remove" type="button">Remove</button></td>
+      `;
+      body.appendChild(row);
+
+      const labelSelect = row.querySelector('.mat-label');
+      setSelectValuesOnElement(labelSelect, MATERIAL_LABEL_OPTIONS, material.material_label || 'Spunbond polymer');
+
+      const pctInput = row.querySelector('.mat-pct');
+      pctInput.value = Number.isFinite(Number(material.percentage)) ? Number(material.percentage).toFixed(2) : '';
+      pctInput.addEventListener('input', updateMaterialsTotal);
+
+      labelSelect.addEventListener('change', () => {
+        renderMaterialNameControl(row, labelSelect.value, '');
+      });
+
+      row.querySelector('.mat-remove').addEventListener('click', () => {
+        row.remove();
+        updateMaterialsTotal();
+      });
+
+      renderMaterialNameControl(row, labelSelect.value, material.material_name || '');
+      updateMaterialsTotal();
+    }
+
+    function setSelectValuesOnElement(selectEl, values, selected = '') {
+      if (!selectEl) return;
+      const opts = (values || []).map((v) => String(v));
+      selectEl.innerHTML = opts.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+      if (selected && opts.includes(String(selected))) {
+        selectEl.value = String(selected);
+      } else if (opts.length) {
+        selectEl.value = opts[0];
+      }
+    }
+
+    function renderMaterialNameControl(row, label, value) {
+      const cell = row.querySelector('.mat-name-cell');
+      const listKey = LABEL_TO_LIST_KEY[label] || '';
+      const options = listKey ? ((metadata?.editor?.materialLists || {})[listKey] || []) : [];
+
+      if (options.length) {
+        const select = document.createElement('select');
+        select.className = 'mat-name';
+        setSelectValuesOnElement(select, options, value);
+        cell.innerHTML = '';
+        cell.appendChild(select);
+      } else {
+        const input = document.createElement('input');
+        input.className = 'mat-name';
+        input.type = 'text';
+        input.value = value || '';
+        cell.innerHTML = '';
+        cell.appendChild(input);
+      }
+    }
+
+    function updateMaterialsTotal() {
+      const totalsEl = document.getElementById('materialsTotal');
+      const rowsEls = Array.from(document.querySelectorAll('#materialsBody .material-row'));
+      let totalNonSurfactant = 0;
+      rowsEls.forEach((row) => {
+        const label = row.querySelector('.mat-label')?.value || '';
+        const pct = Number(row.querySelector('.mat-pct')?.value || 0);
+        if (!Number.isFinite(pct)) return;
+        if (!isSurfactantLabel(label)) {
+          totalNonSurfactant += pct;
+        }
+      });
+      totalsEl.textContent = `Total (non-surfactants): ${totalNonSurfactant.toFixed(2)}%`;
+      totalsEl.classList.toggle('bad', Math.abs(totalNonSurfactant - 100) > 0.01);
+    }
+
+    function fillEditor(record) {
+      setEditorValue('ed_sap_id', record.sap_id || '');
+      setEditorValue('ed_pd_id', record.pd_id || '');
+      setEditorValue('ed_customer', record.customer || '');
+      setEditorValue('ed_market_segment', record.market_segment || '');
+      setEditorValue('ed_application', record.application || '');
+      setEditorValue('ed_smms', record.smms || '');
+      setEditorValue('ed_mono_bico', record.mono_bico || '');
+      setEditorValue('ed_structure', record.structure || '');
+      setEditorValue('ed_bico_ratio_desc', record.bico_ratio_desc || '');
+      setEditorValue('ed_main_raw_mat', record.main_raw_mat || '');
+      setEditorValue('ed_treatment', record.treatment || '');
+      setEditorValue('ed_color', record.color || '');
+      setEditorValue('ed_bonding', record.bonding || '');
+      setEditorValue('ed_line', record.line || '');
+      setEditorValue('ed_target_unit', record.target_unit || 'tons');
+
+      setEditorValue('ed_customer_bw', record.customer_bw ?? '');
+      setEditorValue('ed_belt_bw', record.belt_bw ?? '');
+      setEditorValue('ed_mb_grams', record.mb_grams ?? '');
+      setEditorValue('ed_belt_speed', record.belt_speed ?? '');
+      setEditorValue('ed_siko_percent', record.siko_percent ?? '');
+      setEditorValue('ed_repro_percent', record.repro_percent ?? '');
+      setEditorValue('ed_max_usable_width', record.max_usable_width ?? '');
+      setEditorValue('ed_usable_width', record.usable_width ?? '');
+      setEditorValue('ed_edge_trim_percent', record.edge_trim_percent ?? '');
+      setEditorValue('ed_web_loss_percent', record.web_loss_percent ?? '');
+      setEditorValue('ed_other_scrap_percent', record.other_scrap_percent ?? '');
+      setEditorValue('ed_total_scrap_percent', record.total_scrap_percent ?? '');
+      setEditorValue('ed_gross_yield_percent', record.gross_yield_percent ?? '');
+      setEditorValue('ed_s_beams', record.s_beams ?? '');
+      setEditorValue('ed_m_beams', record.m_beams ?? '');
+      setEditorValue('ed_sb_throughput', record.sb_throughput ?? '');
+      setEditorValue('ed_mb_throughput', record.mb_throughput ?? '');
+      setEditorValue('ed_total_throughput', record.total_throughput ?? '');
+      setEditorValue('ed_production_time', record.production_time ?? '');
+      setEditorValue('ed_cores', record.cores || '');
+      setEditorValue('ed_slit_width', record.slit_width ?? '');
+      setEditorValue('ed_length_meters', record.length_meters ?? '');
+      setEditorValue('ed_roll_diameter', record.roll_diameter ?? '');
+      setEditorValue('ed_target_production', record.target_production ?? '');
+      setEditorValue('ed_overconsumption', Number.isFinite(Number(record.overconsumption)) ? (Number(record.overconsumption) * 100).toFixed(2) : '');
+      setEditorValue('ed_notes', record.notes || '');
+
+      document.getElementById('materialsBody').innerHTML = '';
+      const materials = Array.isArray(record.materials) ? record.materials : [];
+      if (!materials.length) {
+        addMaterialRow({ material_label: 'Spunbond polymer', material_name: '', percentage: '' });
+      } else {
+        materials.forEach((m) => addMaterialRow(m));
+      }
+
+      const pdInput = document.getElementById('ed_pd_id');
+      if (editorMode === 'edit' && originalPdId) {
+        pdInput.readOnly = true;
+      } else {
+        pdInput.readOnly = false;
+      }
+    }
+
+    function collectEditorPayload() {
+      const record = {
+        sap_id: getEditorValue('ed_sap_id'),
+        pd_id: getEditorValue('ed_pd_id'),
+        customer: getEditorValue('ed_customer'),
+        market_segment: getEditorValue('ed_market_segment'),
+        application: getEditorValue('ed_application'),
+        smms: getEditorValue('ed_smms'),
+        mono_bico: getEditorValue('ed_mono_bico'),
+        structure: getEditorValue('ed_structure'),
+        bico_ratio_desc: getEditorValue('ed_bico_ratio_desc'),
+        main_raw_mat: getEditorValue('ed_main_raw_mat'),
+        treatment: getEditorValue('ed_treatment'),
+        color: getEditorValue('ed_color'),
+        bonding: getEditorValue('ed_bonding'),
+        customer_bw: toNumberOrNull(getEditorValue('ed_customer_bw')),
+        belt_bw: toNumberOrNull(getEditorValue('ed_belt_bw')),
+        mb_grams: toNumberOrNull(getEditorValue('ed_mb_grams')),
+        line: getEditorValue('ed_line'),
+        belt_speed: toNumberOrNull(getEditorValue('ed_belt_speed')),
+        siko_percent: toNumberOrNull(getEditorValue('ed_siko_percent')),
+        repro_percent: toNumberOrNull(getEditorValue('ed_repro_percent')),
+        max_usable_width: toNumberOrNull(getEditorValue('ed_max_usable_width')),
+        usable_width: toNumberOrNull(getEditorValue('ed_usable_width')),
+        edge_trim_percent: toNumberOrNull(getEditorValue('ed_edge_trim_percent')),
+        web_loss_percent: toNumberOrNull(getEditorValue('ed_web_loss_percent')),
+        other_scrap_percent: toNumberOrNull(getEditorValue('ed_other_scrap_percent')),
+        total_scrap_percent: toNumberOrNull(getEditorValue('ed_total_scrap_percent')),
+        gross_yield_percent: toNumberOrNull(getEditorValue('ed_gross_yield_percent')),
+        s_beams: toNumberOrNull(getEditorValue('ed_s_beams')),
+        m_beams: toNumberOrNull(getEditorValue('ed_m_beams')),
+        sb_throughput: toNumberOrNull(getEditorValue('ed_sb_throughput')),
+        mb_throughput: toNumberOrNull(getEditorValue('ed_mb_throughput')),
+        total_throughput: toNumberOrNull(getEditorValue('ed_total_throughput')),
+        production_time: toNumberOrNull(getEditorValue('ed_production_time')),
+        cores: getEditorValue('ed_cores'),
+        slit_width: toNumberOrNull(getEditorValue('ed_slit_width')),
+        length_meters: toNumberOrNull(getEditorValue('ed_length_meters')),
+        roll_diameter: toNumberOrNull(getEditorValue('ed_roll_diameter')),
+        target_production: toNumberOrNull(getEditorValue('ed_target_production')),
+        target_unit: getEditorValue('ed_target_unit') || 'tons',
+        overconsumption: (() => {
+          const percent = toNumberOrNull(getEditorValue('ed_overconsumption'));
+          return percent === null ? null : (percent / 100);
+        })(),
+        notes: getEditorValue('ed_notes')
+      };
+
+      const mats = Array.from(document.querySelectorAll('#materialsBody .material-row')).map((row, index) => {
+        const label = (row.querySelector('.mat-label')?.value || '').trim();
+        const name = (row.querySelector('.mat-name')?.value || '').trim();
+        const percentage = Number(row.querySelector('.mat-pct')?.value || 0);
+        return {
+          material_label: label,
+          material_name: name,
+          percentage,
+          sort_order: index
+        };
+      }).filter((m) => m.material_label || m.material_name || Number.isFinite(m.percentage));
+
+      return { record, materials: mats };
+    }
+
+    function openEditor(mode, recordId) {
+      if (!canModify) return;
+      const source = rows.find((r) => Number(r.id) === Number(recordId));
+      if (!source) {
+        setStatus('Record not found.', true);
+        return;
+      }
+
+      editorMode = mode;
+      sourceRecordId = Number(source.id);
+
+      const rec = JSON.parse(JSON.stringify(source));
+      if (mode === 'copy') {
+        currentRecordId = null;
+        rec.id = null;
+        rec.pd_id = '';
+        rec.recipe_approved = 'No';
+        currentRecordRecipeApproved = 'No';
+        originalPdId = '';
+      } else {
+        currentRecordId = Number(source.id);
+        currentRecordRecipeApproved = String(source.recipe_approved || 'No');
+        originalPdId = (source.pd_id || '').toString().trim();
+      }
+
+      const requestApprovalBtn = document.getElementById('requestApprovalBtn');
+      const isPendingEdit = mode === 'edit' && String(currentRecordRecipeApproved).toLowerCase() !== 'yes';
+      requestApprovalBtn.classList.toggle('hidden', !isPendingEdit);
+
+      document.getElementById('editorTitle').textContent = mode === 'copy'
+        ? `Copy Recipe (source ID ${source.id})`
+        : `Edit Recipe ID ${source.id}`;
+
+      buildEditorGrid();
+      fillEditor(rec);
+      setStatus('', false, 'editorStatus');
+      document.getElementById('editorModal').classList.add('show');
+    }
+
+    function closeEditor() {
+      document.getElementById('editorModal').classList.remove('show');
+    }
+
+    async function saveEditor(options = {}) {
+      if (!canModify) return;
+      setStatus('', false, 'editorStatus');
+
+      const sendApprovalRequest = !!options.sendApprovalRequest;
+
+      const { record, materials } = collectEditorPayload();
+      if (!materials.length) {
+        setStatus('At least one BOM material row is required.', true, 'editorStatus');
+        return;
+      }
+
+      const nonSurfactantTotal = materials.reduce((sum, m) => {
+        const pct = Number(m.percentage) || 0;
+        return isSurfactantLabel(m.material_label) ? sum : (sum + pct);
+      }, 0);
+
+      if (Math.abs(nonSurfactantTotal - 100) > 0.01) {
+        setStatus(`BOM non-surfactant total must be 100.00%, current total is ${nonSurfactantTotal.toFixed(2)}%.`, true, 'editorStatus');
+        return;
+      }
+
+      const method = editorMode === 'copy' ? 'POST' : 'PUT';
+      const url = editorMode === 'copy'
+        ? '/api/bom/records'
+        : `/api/bom/records/${Number(currentRecordId)}`;
+
+      if (editorMode === 'copy') {
+        record.pd_id = '';
+      }
+
+      const payload = {
+        record,
+        materials,
+        sourceRecordId: editorMode === 'copy' ? sourceRecordId : null,
+        sendApprovalRequest
+      };
+
+      const btn = document.getElementById('saveEditorBtn');
+      const requestBtn = document.getElementById('requestApprovalBtn');
+      btn.disabled = true;
+      requestBtn.disabled = true;
+      try {
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setStatus(data.error || 'Save failed.', true, 'editorStatus');
+          return;
+        }
+
+        if (editorMode === 'copy') {
+          closeEditor();
+          setStatus(`Clone saved successfully (ID: ${data.id}${data.pd_id ? `, PD ID: ${data.pd_id}` : ''}).`, false);
+          await loadRows();
+          return;
+        }
+
+        if (sendApprovalRequest) {
+          const mailMsg = data.emailSent
+            ? ' Approval request email sent.'
+            : ` Approval email not sent (${data.emailReason || 'unknown'}).`;
+          setStatus(`Saved successfully (ID: ${data.id}).${mailMsg}`, false, 'editorStatus');
+          closeEditor();
+          window.location.href = '/recipe-edit-clone';
+          return;
+        } else {
+          setStatus(`Saved successfully (ID: ${data.id}).`, false, 'editorStatus');
+        }
+        await loadRows();
+      } catch (err) {
+        setStatus(err.message || 'Save failed.', true, 'editorStatus');
+      } finally {
+        btn.disabled = false;
+        requestBtn.disabled = false;
+      }
+    }
+
+    async function deleteRecipe(recordId) {
+      if (!isAdminGroupMember) {
+        setStatus('Delete is available only for users in Admin group.', true);
+        return;
+      }
+
+      const row = rows.find((r) => Number(r.id) === Number(recordId));
+      const pd = row?.pd_id ? `PD ${row.pd_id}` : `ID ${recordId}`;
+      const confirmed = window.confirm(`Delete recipe ${pd}? This action cannot be undone.`);
+      if (!confirmed) return;
+
+      setStatus('Deleting recipe...', false);
+
+      try {
+        const response = await fetch(`/api/bom/records/${Number(recordId)}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to delete recipe.');
+        }
+
+        setStatus(`Recipe deleted (ID: ${recordId}).`, false);
+        await loadRows();
+      } catch (err) {
+        setStatus(err.message || 'Delete failed.', true);
+      }
+    }
+
+    async function initialize() {
+      if (!token) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      auth.configureHeaderButtons();
+      buildFilterGrid();
+
+      try {
+        await loadPagePermissions();
+        await loadMetadata();
+        await loadRows();
+        syncRecipeTableTopScrollbarWidth();
+        setupRecipeTableTopScrollbar();
+      } catch (err) {
+        setStatus(err.message || 'Initialization failed.', true);
+      }
+
+      document.getElementById('loadBtn').addEventListener('click', () => {
+        loadRows().then(() => {
+          syncRecipeTableTopScrollbarWidth();
+          setupRecipeTableTopScrollbar();
+        }).catch((err) => setStatus(err.message || 'Failed to load rows.', true));
+      });
+
+      document.getElementById('clearBtn').addEventListener('click', () => {
+        clearFilters();
+      });
+
+      document.getElementById('addMaterialBtn').addEventListener('click', () => {
+        addMaterialRow({ material_label: 'Spunbond polymer', material_name: '', percentage: '' });
+      });
+
+      document.getElementById('saveEditorBtn').addEventListener('click', () => saveEditor());
+      document.getElementById('requestApprovalBtn').addEventListener('click', () => saveEditor({ sendApprovalRequest: true }));
+
+      document.getElementById('editorModal').addEventListener('click', (event) => {
+        if (event.target.id === 'editorModal') closeEditor();
+      });
+    }
+
+    window.openEditor = openEditor;
+    window.closeEditor = closeEditor;
+    window.deleteRecipe = deleteRecipe;
+
+    document.addEventListener('DOMContentLoaded', initialize);
+  </script>
+</body>
+</html>

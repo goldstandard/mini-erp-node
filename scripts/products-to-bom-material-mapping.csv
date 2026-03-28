@@ -1,0 +1,61 @@
+xlsx_name,db_name,action,notes
+0,,SKIP,Placeholder zero value - will be skipped
+Aloe Vera - powder 200x,Surf - Aloe Vera - powder 200x,AUTO,Prefix added
+CoPET XPure 701K,PET - XPURE 701 K,AUTO,Check if correct - name differs slightly
+PLA Ingeo 6100D,PLA - Ingeo 6100D,AUTO,Prefix added
+S.Pig.-M-Color blue 51 368 PP,Pig - M-Color blue 51 368 PP,MISSING,added to Sources.xlsx file
+S: Bio HDPE SHA 7260,PE - Bio HDPE SHA 7260,AUTO,Prefix normalized
+S: PE Aspun 6834,PE - Aspun 6834,AUTO,Prefix normalized + dash added
+S: PE Aspun 6850,PE - Aspun 6850,AUTO,Prefix normalized + dash added
+S: PE Liten LS87,PE - Liten LS87,AUTO,Prefix normalized + dash added
+S: PET Xpure V062,PET - Xpure V062,AUTO,Prefix normalized + dash added
+S: PP 3684HL,PPSB - 3684HL,AUTO,Renamed to PPSB format
+S: PPMB - Borflow HL 708 FB,PPMB - Borflow HL 708 FB,AUTO,S: prefix removed
+S: PPMB - Borflow HL 712 FB,PPMB - Borflow HL 712 FB,AUTO,S: prefix removed
+S: PPMB - Mosten NB 480,PPMB - Mosten NB480,AUTO,S: prefix removed + space normalized
+S: PPMB - Sabic PP 514M14,PPMB - Sabic PP 514M14,AUTO,S: prefix removed
+S: PPMB - Z1200,PPMB - Z1200,MISSING,added to Sources.xlsx file
+S: PPMF - HG 485 FB,PPMF - Borflow HG485FB,MISSING,added to Sources.xlsx file
+S: PPMF - MR 2001,PPMF - MR 2001,AUTO,S: prefix removed
+S: PPSB - Borflow HG475FB,PPSB - Borflow HG475FB,AUTO,S: prefix removed
+S: PPSB - HMD077,PPSB - Sasol HMD077,MISSING,added to Sources.xlsx file
+S: PPSB - Mosten NB 425,PPSB - Mosten NB 425,AUTO,S: prefix removed
+S: PPSB - SABIC PP 511A,PPSB - Sabic PP 511A,AUTO,S: prefix removed + case normalized
+S: PPSB - SABIC PP 519A,PPSB - Sabic PP 519A,AUTO,S: prefix removed + case normalized
+S: PPSB - Sasol HSV103,PPSB - Sasol HSV103,MISSING,added to Sources.xlsx file
+S: PPSB - Sasol HSV903,PPSB - Sasol HSV903,AUTO,S: prefix removed
+S: PPSB - TATREN HS 25 52,PPSB - Tatren HS 25 52,AUTO,S: prefix removed + case normalized
+S: Pig.  - CC10084467BG bílá 60%,Pig - CC10084467BG bílá 60%,AUTO,Pig. prefix normalized
+S: Pig.  - CC10085478BG green,Pig - CC10085478BG green,AUTO,Pig. prefix normalized
+S: Pig.  - M-Color modrý 50 756 PP,Pig - M-Color modrý 50 756 PP,AUTO,Pig. prefix normalized
+S: Pig.  - SCC 31438 Presto Green,Pig - SCC 31438 Presto Green,AUTO,Pig. prefix normalized
+S: Pig.  - SCC 88938  Úhlava Pink,Pig - SCC 88938 Úhlava Pink,AUTO,Pig. prefix normalized + double space removed
+S: Pig.  - SCC 88939  Thaya Blue,Pig - SCC 88939 Thaya Blue,AUTO,Pig. prefix normalized + double space removed
+S: Pig.  - SCC 89899 black SB,Pig - SCC 89899 black SB,MISSING,added to Sources.xlsx file
+S: Pig.  - SCC 90015 black MB,Pig - SCC 90015 black MB,MISSING,added to Sources.xlsx file
+S: Pig.  - SCC 91513 soft Peony SB,Pig - SCC 91513 soft Peony SB,MISSING,added to Sources.xlsx file
+S: Pig. - CC10098935BG slip ad. 10%Eruc.,Add - CC10098935BG slip ad. 10%Eruc.,AUTO,Classified as additive in DB (not pigment)
+S: Pig. - CC10262795BG green,Pig - CC10262795BG green,AUTO,Pig. prefix normalized
+S: Pig. - SCC 26SAM0174,Pig - SCC 26SAM0174,MISSING,added to Sources.xlsx file
+"S: Pig. - SCC 90386 beige, Pant4665/4667","Pig - SCC 90386 beige, Pant4665/4667",AUTO,Pig. prefix normalized
+S: Pig.- SCC 86906,Pig - SCC 86906 Peach 475,AUTO,DB has longer name - verify this is the same product
+S: Pig.- SCC 88351 black 35%,Pig - SCC 88351 black 35%,AUTO,Pig. prefix normalized
+S: Pig.-SCC 79453 white 70% TiO2,Pig - SCC 79453 white 70% TiO2,AUTO,Pig. prefix normalized
+S: SCC 32986 optical brightener,Add - SCC 32986 optical brightener,AUTO,Classified as additive in DB
+S: SCC 89511 Stancarb Fibermaxx,Add - SCC 89511 Stancarb Fibermaxx,AUTO,Classified as additive in DB
+S: Sabic PP 576P,PPSB - Sabic PP 576P,AUTO,Renamed to PPSB format
+S: Vistamaxx 6202,Add - Vistamaxx 6202,AUTO,Classified as additive in DB (not SB material)
+S: ZUŠL. - SILASTOL PHP 10,Surf - Silastol PHP 10,MISSING,"added to Sources.xlsx file, conc. 85%"
+S: Zušl. - Cesa Slip PPA 0050442 PG,Add - Cesa Slip PPA 0050442 PG,AUTO,Classified as additive in DB (not surfactant)
+S: Zušl. - SILASTOL 163,Surf - Silastol 163,AUTO,Zušl. -> Surf prefix + case normalized
+S: Zušl. - SILASTOL GF 16,Surf - Silastol GF 16,AUTO,Zušl. -> Surf prefix + case normalized
+S: Zušl. - SILASTOL PHP 26,Surf - Silastol PHP 26,AUTO,Zušl. -> Surf prefix + case normalized
+S: Zušl. - Silastol PHP 207,Surf - Silastol PHP 207,AUTO,Zušl. -> Surf prefix
+S: Zušl. - Silastol PHP 90,Surf - Silastol PHP 90,AUTO,Zušl. -> Surf prefix
+S: Zušl. - Stantex S 6327,Surf - Stantex S 6327,AUTO,Zušl. -> Surf prefix
+S: Zušl. - Stantex S 6677,Surf - Stantex S 6677,MISSING,"added to Sources.xlsx file, conc. 21%"
+S: coPET - 5032,PET - RT 5032,AUTO,Different naming convention - verify this is the same material
+Sabic PP 576P,PPSB - Sabic PP 576P,AUTO,Renamed to PPSB format (same as S: Sabic PP 576P)
+Silastol Care T- Vitamine E,Surf - Silastol Care T- Vitamine E,AUTO,Surf prefix added
+"S: Pig.-SCC 79453 white, 70% TiO2",Pig - SCC 79453 white 70% TiO2,AUTO,Comma variant of the same material (same db_name as without comma)
+"S: Pig.- SCC 88351 black, 35%",Pig - SCC 88351 black 35%,AUTO,Comma variant of the same material (same db_name as without comma)

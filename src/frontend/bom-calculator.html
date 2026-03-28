@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>BOM Calculator - Manufacturing Cost ERP</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="/styles.css" />
   <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .calculator-container {
@@ -211,6 +211,14 @@
 
     .required-empty-yellow {
       background-color: #fff8d6 !important;
+    }
+
+    #pdId.locked-pd-field {
+      background-color: #bbdefb !important;
+      color: #0d47a1;
+      border-color: #64b5f6;
+      cursor: not-allowed;
+      pointer-events: none;
     }
 
     .beam-table {
@@ -428,6 +436,11 @@
 
     .material-missing {
       background: #ffebee !important;
+    }
+
+    .material-unavailable-row {
+      background: #ffcdd2 !important;
+      box-shadow: inset 0 0 0 2px #c62828;
     }
 
     .warning-flash {
@@ -713,6 +726,13 @@
       padding: 20px;
     }
 
+    /* Apply full-browser-width layout only to the Line Parameters modal. */
+    #techParamsModal .techparams-modal-content {
+      width: 100vw;
+      max-width: 100vw;
+      box-sizing: border-box;
+    }
+
     .techparams-sheet-wrap {
       border: 1px solid #ddd;
       border-radius: 6px;
@@ -920,11 +940,19 @@
 
 <body>
   <div class="container calculator-container">
-    <header class="calculator-header">
-      <h1>BOM Calculator</h1>
-      <div style="display: flex; gap: 10px;">
-        <button class="back-link" onclick="window.location.href='/dashboard'">← Back to Dashboard</button>
-        <button class="logout-btn" onclick="logoutHandler()">Logout</button>
+    <header class="app-header">
+      <div class="app-branding">
+        <img src="/data/PFN_logo.png" alt="PFN" class="company-logo" />
+        <div class="app-title-wrap">
+          <h1>BOM Calculator</h1>
+          <p>Build, calculate, and save BOM recipes</p>
+        </div>
+      </div>
+      <div class="app-top-actions">
+        <button class="action-btn btn-nav" onclick="window.location.href='/dashboard'">Back to Dashboard</button>
+        <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;">Change Password</button>
+        <button id="adminBtn" class="action-btn btn-admin" style="display:none;">Admin</button>
+        <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
       </div>
     </header>
 
@@ -959,7 +987,7 @@
       <div class="input-group">
         <div class="input-field">
           <label for="pdId">PD ID</label>
-          <input type="text" id="pdId" placeholder="Enter PD ID" />
+          <input type="text" id="pdId" class="locked-pd-field" placeholder="Auto-assigned when saved" readonly tabindex="-1" aria-readonly="true" />
         </div>
         <div class="input-field" style="display: none;" aria-hidden="true">
           <label for="sapId">SAP ID</label>
@@ -1544,10 +1572,22 @@
     <button class="calculate-btn" onclick="calculateBOM()">Calculate BOM</button>
     <div id="polymerWarning" class="warning-banner">Polymers do not add up to 100%</div>
     <div id="materialWarning" class="warning-banner">Material selection missing for a chosen type</div>
+    <div id="materialAvailabilityWarning" class="warning-banner"></div>
 
     <!-- Results -->
     <div class="section" id="resultsSection" style="display: none;">
-      <h2>Calculation Results</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+          <h2 style="margin:0;">Calculation Results</h2>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label for="resultsCurrencySelect" style="font-weight:600;color:#1f2937;">Display Currency:</label>
+            <select id="resultsCurrencySelect" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;min-width:90px;">
+              <option value="USD">USD</option>
+              <option value="CZK">CZK</option>
+              <option value="EUR">EUR</option>
+              <option value="ZAR">ZAR</option>
+            </select>
+          </div>
+        </div>
 
       <details class="calc-logic-panel">
         <summary>Calculation Logic — Raw Material Consumption</summary>
@@ -1566,18 +1606,23 @@
           <div class="calc-formula">fraction = &sum;(contributions across all active columns) / total_beam_GSM</div>
           <div class="calc-note">total_beam_GSM = sum of all per-beam GSM values entered in the beams table.</div>
 
-          <h4>4 · Consumption (Polymer / Pigment / Additive)</h4>
-          <div class="calc-formula">consumption = target_production &times; fraction &times; (1 + overconsumption_% / 100)</div>
+          <h4>4 · Base consumption (Polymer / Pigment / Additive)</h4>
+          <div class="calc-formula">consumption<sub>base</sub> = target_production &times; fraction</div>
+          <div class="calc-note">Base consumption WITHOUT overconsumption factor applied.</div>
 
-          <h4>5 · Surfactant consumption</h4>
-          <div class="calc-formula">consumption = target_production &times; concentration &times; (OPU_% / 100) &times; (1 + overconsumption_% / 100)</div>
-          <div class="calc-note">Concentration is the surfactant&rsquo;s active-substance fraction. OPU (On-Product Use) is the application rate as % of fabric weight.</div>
+          <h4>5 · Siko &amp; Repro adjustment</h4>
+          <div class="calc-formula">SB<sub>adjusted</sub> = SB<sub>base</sub> &minus; Siko<sub>base</sub> &minus; Repro<sub>base</sub></div>
+          <div class="calc-note">Siko and Repro are subtracted from virgin Spunbond polymer on base consumption level.</div>
 
-          <h4>6 · Siko &amp; Repro consumption</h4>
-          <div class="calc-formula">consumption = target_production &times; (siko_% / 100) &times; (1 + overconsumption_% / 100)</div>
-          <div class="calc-note">Siko and Repro reduce the virgin polymer requirement. Their combined weight is subtracted from the primary SB polymer in the results.</div>
+          <h4>6 · Applied overconsumption</h4>
+          <div class="calc-formula">consumption<sub>final</sub> = consumption<sub>base</sub> &times; (1 + overconsumption_% / 100)</div>
+          <div class="calc-note">Overconsumption factor is applied uniformly to ALL materials (including adjusted Siko/Repro) after base calculation.</div>
 
-          <h4>7 · Batch production time</h4>
+          <h4>7 · Surfactant consumption</h4>
+          <div class="calc-formula">consumption<sub>surfactant</sub> = target_production &times; concentration &times; (OPU_% / 100)</div>
+          <div class="calc-note">Concentration is the surfactant&rsquo;s active-substance fraction. OPU (On-Product Use) is the application rate as % of fabric weight. Then multiplied by overconsumption factor.</div>
+
+          <h4>8 · Batch production time</h4>
           <div class="calc-formula">time (h) = (1 + overconsumption_% / 100) &times; target_production (tons) &times; production_time (h/ton)</div>
           <div class="calc-note">Production time per ton is derived from total line throughput (kg/h) and yield.</div>
 
@@ -1589,15 +1634,18 @@
           <tr>
             <th>Material</th>
             <th>Name</th>
-            <th id="consumptionHeader">Consumption (kg)</th>
-            <th>Percentage (%)</th>
+            <th id="baseConsumptionHeader" style="text-align:right;">Consumption Base (kg)</th>
+            <th id="consumptionHeader" style="text-align:right;">Consumption (kg)</th>
+            <th style="text-align:right;">Percentage (%)</th>
+            <th id="materialCostHeader">Material Cost (USD/kg)</th>
           </tr>
         </thead>
         <tbody id="resultsBody">
         </tbody>
       </table>
-      <div style="margin-top: 16px; text-align: right;">
-        <button class="btn-success" onclick="openSaveBomRecordModal()" style="background:#1b5e20; padding:12px 24px; font-size:1em;">📊 Save BOM Record</button>
+      <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px; align-items: center;">
+        <button id="saveBomRecordBottomBtn" class="btn-success" onclick="openSaveBomRecordModal()" style="background:#1b5e20; padding:12px 24px; font-size:1em;">📊 Save BOM Record</button>
+        <button id="backToDashboardAfterSaveBtn" class="btn-secondary" onclick="window.location.href='/dashboard'" style="padding:12px 24px; font-size:1em; display:none;">Back to Dashboard</button>
       </div>
     </div>
   </div>
@@ -1611,6 +1659,138 @@
       list_surfactant: [],
       surfactant_conc_map: {}
     };
+
+    let materialPriceMap = {};
+    let materialAvailabilityMap = null;
+    let latestCostPreview = null;
+
+    function getResultsDisplayCurrency() {
+      return document.getElementById('resultsCurrencySelect')?.value || 'USD';
+    }
+
+    function getMaterialListKeyFromType(typeValue) {
+      if (typeValue === 'SB') return 'list_sb';
+      if (typeValue === 'MB') return 'list_mb';
+      if (typeValue === 'Pigment') return 'list_pigment';
+      if (typeValue === 'Additive') return 'list_additive';
+      return null;
+    }
+
+    function getMaterialPriceInfo(listKey, materialName) {
+      const key = `${String(listKey || '').toLowerCase()}:${String(materialName || '').toLowerCase()}`;
+      return materialPriceMap[key] || null;
+    }
+
+    function isMaterialAvailable(listKey, materialName) {
+      if (!materialAvailabilityMap) {
+        return true;
+      }
+
+      const normalizedKey = String(listKey || '').toLowerCase();
+      const normalizedName = String(materialName || '').toLowerCase();
+      const availableItems = materialAvailabilityMap[normalizedKey];
+      if (!availableItems) {
+        return false;
+      }
+
+      return availableItems.has(normalizedName);
+    }
+
+    function getAvailableMaterials(listKey, values) {
+      return sortValuesForDisplay(values || []).filter((materialName) => isMaterialAvailable(listKey, materialName));
+    }
+
+    function formatMaterialOptionLabel(listKey, materialName) {
+      const priceInfo = getMaterialPriceInfo(listKey, materialName);
+      if (!priceInfo) {
+        return materialName;
+      }
+
+      if (priceInfo.price === null || priceInfo.price === undefined || priceInfo.price === '') {
+        return `${materialName} (price missing)`;
+      }
+
+      const numericPrice = Number(priceInfo.price);
+      const displayPrice = Number.isFinite(numericPrice) ? numericPrice.toFixed(2) : priceInfo.price;
+      const currency = (priceInfo.currency || '').toString().trim();
+      return currency ? `${materialName} (${displayPrice} ${currency}/kg)` : `${materialName} (${displayPrice})`;
+    }
+
+    async function loadPricesForSelectedLine(lineId) {
+      if (!lineId) {
+        materialPriceMap = {};
+        materialAvailabilityMap = null;
+        refreshAllMaterialDropdownLabels();
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/rm-prices/current-for-line?line=${encodeURIComponent(lineId)}`,
+          { headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}` } }
+        );
+
+        if (!response.ok) {
+          materialPriceMap = {};
+          materialAvailabilityMap = null;
+          refreshAllMaterialDropdownLabels();
+          return;
+        }
+
+        const payload = await response.json();
+        const map = payload.price_map || {};
+        const normalized = {};
+        const availability = {
+          list_sb: new Set(),
+          list_mb: new Set(),
+          list_pigment: new Set(),
+          list_additive: new Set(),
+          list_surfactant: new Set()
+        };
+
+        Object.keys(map).forEach((key) => {
+          normalized[String(key).toLowerCase()] = map[key];
+        });
+
+        (payload.rows || []).forEach((row) => {
+          const listKey = String(row.material_list_key || '').toLowerCase();
+          const materialName = String(row.material_name || '').toLowerCase();
+          if (availability[listKey] && materialName) {
+            availability[listKey].add(materialName);
+          }
+        });
+
+        materialPriceMap = normalized;
+        materialAvailabilityMap = availability;
+        refreshAllMaterialDropdownLabels();
+      } catch (err) {
+        console.warn('Unable to load material prices for line:', err);
+        materialAvailabilityMap = null;
+      }
+    }
+
+    function refreshAllMaterialDropdownLabels() {
+      const tableRows = document.querySelectorAll('#beamTable tbody tr');
+      tableRows.forEach((row) => {
+        const selects = row.querySelectorAll('select.material-row-selector');
+        if (selects.length !== 2) return;
+        updateMaterialOptions(selects[0], selects[1], { reason: 'line-refresh' });
+      });
+
+      const surfactantRows = document.querySelectorAll('.surfactant-item select');
+      surfactantRows.forEach((select) => {
+        const selected = select.value;
+        select.innerHTML = '<option value="">Select surfactant</option>';
+        populateSurfactantOptions(select);
+        if (selected) {
+          select.value = selected;
+        }
+
+        const concInput = select.parentElement?.querySelector('.surfactant-conc');
+        if (concInput) {
+          updateSurfactantConcentration(select, concInput);
+        }
+      });
+    }
 
     // Initialize column type attributes and event listeners
     function initializeColumnTypes() {
@@ -1841,10 +2021,10 @@
     function populateSurfactantOptions(select) {
       if (!materialLists.list_surfactant) return;
 
-      sortValuesForDisplay(materialLists.list_surfactant).forEach(surfactant => {
+      getAvailableMaterials('list_surfactant', materialLists.list_surfactant).forEach(surfactant => {
         const option = document.createElement('option');
         option.value = surfactant;
-        option.textContent = surfactant;
+        option.textContent = formatMaterialOptionLabel('list_surfactant', surfactant);
         select.appendChild(option);
       });
     }
@@ -1972,6 +2152,7 @@
       if (!selectedLine || !lineParametersMap[selectedLine]) {
         // Clear fields if no line selected
         console.log('Line not found in map, clearing fields');
+        loadPricesForSelectedLine('');
         document.getElementById('sBeams').value = '';
         document.getElementById('mBeams').value = '';
         document.getElementById('sBeams').removeAttribute('max');
@@ -1990,6 +2171,8 @@
         document.getElementById('productionTime').value = '';
         return;
       }
+
+      loadPricesForSelectedLine(selectedLine);
       
       const params = lineParametersMap[selectedLine];
       console.log('Parameters found:', params);
@@ -2130,7 +2313,7 @@
       ];
 
       const yellowRequiredIds = [
-        'pdId', 'sapId', 'cores', 'slitWidth', 'lengthMeters',
+        'sapId', 'cores', 'slitWidth', 'lengthMeters',
         'rollDiameter', 'otherScrapPercent', 'overconsumptionPercent'
       ];
 
@@ -2160,7 +2343,7 @@
       ];
 
       const yellowRequiredIds = [
-        'pdId', 'sapId', 'cores', 'slitWidth', 'lengthMeters',
+        'sapId', 'cores', 'slitWidth', 'lengthMeters',
         'rollDiameter', 'otherScrapPercent', 'overconsumptionPercent'
       ];
 
@@ -2221,7 +2404,6 @@
       const sikoPercent = parseFloat(document.getElementById("sikoPercent").value) || 0;
       const reproPercent = parseFloat(document.getElementById("reproPercent").value) || 0;
       const overconsumptionPercent = parseFloat(document.getElementById('overconsumptionPercent').value) || 0;
-      const overconsumptionFactor = 1 + (overconsumptionPercent / 100);
       
       // Convert to kg for internal calculations
       const targetProduction = unit === 'tons' ? targetProductionInput * 1000 : targetProductionInput;
@@ -2352,7 +2534,7 @@
         if (gsmContribution <= 0 || totalGSMWeight <= 0) return;
 
         const percentage = (gsmContribution / totalGSMWeight) * 100;
-        const consumption = targetProduction * (percentage / 100) * overconsumptionFactor;
+        const consumption = targetProduction * (percentage / 100);
 
         let materialLabel = materialName;
         if (typeSelector.value === 'SB') {
@@ -2395,7 +2577,7 @@
 
         if (matName && concValue > 0 && opuPercent > 0) {
           const surfactantFraction = concValue * (opuPercent / 100);
-          const consumption = targetProduction * surfactantFraction * overconsumptionFactor;
+          const consumption = targetProduction * surfactantFraction;
           const label = `Surfactant ${index + 1}`;
           materials[label] = {
             name: matName,
@@ -2408,7 +2590,7 @@
 
       // Add Siko and Repro to materials if nonzero
       if (sikoPercent > 0) {
-        const sikoConsumption = targetProduction * (sikoPercent / 100) * overconsumptionFactor;
+        const sikoConsumption = targetProduction * (sikoPercent / 100);
         materials['siko'] = {
           name: 'Siko',
           materialLabel: 'Recyclate',
@@ -2418,7 +2600,7 @@
       }
 
       if (reproPercent > 0) {
-        const reproConsumption = targetProduction * (reproPercent / 100) * overconsumptionFactor;
+        const reproConsumption = targetProduction * (reproPercent / 100);
         materials['repro'] = {
           name: 'Repro',
           materialLabel: 'Regranulate',
@@ -2434,25 +2616,33 @@
     function displayResults(materials, total, totalGSM, overconsumptionPercent = 0) {
       const resultsBody = document.getElementById('resultsBody');
       resultsBody.innerHTML = '';
-      
-      // Get selected unit
+      latestCostPreview = null;
+
+      const resultColumnCount = 6;
       const unit = document.getElementById('targetUnit').value;
       const conversionFactor = unit === 'tons' ? 1000 : 1;
       const unitLabel = unit === 'tons' ? 'tons' : 'kg';
-      
-      // Update table header
+
+      const baseConsumptionHeader = document.getElementById('baseConsumptionHeader');
+      if (baseConsumptionHeader) {
+        baseConsumptionHeader.textContent = `Consumption Base (${unitLabel})`;
+      }
+
       const consumptionHeader = document.getElementById('consumptionHeader');
       if (consumptionHeader) {
-        consumptionHeader.textContent = `Consumption (${unitLabel})`;
+        consumptionHeader.textContent = overconsumptionPercent > 0
+          ? `Consumption with Overconsumption (${unitLabel})`
+          : `Consumption (${unitLabel})`;
+      }
+
+      const materialCostHeader = document.getElementById('materialCostHeader');
+      if (materialCostHeader) {
+        materialCostHeader.textContent = `Material Cost (${getResultsDisplayCurrency()}/kg)`;
       }
 
       const overconsumptionFactor = 1 + (overconsumptionPercent / 100);
-      const adjustedTotal = total * overconsumptionFactor;
-      let totalConsumption = 0;
-      let totalPercentageSum = 0;
-      let firstSBPolymerSeen = false;
-      const sikoPercent = parseFloat(document.getElementById("sikoPercent").value) || 0;
-      const reproPercent = parseFloat(document.getElementById("reproPercent").value) || 0;
+      const sikoPercent = parseFloat(document.getElementById('sikoPercent').value) || 0;
+      const reproPercent = parseFloat(document.getElementById('reproPercent').value) || 0;
 
       const orderMap = {
         'Spunbond polymer': 1,
@@ -2464,119 +2654,253 @@
         'Surfactant': 5
       };
 
-      const materialEntries = Object.keys(materials)
-        .map(matType => ({ key: matType, value: materials[matType] }))
+      const adjustedConsumption = {};
+      let firstSBPolymerSeen = false;
+
+      Object.entries(materials).forEach(([key, mat]) => {
+        let consumption = mat.consumption;
+
+        if (mat.materialLabel === 'Spunbond polymer' && !firstSBPolymerSeen) {
+          const sikoAmount = total * (sikoPercent / 100);
+          const reproAmount = total * (reproPercent / 100);
+          consumption = consumption - sikoAmount - reproAmount;
+          firstSBPolymerSeen = true;
+        }
+
+        adjustedConsumption[key] = {
+          ...mat,
+          consumption: consumption * overconsumptionFactor,
+          baseConsumption: consumption
+        };
+      });
+
+      let baseTotal = 0;
+      let adjustedTotal = 0;
+      Object.values(adjustedConsumption).forEach((mat) => {
+        baseTotal += mat.baseConsumption;
+        adjustedTotal += mat.consumption;
+      });
+
+      // Percentage column is normalized to minimum batch size without surfactants.
+      const percentageBaseTotal = Object.values(adjustedConsumption)
+        .filter((mat) => mat.materialLabel !== 'Surfactant')
+        .reduce((sum, mat) => sum + mat.baseConsumption, 0);
+
+      const materialEntries = Object.keys(adjustedConsumption)
+        .map((matType) => ({ key: matType, value: adjustedConsumption[matType] }))
         .sort((a, b) => {
           const labelA = a.value.materialLabel || a.key;
           const labelB = b.value.materialLabel || b.key;
           const orderA = orderMap[labelA] || 99;
           const orderB = orderMap[labelB] || 99;
           if (orderA !== orderB) return orderA - orderB;
-          // Secondary sort by consumption (descending)
           if (a.value.consumption !== b.value.consumption) {
             return b.value.consumption - a.value.consumption;
           }
           return labelA.localeCompare(labelB);
         });
 
-      materialEntries.forEach(entry => {
+      let totalConsumption = 0;
+      let totalPercentageSum = 0;
+
+      materialEntries.forEach((entry) => {
         const matType = entry.key;
         const mat = entry.value;
-        let finalConsumption = mat.consumption;
-        let isAdjustedSBPolymer = false;
-        
-        // Subtract Siko and Repro from first SB polymer only
-        if (mat.materialLabel === 'Spunbond polymer' && !firstSBPolymerSeen && (sikoPercent > 0 || reproPercent > 0)) {
-          finalConsumption -= (adjustedTotal * ((sikoPercent + reproPercent) / 100));
-          firstSBPolymerSeen = true;
-          isAdjustedSBPolymer = true;
-        }
-        
-        totalConsumption += finalConsumption;
+        const finalConsumption = mat.consumption;
+        const percentageDenominator = percentageBaseTotal > 0 ? percentageBaseTotal : baseTotal;
+        const percentageValue = percentageDenominator > 0 ? (mat.baseConsumption / percentageDenominator * 100) : 0;
 
-        // For adjusted SB polymer, recalculate percentage based on new consumption
-        let percentageValue;
-        if (isAdjustedSBPolymer) {
-          percentageValue = adjustedTotal > 0 ? (finalConsumption / adjustedTotal * 100) : 0;
-        } else {
-          percentageValue = mat.percentage !== undefined
-            ? mat.percentage
-            : (adjustedTotal > 0 ? (finalConsumption / adjustedTotal * 100) : 0);
-        }
-        
-        const displayConsumption = finalConsumption / conversionFactor;
+        totalConsumption += finalConsumption;
         totalPercentageSum += percentageValue;
-        
+
+        const displayConsumption = finalConsumption / conversionFactor;
+        const baseDisplay = mat.baseConsumption / conversionFactor;
+
         const row = document.createElement('tr');
         const materialLabel = mat.materialLabel || matType;
+        const normalizedName = (mat.name || '').toString().trim().toLowerCase();
+        row.setAttribute('data-material-name', normalizedName);
         row.innerHTML = `
           <td><strong>${materialLabel}</strong></td>
           <td>${mat.name}</td>
-          <td>${displayConsumption.toFixed(2)} ${unitLabel}</td>
-          <td>${percentageValue.toFixed(4)}%</td>
+          <td style="text-align:right;">${baseDisplay.toFixed(2)} ${unitLabel}</td>
+          <td style="text-align:right;">${displayConsumption.toFixed(2)} ${unitLabel}</td>
+          <td style="text-align:right;">${percentageValue.toFixed(4)}%</td>
+          <td class="material-cost-cell" style="text-align:right;">-</td>
         `;
         resultsBody.appendChild(row);
       });
 
-      // Add total row
       const displayTotal = totalConsumption / conversionFactor;
+      const baseTotalDisplay = baseTotal / conversionFactor;
       const totalRow = document.createElement('tr');
       totalRow.className = 'total-row';
       totalRow.innerHTML = `
         <td colspan="2"><strong>TOTAL</strong></td>
-        <td><strong>${displayTotal.toFixed(2)} ${unitLabel}</strong></td>
-        <td><strong>${totalPercentageSum.toFixed(2)}%</strong></td>
+        <td style="text-align:right;"><strong>${baseTotalDisplay.toFixed(2)} ${unitLabel}</strong></td>
+        <td style="text-align:right;"><strong>${displayTotal.toFixed(2)} ${unitLabel}</strong></td>
+        <td style="text-align:right;"><strong>${totalPercentageSum.toFixed(2)}%</strong></td>
+          <td class="material-cost-total-cell" style="text-align:right;"><strong>-</strong></td>
       `;
       resultsBody.appendChild(totalRow);
 
       if (overconsumptionPercent > 0) {
-        const expectedTotal = adjustedTotal / conversionFactor;
+        const expectedTotal = baseTotal * overconsumptionFactor / conversionFactor;
         const delta = displayTotal - expectedTotal;
         const validationRow = document.createElement('tr');
         validationRow.innerHTML = `
-          <td colspan="4" style="text-align: center; background: #f0f4ff; font-weight: 600;">
+          <td colspan="${resultColumnCount}" style="text-align: center; background: #f0f4ff; font-weight: 600;">
             Overconsumption check: expected ${expectedTotal.toFixed(2)} ${unitLabel}, actual ${displayTotal.toFixed(2)} ${unitLabel}, delta ${delta.toFixed(2)} ${unitLabel}
           </td>
         `;
         resultsBody.appendChild(validationRow);
       }
 
-      // Add Batch Production Time
       const targetProductionInput = parseFloat(document.getElementById('targetProduction').value) || 0;
       const productionTime = parseFloat(document.getElementById('productionTime').value) || 0;
-      
+
       if (targetProductionInput > 0 && productionTime > 0) {
-        // Batch Production Time = (1 + overconsumption) * minimum batch size (tons) * production time
-        const overconsumptionFactor = 1 + (overconsumptionPercent / 100);
         const targetProductionTons = unit === 'tons' ? targetProductionInput : targetProductionInput / 1000;
         const totalHours = overconsumptionFactor * targetProductionTons * productionTime;
-        
-        // Format as days/hours/minutes
         const days = Math.floor(totalHours / 24);
         const remainingHours = Math.floor(totalHours % 24);
         const minutes = Math.floor((totalHours * 60) % 60);
-        
+
         let timeString = '';
         if (days > 0) {
           timeString = `${days}d ${remainingHours}h ${minutes}m`;
         } else {
           timeString = `${remainingHours}h ${minutes}m`;
         }
-        
+
         const batchTimeRow = document.createElement('tr');
         batchTimeRow.innerHTML = `
-          <td colspan="4" style="text-align: center; background: #e3f2fd; font-weight: 600;">
+          <td colspan="${resultColumnCount}" style="text-align: center; background: #e3f2fd; font-weight: 600;">
             Batch Production Time (including overconsumption): ${timeString}
           </td>
         `;
         resultsBody.appendChild(batchTimeRow);
       }
 
+      updateCostPreviewForCurrentCalculation();
+
       document.getElementById('resultsSection').style.display = 'block';
       document.getElementById('saveBomRecordToolbarBtn').style.display = '';
-      
-      // Scroll to results
       document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function appendResultInfoRow(text, background = '#f9fbff') {
+      const resultsBody = document.getElementById('resultsBody');
+      const row = document.createElement('tr');
+      row.className = 'cost-info-row';
+      row.innerHTML = `<td colspan="6" style="text-align:center;background:${background};font-weight:600;">${text}</td>`;
+      resultsBody.appendChild(row);
+    }
+
+    function formatCostPerKg(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(2) : 'N/A';
+    }
+
+    async function updateCostPreviewForCurrentCalculation() {
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+
+      // Prevent duplicated summary blocks when preview refreshes (e.g. currency switch).
+      document.querySelectorAll('#resultsBody .cost-info-row').forEach((row) => row.remove());
+
+      const selectedCurrency = getResultsDisplayCurrency();
+
+      const materialCostHeader = document.getElementById('materialCostHeader');
+      if (materialCostHeader) {
+        materialCostHeader.textContent = `Material Cost (${selectedCurrency}/kg)`;
+      }
+
+      const { record, materials } = collectBomRecord();
+      if (!record.line || !materials.length) return;
+
+      try {
+        const response = await fetch('/api/bom/cost-preview', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ record, materials, currency: selectedCurrency })
+        });
+
+        if (!response.ok) {
+          latestCostPreview = null;
+          return;
+        }
+
+        const payload = await response.json();
+        const item = payload.item;
+        if (!item || !item.details || !Array.isArray(item.details.materials)) {
+          latestCostPreview = null;
+          return;
+        }
+
+        latestCostPreview = {
+          version: 1,
+          generatedAt: new Date().toISOString(),
+          currency: item.currency || 'USD',
+          item
+        };
+
+        const byMaterial = new Map();
+        item.details.materials.forEach((m) => {
+          const key = String(m.material || '').trim().toLowerCase();
+          if (!key) return;
+          byMaterial.set(key, m);
+        });
+
+        document.querySelectorAll('#resultsBody tr').forEach((row) => {
+          const materialName = String(row.getAttribute('data-material-name') || '').trim().toLowerCase();
+          if (!materialName) return;
+          const costCell = row.querySelector('.material-cost-cell');
+          if (!costCell) return;
+
+          const detail = byMaterial.get(materialName);
+          if (!detail || detail.missingPrice) {
+            costCell.textContent = `N/A ${selectedCurrency}/kg`;
+            costCell.style.color = '#c0392b';
+            return;
+          }
+
+          costCell.textContent = `${formatCostPerKg(detail.finalCost)} ${item.currency}/kg`;
+          costCell.style.color = '#1b5e20';
+          costCell.style.fontWeight = '600';
+        });
+
+        const totalCostCell = document.querySelector('#resultsBody .material-cost-total-cell');
+        if (totalCostCell) {
+          totalCostCell.innerHTML = `<strong>${formatCostPerKg(item.materialCostNet)} ${item.currency}/kg</strong>`;
+          totalCostCell.style.color = '#1b5e20';
+        }
+
+        appendResultInfoRow(`Current Material Cost (Net): ${formatCostPerKg(item.materialCostNet)} ${item.currency}/kg`, '#e8f5e9');
+        appendResultInfoRow(`Current Process Cost: ${formatCostPerKg(item.processCost)} ${item.currency}/kg`, '#e3f2fd');
+        appendResultInfoRow(`Current Total Cost: ${formatCostPerKg(item.totalCost)} ${item.currency}/kg`, '#ede7f6');
+      } catch (err) {
+        console.warn('Unable to load cost preview:', err);
+        latestCostPreview = null;
+      }
+    }
+
+    const resultsCurrencySelect = document.getElementById('resultsCurrencySelect');
+    if (resultsCurrencySelect) {
+      resultsCurrencySelect.value = 'USD';
+      resultsCurrencySelect.addEventListener('change', () => {
+        const resultsSection = document.getElementById('resultsSection');
+        const materialCostHeader = document.getElementById('materialCostHeader');
+        if (materialCostHeader) {
+          materialCostHeader.textContent = `Material Cost (${getResultsDisplayCurrency()}/kg)`;
+        }
+        if (resultsSection && resultsSection.style.display !== 'none') {
+          updateCostPreviewForCurrentCalculation();
+        }
+      });
     }
 
     // BICO ratio calculation functions
@@ -2856,6 +3180,8 @@
       
       // Reset row background
       row.style.backgroundColor = '';
+      clearMaterialAvailabilityFlag(row);
+      refreshMaterialAvailabilityWarning();
       
       // Re-run validation in case this affects other row validations
       validateMaterialRow(row);
@@ -2947,7 +3273,7 @@
       
       if (mainTypeSelector && mainNameSelector) {
         mainTypeSelector.addEventListener('change', () => {
-          updateMaterialOptions(mainTypeSelector, mainNameSelector);
+          updateMaterialOptions(mainTypeSelector, mainNameSelector, { reason: 'type-change' });
         });
       }
       
@@ -2964,12 +3290,14 @@
           
           // Add change events to dropdowns
           selects[0].addEventListener('change', () => {
-            updateMaterialOptions(selects[0], selects[1]);
+            updateMaterialOptions(selects[0], selects[1], { reason: 'type-change' });
             validateMaterialRow(row);
             calculateNetPolymer();
           });
           
           selects[1].addEventListener('change', () => {
+            clearMaterialAvailabilityFlag(row);
+            refreshMaterialAvailabilityWarning();
             validateMaterialRow(row);
             calculateNetPolymer();
           });
@@ -2989,8 +3317,45 @@
       });
     }
     
-    function updateMaterialOptions(typeSelector, nameSelector) {
+    function clearMaterialAvailabilityFlag(row) {
+      if (!row) return;
+      row.classList.remove('material-unavailable-row');
+      delete row.dataset.removedUnavailableMaterial;
+    }
+
+    function refreshMaterialAvailabilityWarning() {
+      const warning = document.getElementById('materialAvailabilityWarning');
+      if (!warning) return;
+
+      const invalidRows = Array.from(document.querySelectorAll('#beamTable tbody tr.material-unavailable-row'));
+      if (invalidRows.length === 0) {
+        warning.style.display = 'none';
+        warning.textContent = '';
+        return;
+      }
+
+      const removedMaterials = Array.from(new Set(
+        invalidRows
+          .map((row) => row.dataset.removedUnavailableMaterial)
+          .filter((value) => value)
+      ));
+
+      const removedDetails = removedMaterials.length
+        ? ` Removed material(s): ${removedMaterials.join(', ')}.`
+        : '';
+
+      warning.textContent = `Line changed to another plant. Some selected materials are unavailable and were cleared. Choose replacements in highlighted rows.${removedDetails}`;
+      warning.style.display = 'block';
+      warning.classList.remove('warning-flash');
+      void warning.offsetWidth;
+      warning.classList.add('warning-flash');
+    }
+
+    function updateMaterialOptions(typeSelector, nameSelector, options = {}) {
+      const reason = options.reason || 'type-change';
       const selectedType = typeSelector.value;
+      const selectedValue = nameSelector.value;
+      const row = nameSelector.closest('tr');
       nameSelector.innerHTML = '<option value="">- Select Material -</option>';
       
       console.log('Selected type:', selectedType);
@@ -2998,43 +3363,62 @@
       
       if (selectedType === 'SB' && materialLists.list_sb) {
         console.log('Populating SB list:', materialLists.list_sb.length, 'items');
-        sortValuesForDisplay(materialLists.list_sb).forEach(material => {
+        getAvailableMaterials('list_sb', materialLists.list_sb).forEach(material => {
           const option = document.createElement('option');
           option.value = material;
-          option.textContent = material;
+          option.textContent = formatMaterialOptionLabel('list_sb', material);
           nameSelector.appendChild(option);
         });
       } else if (selectedType === 'MB' && materialLists.list_mb) {
         console.log('Populating MB list:', materialLists.list_mb.length, 'items');
-        sortValuesForDisplay(materialLists.list_mb).forEach(material => {
+        getAvailableMaterials('list_mb', materialLists.list_mb).forEach(material => {
           const option = document.createElement('option');
           option.value = material;
-          option.textContent = material;
+          option.textContent = formatMaterialOptionLabel('list_mb', material);
           nameSelector.appendChild(option);
         });
       } else if (selectedType === 'Pigment' && materialLists.list_pigment) {
         console.log('Populating Pigment list:', materialLists.list_pigment.length, 'items');
-        sortValuesForDisplay(materialLists.list_pigment).forEach(material => {
+        getAvailableMaterials('list_pigment', materialLists.list_pigment).forEach(material => {
           const option = document.createElement('option');
           option.value = material;
-          option.textContent = material;
+          option.textContent = formatMaterialOptionLabel('list_pigment', material);
           nameSelector.appendChild(option);
         });
       } else if (selectedType === 'Additive' && materialLists.list_additive) {
         console.log('Populating Additive list:', materialLists.list_additive.length, 'items');
-        sortValuesForDisplay(materialLists.list_additive).forEach(material => {
+        getAvailableMaterials('list_additive', materialLists.list_additive).forEach(material => {
           const option = document.createElement('option');
           option.value = material;
-          option.textContent = material;
+          option.textContent = formatMaterialOptionLabel('list_additive', material);
           nameSelector.appendChild(option);
         });
+      }
+
+      if (selectedValue) {
+        nameSelector.value = selectedValue;
+      }
+
+      const selectionCleared = Boolean(selectedValue) && nameSelector.value !== selectedValue;
+
+      if (reason === 'line-refresh') {
+        if (selectionCleared && row) {
+          row.classList.add('material-unavailable-row');
+          row.dataset.removedUnavailableMaterial = selectedValue;
+        }
+        refreshMaterialAvailabilityWarning();
+      } else if (row) {
+        clearMaterialAvailabilityFlag(row);
+        refreshMaterialAvailabilityWarning();
       }
     }
 
     let techParamsHtml = '';
     let customerEditorLockedCount = 0;
+    let customerEditorOriginalValues = [];
     let activeDescriptionListKey = '';
     let activeDescriptionListLockedCount = 0;
+    let activeDescriptionListOriginalValues = [];
 
     const editableDescriptionListConfig = {
       marketSegment: 'Market Segment',
@@ -3227,6 +3611,7 @@
 
       const currentCustomers = getCustomerDropdownOptions();
       customerEditorLockedCount = currentCustomers.length;
+      customerEditorOriginalValues = [...currentCustomers];
       renderCustomerEditorRows(currentCustomers);
       applyDynamicModalWidth('customerModal', currentCustomers, { fallbackCh: 48, minCh: 34, maxCh: 72, extraCh: 16, maxWidthPx: 760, minWidthPx: 340 });
       modal.classList.add('active');
@@ -3257,6 +3642,28 @@
       return false;
     }
 
+    function buildRenamePairs(originalValues, updatedValues, lockedCount) {
+      const pairs = [];
+      const limit = Math.min(
+        Number.isFinite(lockedCount) ? lockedCount : 0,
+        Array.isArray(originalValues) ? originalValues.length : 0,
+        Array.isArray(updatedValues) ? updatedValues.length : 0
+      );
+
+      for (let i = 0; i < limit; i++) {
+        const from = (originalValues[i] || '').trim();
+        const to = (updatedValues[i] || '').trim();
+
+        if (!from || !to || from.toLowerCase() === to.toLowerCase()) {
+          continue;
+        }
+
+        pairs.push({ from, to });
+      }
+
+      return pairs;
+    }
+
     async function saveCustomerList() {
       const inputs = Array.from(document.querySelectorAll('#customerEditorList .customer-editor-input'));
       const enteredValues = inputs.map(input => (input.value || '').trim());
@@ -3280,6 +3687,7 @@
       }
 
       const normalized = normalizeOptionList(nonEmptyValues);
+      const renamePairs = buildRenamePairs(customerEditorOriginalValues, enteredValues, customerEditorLockedCount);
 
       if (normalized.length === 0) {
         alert('Add at least one customer name before saving.');
@@ -3293,7 +3701,7 @@
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ customers: normalized })
+          body: JSON.stringify({ customers: normalized, renamePairs })
         });
 
         if (!response.ok) {
@@ -3405,6 +3813,7 @@
       const currentValues = getDropdownOptionsByFieldId(fieldId);
       activeDescriptionListKey = fieldId;
       activeDescriptionListLockedCount = currentValues.length;
+      activeDescriptionListOriginalValues = [...currentValues];
       title.textContent = `Edit ${editableDescriptionListConfig[fieldId]} List`;
       renderDescriptionListEditorRows(currentValues);
       applyDynamicModalWidth('descriptionListModal', currentValues, { fallbackCh: 48, minCh: 34, maxCh: 72, extraCh: 16, maxWidthPx: 700, minWidthPx: 340 });
@@ -3465,6 +3874,7 @@
       }
 
       const normalized = normalizeOptionList(nonEmptyValues);
+      const renamePairs = buildRenamePairs(activeDescriptionListOriginalValues, enteredValues, activeDescriptionListLockedCount);
       if (normalized.length === 0) {
         alert('Add at least one value before saving.');
         return;
@@ -3478,7 +3888,7 @@
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ values: normalized })
+          body: JSON.stringify({ values: normalized, renamePairs })
         });
 
         if (!response.ok) {
@@ -3809,6 +4219,7 @@
           data.surfactants.push({
             name: select.value,
             concentration: concInput?.value || '',
+            concentrationFraction: concInput?.dataset?.value || '',
             opu: opuInput?.value || ''
           });
         }
@@ -3934,14 +4345,32 @@
       
       if (data.surfactants && data.surfactants.length > 0) {
         data.surfactants.forEach(surfactant => {
-          addSurfactantRow();
+          addSurfactantRow(surfactantList);
           const lastItem = surfactantList.lastElementChild;
           const select = lastItem.querySelector('select');
           const concInput = lastItem.querySelector('.surfactant-conc');
           const opuInput = lastItem.querySelector('.surfactant-opu');
           
-          if (select) select.value = surfactant.name;
-          if (concInput) concInput.value = surfactant.concentration;
+          if (select) {
+            select.value = surfactant.name;
+          }
+
+          // Re-derive concentration from selected material to keep dataset.value
+          // consistent for BOM calculations after loading WIP.
+          if (select && concInput) {
+            updateSurfactantConcentration(select, concInput);
+
+            if (surfactant.concentrationFraction !== undefined && surfactant.concentrationFraction !== '') {
+              const numericFraction = parseFloat(surfactant.concentrationFraction);
+              if (Number.isFinite(numericFraction)) {
+                concInput.dataset.value = String(numericFraction);
+                concInput.value = `${Math.round(numericFraction * 100)}%`;
+              }
+            } else if (surfactant.concentration) {
+              concInput.value = surfactant.concentration;
+            }
+          }
+
           if (opuInput) opuInput.value = surfactant.opu;
         });
       }
@@ -4234,7 +4663,10 @@
       const token = localStorage.getItem('authToken');
       if (!token) {
         window.location.href = '/';
+        return;
       }
+
+      auth.configureHeaderButtons();
     });
 
     // ==================== BOM RECORD SAVE ====================
@@ -4283,6 +4715,7 @@
         roll_diameter: n('rollDiameter'),
         target_production: n('targetProduction'),
         target_unit: g('targetUnit'),
+        overconsumption: (() => { const val = n('overconsumptionPercent'); return val !== null ? val / 100 : null; })(),
         notes: g('notes')
       };
 
@@ -4291,13 +4724,13 @@
       rows.forEach((row, idx) => {
         if (row.classList.contains('total-row')) return;
         const cells = row.querySelectorAll('td');
-        // Material rows have exactly 4 cells; summary rows use colspan and won't have 4 separate tds
-        if (cells.length !== 4) return;
+        // Material rows always start with a strong label in column 1.
+        if (cells.length < 5) return;
         const strong = cells[0].querySelector('strong');
         if (!strong) return;
         const materialLabel = strong.textContent.trim();
         const materialName = cells[1].textContent.trim();
-        const pct = parseFloat(cells[3].textContent.replace('%', '').trim());
+        const pct = parseFloat(cells[4].textContent.replace('%', '').trim());
         if (!isNaN(pct)) {
           materials.push({ material_label: materialLabel, material_name: materialName, percentage: pct, sort_order: idx });
         }
@@ -4320,6 +4753,7 @@
       if (record.customer_bw != null) lines.push(`<strong>Customer BW:</strong> ${record.customer_bw}`);
       if (record.target_production != null) lines.push(`<strong>Min. batch size:</strong> ${record.target_production} ${record.target_unit || ''}`);
       lines.push(`<strong>Materials in result:</strong> ${materials.length}`);
+      lines.push(`<strong>Validation rule:</strong> 100% check is applied to non-surfactant materials only.`);
 
       summaryEl.innerHTML = lines.join('<br>');
       const widthHints = [record.pd_id, record.customer, record.line, record.smms, String(record.customer_bw || ''), String(record.target_production || '')].filter(Boolean);
@@ -4341,16 +4775,7 @@
       try {
         refreshRequiredFieldColors();
         
-        // Validate PD ID - must be numeric only
-        const pdIdInput = document.getElementById('pdId');
-        if (pdIdInput && pdIdInput.value.trim()) {
-          const pdIdValue = pdIdInput.value.trim();
-          if (!/^\d+$/.test(pdIdValue)) {
-            statusEl.textContent = 'PD ID must contain only numeric characters (0-9).';
-            btn.disabled = false;
-            return;
-          }
-        }
+        // PD ID will be auto-assigned by backend (no validation needed)
         
         const missingRequired = getMissingRedRequiredFields();
         if (missingRequired.length > 0) {
@@ -4370,7 +4795,11 @@
         const response = await fetch('/api/bom/records', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ record, materials })
+          body: JSON.stringify({
+            record,
+            materials,
+            calculationSnapshot: latestCostPreview
+          })
         });
 
         const data = await response.json();
@@ -4382,6 +4811,10 @@
         }
 
         closeSaveBomRecordModal();
+        const backBtn = document.getElementById('backToDashboardAfterSaveBtn');
+        if (backBtn) {
+          backBtn.style.display = '';
+        }
         alert(`BOM record saved successfully (ID: ${data.id}).`);
       } catch (err) {
         statusEl.textContent = 'Network error. Please try again.';
@@ -4391,7 +4824,7 @@
 
   </script>
 
-  <script src="auth.js"></script>
+  <script src="/auth.js"></script>
 
   <!-- Save Modal -->
   <div id="saveModal" class="modal-overlay">

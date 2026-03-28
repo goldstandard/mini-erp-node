@@ -4,13 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Polymer Resin Index Data</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="/styles.css" />
   <style>
     body { background: #f5f5f5; }
     .page { max-width: 1400px; margin: 0 auto; padding: 16px; }
     .card { background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     .row > * { min-width: 140px; }
+    .table-scroll-top {
+      overflow-x: auto;
+      overflow-y: hidden;
+      height: 16px;
+      margin-top: 12px;
+      border: 1px solid #ececec;
+      border-radius: 4px;
+      background: #fafafa;
+    }
+    .table-scroll-top-inner {
+      height: 1px;
+      min-width: 100%;
+    }
     .table-wrap { overflow: auto; max-height: 600px; position: relative; }
     table { width: 100%; border-collapse: separate; border-spacing: 0; }
     th, td { border-bottom: 1px solid #ececec; padding: 8px; text-align: left; font-size: 12px; }
@@ -72,13 +85,22 @@
 </head>
 <body>
   <div class="page">
-    <div class="card row" style="justify-content: space-between;">
-      <h2 style="margin:0;">Polymer Resin Index Data</h2>
-      <div class="row">
-        <button onclick="window.location.href='/dashboard'">Return to Dashboard</button>
-        <button id="adminButton" onclick="window.location.href='/polymer-index-admin.html'" class="btn-primary" style="display:none;">Index Management</button>
+    <header class="app-header">
+      <div class="app-branding">
+        <img src="/data/PFN_logo.png" alt="PFN" class="company-logo" />
+        <div class="app-title-wrap">
+          <h1>Polymer Resin Index Data</h1>
+          <p>Weekly historical index values overview</p>
+        </div>
       </div>
-    </div>
+      <div class="app-top-actions">
+        <button class="action-btn btn-nav" onclick="window.location.href='/dashboard'">Back to Dashboard</button>
+        <button id="adminButton" onclick="window.location.href='/polymer-index-admin.html'" class="action-btn btn-nav" style="display:none;">Index Management</button>
+        <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;">Change Password</button>
+        <button id="adminBtn" class="action-btn btn-admin" style="display:none;">Admin</button>
+        <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
+      </div>
+    </header>
 
     <div id="status" class="card muted">Ready</div>
 
@@ -111,7 +133,10 @@
         <button onclick="loadHistoricalData()">Load Data</button>
         <button onclick="openChartModal()" class="btn-primary">Show Chart</button>
         <button onclick="openExportModal()" class="btn-primary">Export Data</button>
-        <button onclick="confirmClearAllData()" style="background:#dc3545; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:14px; margin-left:8px;" title="Admin only: Delete all historical index values from database">Clear All Data</button>
+        <button id="clearAllDataButton" onclick="confirmClearAllData()" style="display:none; background:#dc3545; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:14px; margin-left:8px;" title="Admin/Procurement Team only: Delete all historical index values from database">Clear All Data</button>
+      </div>
+      <div id="historicalTopScroll" class="table-scroll-top" aria-label="Horizontal scroll for historical table">
+        <div id="historicalTopScrollInner" class="table-scroll-top-inner"></div>
       </div>
       <div class="table-wrap" style="margin-top: 12px;">
         <table id="historicalTable">
@@ -188,6 +213,7 @@
     </div>
   </div>
 
+  <script src="/auth.js"></script>
   <script>
     const token = localStorage.getItem('authToken');
     let indexes = [];
@@ -195,6 +221,7 @@
     let isProcurementOrAdmin = false;
     let trendChart = null;
     let chartIndexNames = [];
+    let isSyncingHistoricalScroll = false;
 
     function setStatus(message, type = 'muted') {
       const el = document.getElementById('status');
@@ -260,6 +287,38 @@
 
       const firstRowHeight = Math.ceil(firstHeaderRow.getBoundingClientRect().height || 44);
       thead.style.setProperty('--header-row1-height', `${firstRowHeight}px`);
+    }
+
+    function updateHistoricalTopScrollWidth() {
+      const table = document.getElementById('historicalTable');
+      const topInner = document.getElementById('historicalTopScrollInner');
+      if (!table || !topInner) return;
+
+      topInner.style.width = `${table.scrollWidth}px`;
+    }
+
+    function initHistoricalHorizontalScrollSync() {
+      const topScroll = document.getElementById('historicalTopScroll');
+      const tableWrap = document.querySelector('.table-wrap');
+      if (!topScroll || !tableWrap || topScroll.dataset.synced === '1') {
+        return;
+      }
+
+      topScroll.addEventListener('scroll', () => {
+        if (isSyncingHistoricalScroll) return;
+        isSyncingHistoricalScroll = true;
+        tableWrap.scrollLeft = topScroll.scrollLeft;
+        isSyncingHistoricalScroll = false;
+      });
+
+      tableWrap.addEventListener('scroll', () => {
+        if (isSyncingHistoricalScroll) return;
+        isSyncingHistoricalScroll = true;
+        topScroll.scrollLeft = tableWrap.scrollLeft;
+        isSyncingHistoricalScroll = false;
+      });
+
+      topScroll.dataset.synced = '1';
     }
 
     function chartLabelForWeek(week) {
@@ -448,17 +507,20 @@
 
     async function loadUserGroupAccess() {
       try {
-        const groups = await api('/api/auth/me/groups');
-        isProcurementOrAdmin = Array.isArray(groups)
-          ? groups.some(group => {
-              const groupName = String(group?.name || '').toLowerCase();
-              return groupName === 'admin' || groupName === 'procurement';
-            })
-          : false;
+        const access = await api('/api/auth/me/access-permissions');
+        const polymerAccess = access?.pages?.['polymer-indexes'] || { read: true, modify: false };
+        isProcurementOrAdmin = !!polymerAccess.modify;
+
+        if (!polymerAccess.read) {
+          setStatus('Access denied: you do not have read access to Polymer Indexes', 'danger');
+          setTimeout(() => window.location.href = '/dashboard', 1500);
+          return;
+        }
         
-        // Show Index Management button if user is in Admin or Procurement group
+        // Show management controls only for Admin/Procurement Team users.
         if (isProcurementOrAdmin) {
           document.getElementById('adminButton').style.display = 'inline-block';
+          document.getElementById('clearAllDataButton').style.display = 'inline-block';
         }
       } catch (err) {
         isProcurementOrAdmin = false;
@@ -467,8 +529,35 @@
     }
 
     async function loadIndexes() {
-      const data = await api('/api/admin/polymer-indexes?includeInactive=false');
+      const data = await api('/api/polymer-indexes');
       indexes = data.indexes || [];
+    }
+
+    async function fetchWeeksByYearRange(startYear, endYear) {
+      const response = await api(`/api/polymer-indexes/data/by-week?startYear=${startYear}&endYear=${endYear}`);
+      return response.weeks || [];
+    }
+
+    function getAvailableYearRange(weeks) {
+      if (!Array.isArray(weeks) || weeks.length === 0) {
+        return null;
+      }
+
+      let minYear = Number.MAX_SAFE_INTEGER;
+      let maxYear = Number.MIN_SAFE_INTEGER;
+
+      for (const week of weeks) {
+        const yr = Number(week.year);
+        if (!Number.isFinite(yr)) continue;
+        if (yr < minYear) minYear = yr;
+        if (yr > maxYear) maxYear = yr;
+      }
+
+      if (!Number.isFinite(minYear) || !Number.isFinite(maxYear)) {
+        return null;
+      }
+
+      return { minYear, maxYear };
     }
 
     async function loadHistoricalData() {
@@ -481,8 +570,22 @@
           return setStatus('Start year must be <= End year', 'danger');
         }
 
-        const response = await api(`/api/admin/polymer-indexes/data/by-week?startYear=${startYear}&endYear=${endYear}`);
-        weekData = response.weeks || [];
+        weekData = await fetchWeeksByYearRange(startYear, endYear);
+
+        if (weekData.length === 0) {
+          const allWeeks = await fetchWeeksByYearRange(2000, 2100);
+          const availableRange = getAvailableYearRange(allWeeks);
+
+          if (availableRange) {
+            document.getElementById('yearStart').value = String(availableRange.minYear);
+            document.getElementById('yearEnd').value = String(availableRange.maxYear);
+            weekData = await fetchWeeksByYearRange(availableRange.minYear, availableRange.maxYear);
+
+            renderHistoricalTable();
+            setStatus(`No data in selected range ${startYear}-${endYear}. Showing available range ${availableRange.minYear}-${availableRange.maxYear}.`, 'ok');
+            return;
+          }
+        }
 
         renderHistoricalTable();
         setStatus('Historical data loaded', 'ok');
@@ -571,6 +674,7 @@
 
       thead.innerHTML = headerRow1 + headerRow2;
       requestAnimationFrame(updateHistoricalHeaderOffset);
+      requestAnimationFrame(updateHistoricalTopScrollWidth);
 
       // Build body rows
       const bodyRows = [];
@@ -618,6 +722,7 @@
       });
 
       tbody.innerHTML = bodyRows.join('');
+      requestAnimationFrame(updateHistoricalTopScrollWidth);
     }
 
     function openExportModal() {
@@ -824,6 +929,10 @@
     }
 
     async function confirmClearAllData() {
+      if (!isProcurementOrAdmin) {
+        return setStatus('Access denied: only Admin and Procurement Team can clear data', 'danger');
+      }
+
       const confirmMessage = "⚠️ WARNING: This will permanently delete ALL historical index values from the database.\n\n" +
                              "This action CANNOT be undone!\n\n" +
                              "Are you absolutely sure you want to continue?";
@@ -874,9 +983,12 @@
       }
 
       window.addEventListener('resize', updateHistoricalHeaderOffset);
+      window.addEventListener('resize', updateHistoricalTopScrollWidth);
+      initHistoricalHorizontalScrollSync();
 
       try {
         setStatus('Loading data...');
+        await auth.configureHeaderButtons();
         await loadUserGroupAccess();
         await loadIndexes();
         await loadHistoricalData();

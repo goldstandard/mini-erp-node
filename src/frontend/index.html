@@ -2,264 +2,353 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Manufacturing Cost ERP</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mini-ERP Landing Page</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-a: #f5f9ff;
+      --bg-b: #d9ebff;
+      --ink-900: #0e2a47;
+      --ink-600: #32557a;
+      --tile-shadow: 0 10px 22px rgba(26, 52, 87, 0.18);
+      --tile-radius: 14px;
+      --white: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Poppins", "Segoe UI", sans-serif;
+      color: var(--ink-900);
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.76) 0%, rgba(255, 255, 255, 0) 36%),
+        linear-gradient(135deg, var(--bg-a) 0%, var(--bg-b) 100%);
+      padding: 22px;
+    }
+
+    .shell {
+      max-width: 1260px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(3px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 16px 46px rgba(16, 42, 71, 0.16);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #dbeaf9;
+      padding-bottom: 18px;
+    }
+
+    .branding {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .branding img {
+      width: 62px;
+      height: 62px;
+      object-fit: contain;
+    }
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: 1.65rem;
+      letter-spacing: 0.2px;
+    }
+
+    .title-wrap p {
+      margin: 2px 0 0;
+      color: var(--ink-600);
+      font-size: 0.92rem;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .action-btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+      font-family: inherit;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .action-btn:hover { transform: translateY(-1px); }
+
+    .btn-password { background: #2667c9; }
+    .btn-admin { background: #d97706; }
+    .btn-logout { background: #cf3f4e; }
+
+    .landing-intro {
+      margin: 2px 0 16px;
+      color: var(--ink-600);
+      font-size: 0.97rem;
+    }
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(210px, 1fr));
+      gap: 14px;
+    }
+
+    .tile {
+      border: 0;
+      border-radius: var(--tile-radius);
+      min-height: 95px;
+      color: #fff;
+      text-align: left;
+      cursor: pointer;
+      padding: 14px;
+      font-family: inherit;
+      box-shadow: var(--tile-shadow);
+      transition: transform 0.16s ease, filter 0.16s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tile::after {
+      content: "";
+      position: absolute;
+      right: -10px;
+      top: -10px;
+      width: 62px;
+      height: 62px;
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 50%;
+    }
+
+    .tile:hover {
+      transform: translateY(-3px);
+      filter: brightness(1.03);
+    }
+
+    .tile-icon {
+      font-size: 1.2rem;
+      opacity: 0.95;
+      position: relative;
+      z-index: 1;
+    }
+
+    .tile-label {
+      font-size: 1.02rem;
+      font-weight: 600;
+      line-height: 1.2;
+      position: relative;
+      z-index: 1;
+    }
+
+    .empty-note {
+      color: var(--ink-600);
+      padding: 18px;
+      border-radius: 12px;
+      background: #eef5ff;
+      border: 1px solid #d9e8fb;
+      font-size: 0.95rem;
+    }
+
+    .t-recipe { background: linear-gradient(135deg, #ce3d7f, #e0619e); }
+    .t-edit { background: linear-gradient(135deg, #7a3fb5, #9c66d0); }
+    .t-bom { background: linear-gradient(135deg, #345bd8, #2f86db); }
+    .t-approval { background: linear-gradient(135deg, #0f7a6b, #24a38f); }
+    .t-rm { background: linear-gradient(135deg, #cf5c08, #e98a1f); }
+    .t-polymer { background: linear-gradient(135deg, #0c8a40, #33a454); }
+    .t-fx { background: linear-gradient(135deg, #5f55ca, #7a67dd); }
+    .t-line { background: linear-gradient(135deg, #0a7488, #1b9fb2); }
+
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(17, 31, 48, 0.46);
+      z-index: 1000;
+    }
+
+    .modal-content {
+      width: min(440px, 92vw);
+      background: #fff;
+      margin: 12vh auto;
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .modal-head h2 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .close-btn {
+      border: 0;
+      background: transparent;
+      font-size: 1.6rem;
+      color: #7b8ca0;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .field { margin-bottom: 12px; }
+
+    .field label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.9rem;
+      color: #405972;
+      font-weight: 600;
+    }
+
+    .field input {
+      width: 100%;
+      border: 1px solid #cbd8e6;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: inherit;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .btn-flat,
+    .btn-green {
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn-flat { background: #eef2f6; color: #2f4a66; }
+    .btn-green { background: #2e9748; color: #fff; }
+
+    @media (max-width: 980px) {
+      .tile-grid { grid-template-columns: repeat(2, minmax(190px, 1fr)); }
+      .header { flex-direction: column; align-items: stretch; }
+      .top-actions { justify-content: flex-start; }
+    }
+
+    @media (max-width: 620px) {
+      body { padding: 12px; }
+      .shell { padding: 16px; }
+      .tile-grid { grid-template-columns: 1fr; }
+      .branding img { width: 52px; height: 52px; }
+    }
+  </style>
 </head>
-
 <body>
-
-  <div class="container">
-    <header>
-      <div class="header-logo-text-group">
-        <img src="/data/PFN_logo.png" alt="PFNonwovens" class="company-logo" />
-        <div class="header-center">
-          <h1>Manufacturing Cost ERP Dashboard</h1>
-          <p class="subtitle">Product costing, materials, and line analysis</p>
-        </div>
-        <img src="/data/PFN_logo.png" alt="PFNonwovens" class="company-logo company-logo-right" />
-      </div>
-      <div class="header-right">
-        <button id="changePasswordBtn" class="logout-btn" title="Change Password" style="display: none; margin-right: 10px; background-color: #667eea;" onclick="openChangePasswordModal()">Change Password</button>
-        <button id="adminBtn" class="logout-btn" title="Admin Panel" style="display: none; margin-right: 10px; background-color: #ff9800;" onclick="window.location.href='/admin-access.html'">Admin</button>
-        <button id="logoutBtn" class="logout-btn" title="Logout" onclick="auth.logout()">Logout</button>
-      </div>
-    </header>
-
-    <!-- CONTROL PANEL -->
-    <section class="control-panel">
-      <div class="control-top">
-        <div class="control-top-left">
-          <div class="control-group">
-            <label for="currencySelect">Display Currency:</label>
-            <select id="currencySelect">
-              <option value="USD">USD</option>
-              <option value="CZK">CZK</option>
-              <option value="EUR">EUR</option>
-              <option value="ZAR">ZAR</option>
-            </select>
-          </div>
-
-          <div class="control-group">
-            <label for="viewToggle">View Mode:</label>
-            <select id="viewToggle">
-              <option value="aggregated">Aggregated (Summary)</option>
-              <option value="detailed">Detailed (Full Breakdown)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="control-buttons">
-          <button onclick="window.location.href='/products'" class="btn-secondary" title="Edit product data">Edit Products</button>
-          <button onclick="window.location.href='/bom-calculator'" class="btn-secondary" title="BOM Design Calculator">BOM Calculator</button>
-          <button onclick="window.location.href='/bom-recipe-browser'" class="btn-secondary" title="Browse saved BOM recipes">Recipe Browser</button>
-          <button onclick="window.location.href='/polymer-indexes'" class="btn-secondary" title="Polymer resin index database">Polymer Indexes</button>
-          <button id="compactToggle" class="btn-secondary compact-toggle" title="Toggle compact view">Compact</button>
+  <div class="shell">
+    <div class="header">
+      <div class="branding">
+        <img src="/data/PFN_logo.png" alt="PFN" />
+        <div class="title-wrap">
+          <h1>mini-ERP</h1>
+          <p>Recipe management and material costing/pricing</p>
         </div>
       </div>
 
-      <div class="filter-section">
-        <h3>Filters</h3>
-        <div class="filter-row">
-          <div class="filter-item">
-            <label for="filterSapId">SAP ID:</label>
-            <select id="filterSapId" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterPfnId">PFN ID:</label>
-            <select id="filterPfnId" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterCustomer">Customer:</label>
-            <select id="filterCustomer" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterMarketSegment">Market Segment:</label>
-            <select id="filterMarketSegment" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterApplication">Application:</label>
-            <select id="filterApplication" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterSSMS">S/SMS:</label>
-            <select id="filterSSMS" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterBonding">Bonding:</label>
-            <select id="filterBonding" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterBasisWeight">Basis Weight:</label>
-            <select id="filterBasisWeight" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterSlitWidth">Slit Width:</label>
-            <select id="filterSlitWidth" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterTreatment">Treatment:</label>
-            <select id="filterTreatment" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterAuthor">Author:</label>
-            <select id="filterAuthor" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterLine">Line:</label>
-            <select id="filterLine" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterCountry">Country:</label>
-            <select id="filterCountry" multiple size="1"></select>
-          </div>
-          <div class="filter-item">
-            <label for="filterOverconsumption">Overconsumption:</label>
-            <select id="filterOverconsumption" multiple size="1"></select>
-          </div>
-        </div>
-
-        <div class="button-group">
-          <button id="loadBtn" onclick="loadCosts()" class="btn-primary">Load Costs</button>
-          <button onclick="clearFilters()" class="btn-secondary">Clear Filters</button>
-          <button onclick="exportCosts()" class="btn-secondary">Export CSV</button>
-        </div>
+      <div class="top-actions">
+        <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;" onclick="openChangePasswordModal()">Change Password</button>
+        <button id="adminBtn" class="action-btn btn-admin" style="display:none;" onclick="window.location.href='/admin-access.html'">Admin</button>
+        <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
       </div>
-    </section>
-
-    <!-- SUMMARY STATS -->
-    <section id="summaryStats" class="summary-stats" style="display: none;">
-      <div class="stat-card">
-        <h4>Total Records</h4>
-        <p id="statRecords">0</p>
-      </div>
-      <div class="stat-card">
-        <h4>Avg Material Cost</h4>
-        <p id="statAvgMaterial">0</p>
-      </div>
-      <div class="stat-card">
-        <h4>Avg Process Cost</h4>
-        <p id="statAvgProcess">0</p>
-      </div>
-      <div class="stat-card">
-        <h4>Avg Total Cost</h4>
-        <p id="statAvgTotal">0</p>
-      </div>
-    </section>
-
-    <!-- AGGREGATED VIEW TABLE -->
-    <section id="aggregatedView" class="view-section" style="display: none;">
-      <h2>Cost Summary</h2>
-      <div class="table-scroll-top" id="tableScrollTop"><div id="tableScrollInner"></div></div>
-      <div class="table-wrapper">
-        <table id="costTable">
-          <thead>
-            <tr>
-              <th>SAP ID</th>
-              <th>PFN ID</th>
-              <th>Customer</th>
-              <th>Market Segment</th>
-              <th>Application</th>
-              <th>S/SMS</th>
-              <th>Bonding</th>
-              <th>Basis Weight</th>
-              <th>Slit Width</th>
-              <th>Treatment</th>
-              <th>Author</th>
-              <th>Gross Yield %</th>
-              <th>Throughput</th>
-              <th>Line</th>
-              <th>Country</th>
-              <th>Material Cost</th>
-              <th>Process Cost</th>
-              <th>Total Cost</th>
-              <th>Currency</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- DETAILED VIEW TABLE -->
-    <section id="detailedView" class="view-section" style="display: none;">
-      <h2>Detailed Cost Breakdown</h2>
-      <div id="detailedContent"></div>
-    </section>
-
-    <!-- DETAIL PANEL -->
-    <section id="detailPanel" class="detail-panel" style="display: none;">
-      <button onclick="closeDetails()" class="btn-close">✕</button>
-      <div id="detailContent"></div>
-    </section>
-
-    <!-- LOADING SPINNER -->
-    <div id="loadingSpinner" class="spinner" style="display: none;">
-      <p>Loading data...</p>
     </div>
 
-    <!-- ERROR MESSAGE -->
-    <div id="errorMessage" class="error-message" style="display: none;"></div>
+    <p class="landing-intro">Choose the module you want to open.</p>
 
-    <!-- CHANGE PASSWORD MODAL -->
-    <div id="changePasswordModal" class="modal" style="display: none;">
-      <div class="modal-content" style="max-width: 400px; margin-top: 15%;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h2 style="margin: 0;">Change Password</h2>
-          <button onclick="closeChangePasswordModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">×</button>
-        </div>
-        <div style="margin-bottom: 20px;">
-          <div style="margin-bottom: 15px;">
-            <label for="currentPassword" style="display: block; margin-bottom: 5px; font-weight: bold;">Current Password</label>
-            <input type="password" id="currentPassword" placeholder="Enter current password" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" />
-          </div>
-          <div style="margin-bottom: 15px;">
-            <label for="newPassword" style="display: block; margin-bottom: 5px; font-weight: bold;">New Password</label>
-            <input type="password" id="newPassword" placeholder="Enter new password" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" />
-          </div>
-          <div style="margin-bottom: 15px;">
-            <label for="confirmPassword" style="display: block; margin-bottom: 5px; font-weight: bold;">Confirm Password</label>
-            <input type="password" id="confirmPassword" placeholder="Confirm new password" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" />
-          </div>
-        </div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-          <button onclick="closeChangePasswordModal()" style="padding: 10px 20px; background-color: #f5f5f5; color: #333; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-weight: bold;">Cancel</button>
-          <button onclick="confirmChangePassword()" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Change Password</button>
-        </div>
+    <div id="tileGrid" class="tile-grid"></div>
+    <div id="emptyNote" class="empty-note" style="display:none;">No page is available for your current permissions. Contact an administrator.</div>
+  </div>
+
+  <div id="changePasswordModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h2>Change Password</h2>
+        <button class="close-btn" onclick="closeChangePasswordModal()">&times;</button>
+      </div>
+
+      <div class="field">
+        <label for="currentPassword">Current Password</label>
+        <input type="password" id="currentPassword" />
+      </div>
+
+      <div class="field">
+        <label for="newPassword">New Password</label>
+        <input type="password" id="newPassword" />
+      </div>
+
+      <div class="field">
+        <label for="confirmPassword">Confirm Password</label>
+        <input type="password" id="confirmPassword" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-flat" onclick="closeChangePasswordModal()">Cancel</button>
+        <button class="btn-green" onclick="confirmChangePassword()">Change Password</button>
       </div>
     </div>
   </div>
 
-  <script src="auth.js"></script>
+  <script src="/auth.js"></script>
   <script>
-    // Change password modal functions
+    const TILES = [
+      { key: 'bom-recipe-browser', label: 'Recipe Browser', path: '/bom-recipe-browser', icon: 'i', cls: 't-recipe' },
+      { key: 'recipe-edit-clone', label: 'Recipe Edit Clone', path: '/recipe-edit-clone', icon: 'E', cls: 't-edit' },
+      { key: 'bom-calculator', label: 'BOM Calculator', path: '/bom-calculator', icon: '∑', cls: 't-bom' },
+      { key: 'recipe-approval', label: 'Recipe Approval', path: '/recipe-approval', icon: '✓', cls: 't-approval' },
+      { key: 'rm-prices', label: 'Raw Material Prices', path: '/rm-prices', icon: '$', cls: 't-rm' },
+      { key: 'polymer-indexes', label: 'Polymer Indexes', path: '/polymer-indexes', icon: '◌', cls: 't-polymer' },
+      { key: 'fx-rates', label: 'FX Rates', path: '/fx-rates', icon: '↔', cls: 't-fx' },
+      { key: 'line-rates', label: 'Line Rates', path: '/line-rates', icon: '#', cls: 't-line' }
+    ];
+
     function openChangePasswordModal() {
-      console.log('[openChangePasswordModal] Called');
       const modal = document.getElementById('changePasswordModal');
-      console.log('[openChangePasswordModal] Modal element:', modal);
-      if (modal) {
-        modal.style.display = 'block';
-        const currentPwdInput = document.getElementById('currentPassword');
-        const newPwdInput = document.getElementById('newPassword');
-        const confirmPwdInput = document.getElementById('confirmPassword');
-        
-        if (currentPwdInput) currentPwdInput.value = '';
-        if (newPwdInput) newPwdInput.value = '';
-        if (confirmPwdInput) confirmPwdInput.value = '';
-        if (currentPwdInput) currentPwdInput.focus();
-        
-        console.log('[openChangePasswordModal] Modal opened successfully');
-      } else {
-        console.error('[openChangePasswordModal] Modal element not found');
-      }
+      if (!modal) return;
+      modal.style.display = 'block';
+      document.getElementById('currentPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmPassword').value = '';
+      document.getElementById('currentPassword').focus();
     }
 
     function closeChangePasswordModal() {
-      console.log('[closeChangePasswordModal] Called');
       const modal = document.getElementById('changePasswordModal');
-      if (modal) {
-        modal.style.display = 'none';
-        console.log('[closeChangePasswordModal] Modal closed');
-      }
+      if (modal) modal.style.display = 'none';
     }
 
     async function confirmChangePassword() {
@@ -272,17 +361,14 @@
         alert('All fields are required');
         return;
       }
-
       if (newPassword !== confirmPassword) {
         alert('New passwords do not match');
         return;
       }
-
       if (newPassword.length < 6) {
         alert('New password must be at least 6 characters');
         return;
       }
-
       if (currentPassword === newPassword) {
         alert('New password must be different from current password');
         return;
@@ -292,17 +378,13 @@
         const response = await fetch('/api/auth/change-password', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            currentPassword,
-            newPassword
-          })
+          body: JSON.stringify({ currentPassword, newPassword })
         });
 
         const data = await response.json();
-
         if (response.ok) {
           alert('Password changed successfully');
           closeChangePasswordModal();
@@ -314,7 +396,74 @@
       }
     }
 
-    // Close modal when clicking outside
+    function renderTiles(allowedPageMap) {
+      const tileGrid = document.getElementById('tileGrid');
+      const emptyNote = document.getElementById('emptyNote');
+
+      const visible = TILES.filter((tile) => {
+        const permission = allowedPageMap[tile.key];
+        return !!(permission && permission.read);
+      });
+
+      if (!visible.length) {
+        tileGrid.innerHTML = '';
+        emptyNote.style.display = 'block';
+        return;
+      }
+
+      emptyNote.style.display = 'none';
+      tileGrid.innerHTML = visible.map((tile) => (
+        `<button class="tile ${tile.cls}" onclick="window.location.href='${tile.path}'">` +
+          `<div class="tile-icon">${tile.icon}</div>` +
+          `<div class="tile-label">${tile.label}</div>` +
+        `</button>`
+      )).join('');
+    }
+
+    async function initialize() {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      let groups = [];
+      let pagePermissions = {};
+
+      try {
+        const groupsResponse = await fetch('/api/auth/me/groups', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (groupsResponse.ok) {
+          groups = await groupsResponse.json();
+        }
+      } catch (_) {}
+
+      try {
+        const pagePermResponse = await fetch('/api/auth/me/access-permissions', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (pagePermResponse.ok) {
+          const pageData = await pagePermResponse.json();
+          pagePermissions = pageData.pages || {};
+        }
+      } catch (_) {}
+
+      const isAdmin = groups.some((group) => group.name === 'Admin');
+      const isTestGroup = groups.some((group) => group.name === 'Test Group');
+
+      if (isAdmin) {
+        const adminBtn = document.getElementById('adminBtn');
+        if (adminBtn) adminBtn.style.display = 'inline-block';
+      }
+      if (!isTestGroup) {
+        const changePasswordBtn = document.getElementById('changePasswordBtn');
+        if (changePasswordBtn) changePasswordBtn.style.display = 'inline-block';
+      }
+
+      renderTiles(pagePermissions);
+    }
+
     window.onclick = function(event) {
       const modal = document.getElementById('changePasswordModal');
       if (modal && event.target === modal) {
@@ -322,99 +471,7 @@
       }
     };
 
-    // Setup all button and event listeners
-    function setupEventListeners() {
-      // Logout functionality
-      const logoutBtn = document.getElementById('logoutBtn');
-      if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-          auth.logout();
-        });
-      }
-
-      // Change password button
-      const changePasswordBtn = document.getElementById('changePasswordBtn');
-      if (changePasswordBtn) {
-        changePasswordBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          openChangePasswordModal();
-        });
-      }
-
-      // Admin button - show for admin users
-      const adminBtn = document.getElementById('adminBtn');
-      if (adminBtn) {
-        adminBtn.addEventListener('click', () => {
-          window.location.href = '/admin-access.html';
-        });
-      }
-    }
-
-    // Check if user is authenticated on page load and show admin button if in Admin group
-    function checkUserGroups() {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        // Not logged in, redirect to login
-        window.location.href = '/';
-      } else {
-        // Check if user is in Admin group
-        fetch('/api/auth/me/groups', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        .then(response => {
-          if (response.ok) {
-            return response.json();
-          }
-          throw new Error('Failed to get user groups');
-        })
-        .then(groups => {
-          // Check if user is in Admin group
-          const isAdmin = groups.some(group => group.name === 'Admin');
-          if (isAdmin) {
-            const adminBtn = document.getElementById('adminBtn');
-            if (adminBtn) {
-              adminBtn.style.display = 'block';
-            }
-          }
-
-          // Show Change Password button if user is NOT in Test Group
-          const isTestGroup = groups.some(group => group.name === 'Test Group');
-          if (!isTestGroup) {
-            const changePasswordBtn = document.getElementById('changePasswordBtn');
-            if (changePasswordBtn) {
-              changePasswordBtn.style.display = 'block';
-            }
-          }
-        })
-        .catch(err => {
-          console.warn('Could not check user groups:', err);
-        });
-      }
-    }
-
-    // Initialize when DOM is ready
-    console.log('[Init] Current readyState:', document.readyState);
-    
-    function initializeApp() {
-      console.log('[initializeApp] Initializing application');
-      setupEventListeners();
-      checkUserGroups();
-      console.log('[initializeApp] Application initialized');
-    }
-    
-    if (document.readyState === 'loading') {
-      console.log('[Init] DOM still loading, waiting for DOMContentLoaded');
-      document.addEventListener('DOMContentLoaded', function() {
-        console.log('[Init] DOMContentLoaded fired');
-        initializeApp();
-      });
-    } else {
-      console.log('[Init] DOM already loaded, initializing immediately');
-      initializeApp();
-    }
+    document.addEventListener('DOMContentLoaded', initialize);
   </script>
-  <script src="script.js"></script>
 </body>
 </html>

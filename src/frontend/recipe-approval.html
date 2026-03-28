@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recipe Approval</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    body {
+      margin: 0;
+      background: #f2f6fb;
+      color: #12324f;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .page-layout {
+      display: grid;
+      grid-template-columns: minmax(420px, 1fr) minmax(460px, 1.1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      background: #ffffff;
+      border: 1px solid #d9e6f4;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(18, 50, 79, 0.08);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e8eff7;
+      background: linear-gradient(180deg, #f9fcff 0%, #f0f7ff 100%);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      color: #144873;
+    }
+
+    .panel-header p {
+      margin: 4px 0 0;
+      color: #4a6c8f;
+      font-size: 0.9rem;
+    }
+
+    .list-wrap {
+      max-height: calc(100vh - 230px);
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #e9f2fc;
+      color: #123d65;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid #d3e2f2;
+    }
+
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #edf3fa;
+      font-size: 0.9rem;
+      color: #1b446c;
+      vertical-align: top;
+    }
+
+    tr.recipe-row {
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    tr.recipe-row:hover {
+      background: #f4f9ff;
+    }
+
+    tr.recipe-row.selected {
+      background: #dff0ff;
+    }
+
+    .status-pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+
+    .status-pending {
+      background: #fff7e6;
+      border-color: #f7d28d;
+      color: #946200;
+    }
+
+    .status-needs-update {
+      background: #fff2eb;
+      border-color: #f4c8b6;
+      color: #9a3f17;
+    }
+
+    .status-rejected {
+      background: #ffecee;
+      border-color: #f7bcc4;
+      color: #9a2236;
+    }
+
+    .status-approved {
+      background: #ebfff0;
+      border-color: #b7efc7;
+      color: #197338;
+    }
+
+    .empty-state,
+    .placeholder {
+      padding: 24px;
+      text-align: center;
+      color: #5c7895;
+      font-size: 0.95rem;
+    }
+
+    .detail-content {
+      padding: 14px 16px 18px;
+      max-height: calc(100vh - 230px);
+      overflow: auto;
+    }
+
+    .section-title {
+      margin: 16px 0 8px;
+      color: #16507f;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      gap: 8px 12px;
+      background: #f9fcff;
+      border: 1px solid #e4eef9;
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .detail-item {
+      border-bottom: 1px dashed #dce8f4;
+      padding-bottom: 6px;
+    }
+
+    .detail-label {
+      font-size: 0.74rem;
+      color: #5d7ea0;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 2px;
+    }
+
+    .detail-value {
+      font-size: 0.92rem;
+      color: #163e67;
+      word-break: break-word;
+    }
+
+    .materials-table th {
+      position: static;
+      background: #f0f6fd;
+    }
+
+    .review-block {
+      margin-top: 16px;
+      border: 1px solid #dce9f7;
+      border-radius: 10px;
+      padding: 12px;
+      background: #f9fcff;
+    }
+
+    .review-block label {
+      display: block;
+      font-size: 0.86rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #1b4f7c;
+    }
+
+    .review-block textarea {
+      width: 100%;
+      min-height: 90px;
+      border: 1px solid #c8dbee;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: inherit;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .action-row {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .decision-btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 600;
+      color: #ffffff;
+      cursor: pointer;
+    }
+
+    .btn-approve { background: #1f8b47; }
+    .btn-revise { background: #d97706; }
+    .btn-reject { background: #cf3f4e; }
+
+    .info-text {
+      margin-top: 8px;
+      font-size: 0.84rem;
+      color: #4f6f90;
+    }
+
+    .feedback {
+      margin-top: 10px;
+      font-size: 0.88rem;
+      min-height: 18px;
+      color: #0e5f2d;
+    }
+
+    .feedback.error {
+      color: #a11b2f;
+    }
+
+    @media (max-width: 1180px) {
+      .page-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .list-wrap,
+      .detail-content {
+        max-height: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <div class="app-branding">
+        <img src="/data/PFN_logo.png" alt="PFN" class="company-logo" />
+        <div class="app-title-wrap">
+          <h1>Recipe Approval</h1>
+          <p>Review and decide unapproved recipes</p>
+        </div>
+      </div>
+      <div class="app-top-actions">
+        <button class="action-btn btn-nav" onclick="window.location.href='/dashboard'">Back to Dashboard</button>
+        <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;">Change Password</button>
+        <button id="adminBtn" class="action-btn btn-admin" style="display:none;">Admin</button>
+        <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="page-layout">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Unapproved Recipes</h2>
+          <p>Only records with Recipe Approved = No are listed here.</p>
+        </div>
+        <div id="listWrap" class="list-wrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Recipe Technical Detail</h2>
+          <p>Select a recipe to view all technical parameters and materials.</p>
+        </div>
+        <div id="detailWrap" class="detail-content">
+          <div class="placeholder">Select a recipe from the left list.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="/auth.js"></script>
+  <script>
+    const token = localStorage.getItem('authToken');
+    let pendingRecords = [];
+    let selectedRecordId = null;
+    let canModify = false;
+
+    const technicalFields = [
+      ['Customer', 'customer'],
+      ['Line', 'line'],
+      ['Author', 'author'],
+      ['Author Email', 'author_email'],
+      ['Market Segment', 'market_segment'],
+      ['Application', 'application'],
+      ['S/SMS', 'smms'],
+      ['Mono/Bico', 'mono_bico'],
+      ['Structure', 'structure'],
+      ['Bico Ratio Desc', 'bico_ratio_desc'],
+      ['Main Raw Material', 'main_raw_mat'],
+      ['Treatment', 'treatment'],
+      ['Color', 'color'],
+      ['Bonding', 'bonding'],
+      ['Customer BW', 'customer_bw'],
+      ['Belt BW', 'belt_bw'],
+      ['MB grams', 'mb_grams'],
+      ['Line', 'line'],
+      ['Belt Speed', 'belt_speed'],
+      ['SIKO Percent', 'siko_percent'],
+      ['Repro Percent', 'repro_percent'],
+      ['Max Usable Width', 'max_usable_width'],
+      ['Usable Width', 'usable_width'],
+      ['Edge Trim Percent', 'edge_trim_percent'],
+      ['Web Loss Percent', 'web_loss_percent'],
+      ['Other Scrap Percent', 'other_scrap_percent'],
+      ['Total Scrap Percent', 'total_scrap_percent'],
+      ['Gross Yield Percent', 'gross_yield_percent'],
+      ['S Beams', 's_beams'],
+      ['M Beams', 'm_beams'],
+      ['SB Throughput', 'sb_throughput'],
+      ['MB Throughput', 'mb_throughput'],
+      ['Total Throughput', 'total_throughput'],
+      ['Production Time', 'production_time'],
+      ['Cores', 'cores'],
+      ['Slit Width', 'slit_width'],
+      ['Length Meters', 'length_meters'],
+      ['Roll Diameter', 'roll_diameter'],
+      ['Target Production', 'target_production'],
+      ['Target Unit', 'target_unit'],
+      ['Overconsumption', 'overconsumption'],
+      ['Notes', 'notes'],
+      ['Recipe Approved', 'recipe_approved'],
+      ['Approval Decision', 'approval_decision'],
+      ['Approval Comment', 'approval_comment'],
+      ['Created At', 'created_at'],
+      ['Updated At', 'updated_at']
+    ];
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatDate(value) {
+      if (!value) return '-';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return escapeHtml(value);
+      return date.toLocaleString();
+    }
+
+    function formatPercent(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '-';
+      const pct = Math.abs(n) <= 1 ? n * 100 : n;
+      return `${pct.toFixed(2)}%`;
+    }
+
+    function statusClass(decision) {
+      const normalized = String(decision || '').trim().toLowerCase();
+      if (normalized === 'approved') return 'status-approved';
+      if (normalized === 'rejected') return 'status-rejected';
+      if (normalized === 'needs update') return 'status-needs-update';
+      return 'status-pending';
+    }
+
+    function renderList() {
+      const listWrap = document.getElementById('listWrap');
+      if (!pendingRecords.length) {
+        listWrap.innerHTML = '<div class="empty-state">No pending recipes found.</div>';
+        return;
+      }
+
+      const rows = pendingRecords.map((record) => {
+        const selected = Number(record.id) === Number(selectedRecordId) ? 'selected' : '';
+        const decision = record.approval_decision || 'Pending';
+        return `
+          <tr class="recipe-row ${selected}" onclick="openRecipeDetail(${Number(record.id)})">
+            <td>${escapeHtml(record.pd_id || '-')}</td>
+            <td>${escapeHtml(record.customer || '-')}</td>
+            <td>${escapeHtml(record.line || '-')}</td>
+            <td>${escapeHtml(record.author || '-')}</td>
+            <td><span class="status-pill ${statusClass(decision)}">${escapeHtml(decision)}</span></td>
+            <td>${formatDate(record.updated_at || record.created_at)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      listWrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>PD ID</th>
+              <th>Customer</th>
+              <th>Line</th>
+              <th>Author</th>
+              <th>Status</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function buildTechnicalGrid(record) {
+      return technicalFields.map(([label, key]) => {
+        let raw;
+        if (key.endsWith('_at')) {
+          raw = formatDate(record[key]);
+        } else if (key === 'overconsumption') {
+          raw = escapeHtml(formatPercent(record[key]));
+        } else {
+          raw = escapeHtml(record[key] ?? '-');
+        }
+        return `
+          <div class="detail-item">
+            <div class="detail-label">${escapeHtml(label)}</div>
+            <div class="detail-value">${raw}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function buildMaterialsTable(materials) {
+      if (!Array.isArray(materials) || !materials.length) {
+        return '<div class="info-text">No materials found.</div>';
+      }
+
+      let totalPercentage = 0;
+      const rows = materials.map((material) => `
+        <tr>
+          <td>${escapeHtml(material.material_label || '-')}</td>
+          <td>${escapeHtml(material.material_name || '-')}</td>
+          <td>${(() => {
+            const n = Number(material.percentage);
+            if (!Number.isFinite(n)) return '-';
+            totalPercentage += n;
+            return `${n.toFixed(2)}%`;
+          })()}</td>
+        </tr>
+      `).join('');
+
+      return `
+        <table class="materials-table">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Material</th>
+              <th>Percentage</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr>
+              <td colspan="2" style="font-weight:700;">Total</td>
+              <td style="font-weight:700;">${totalPercentage.toFixed(2)}%</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    function setFeedback(message, isError) {
+      const feedback = document.getElementById('approvalFeedback');
+      if (!feedback) return;
+      feedback.textContent = message || '';
+      feedback.classList.toggle('error', !!isError);
+    }
+
+    async function loadPendingRecords() {
+      const response = await fetch('/api/bom/approvals/pending', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to load pending recipes.');
+      }
+
+      const data = await response.json();
+      pendingRecords = Array.isArray(data.records) ? data.records : [];
+      renderList();
+
+      if (selectedRecordId && !pendingRecords.some((item) => Number(item.id) === Number(selectedRecordId))) {
+        selectedRecordId = null;
+        document.getElementById('detailWrap').innerHTML = '<div class="placeholder">Select a recipe from the left list.</div>';
+      }
+    }
+
+    async function openRecipeDetail(id) {
+      selectedRecordId = Number(id);
+      renderList();
+
+      const detailWrap = document.getElementById('detailWrap');
+      detailWrap.innerHTML = '<div class="placeholder">Loading recipe detail...</div>';
+
+      try {
+        const response = await fetch(`/api/bom/approvals/${Number(id)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to load recipe detail.');
+        }
+
+        const data = await response.json();
+        const record = data.record || {};
+        const materials = data.materials || [];
+
+        const reviewBlock = canModify
+          ? `
+          <div class="section-title">Technical Parameters</div>
+          <div class="detail-grid">${buildTechnicalGrid(record)}</div>
+
+          <div class="section-title">Materials</div>
+          ${buildMaterialsTable(materials)}
+
+          <div class="review-block">
+            <label for="approvalComment">Comment (required before action)</label>
+            <textarea id="approvalComment" placeholder="Add your review comment before approving, recommending update, or rejecting.">${escapeHtml(record.approval_comment || '')}</textarea>
+            <div class="action-row">
+              <button class="decision-btn btn-approve" onclick="submitApprovalAction('approve')">Approve</button>
+              <button class="decision-btn btn-revise" onclick="submitApprovalAction('revise')">Recommend Update</button>
+              <button class="decision-btn btn-reject" onclick="submitApprovalAction('reject')">Reject</button>
+            </div>
+            <div class="info-text">After action, an email is sent to the recipe author.</div>
+            <div id="approvalFeedback" class="feedback"></div>
+          </div>
+        `
+          : `
+          <div class="section-title">Technical Parameters</div>
+          <div class="detail-grid">${buildTechnicalGrid(record)}</div>
+
+          <div class="section-title">Materials</div>
+          ${buildMaterialsTable(materials)}
+
+          <div class="review-block">
+            <div class="info-text">Read-only access. Modify permission is required to approve, recommend update, or reject recipes.</div>
+            <div id="approvalFeedback" class="feedback"></div>
+          </div>
+        `;
+
+        detailWrap.innerHTML = reviewBlock;
+      } catch (error) {
+        detailWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    async function submitApprovalAction(action) {
+      if (!canModify) {
+        setFeedback('Modify access is required to submit an approval action.', true);
+        return;
+      }
+
+      if (!selectedRecordId) {
+        return;
+      }
+
+      const commentEl = document.getElementById('approvalComment');
+      const comment = String(commentEl ? commentEl.value : '').trim();
+
+      if (!comment) {
+        const wantsToFill = confirm('Comment is required before action. Do you want to fill it now?');
+        if (wantsToFill && commentEl) {
+          commentEl.focus();
+        }
+        setFeedback('Please provide a comment first.', true);
+        return;
+      }
+
+      const actionLabels = {
+        approve: 'approve',
+        revise: 'recommend update',
+        reject: 'reject'
+      };
+      const human = actionLabels[action] || action;
+
+      if (!confirm(`Do you want to ${human} this recipe?`)) {
+        return;
+      }
+
+      setFeedback('Saving decision...', false);
+
+      try {
+        const response = await fetch(`/api/bom/approvals/${Number(selectedRecordId)}/action`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ action, comment })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to save decision.');
+        }
+
+        const emailInfo = data?.result?.emailSent
+          ? 'Email sent to author.'
+          : `Email not sent (${data?.result?.emailReason || 'unknown reason'}).`;
+
+        setFeedback(`Decision saved. ${emailInfo}`, false);
+        await loadPendingRecords();
+
+        if (action === 'approve') {
+          document.getElementById('detailWrap').innerHTML = '<div class="placeholder">Recipe approved and removed from pending list.</div>';
+          selectedRecordId = null;
+          renderList();
+        } else {
+          await openRecipeDetail(Number(selectedRecordId));
+        }
+      } catch (error) {
+        setFeedback(error.message, true);
+      }
+    }
+
+    async function ensurePageAccess() {
+      const [meResponse, permissionsResponse] = await Promise.all([
+        fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch('/api/auth/me/access-permissions', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      if (!meResponse.ok || !permissionsResponse.ok) {
+        throw new Error('Failed to verify page permissions.');
+      }
+
+      const me = await meResponse.json().catch(() => null);
+      const data = await permissionsResponse.json().catch(() => ({}));
+      const isAdmin = me?.role === 'admin';
+      const pageAccess = data?.pages?.['recipe-approval'] || {};
+      canModify = isAdmin || !!pageAccess.modify;
+
+      if (!(isAdmin || !!pageAccess.read)) {
+        alert('You do not have access to Recipe Approval page.');
+        window.location.href = '/dashboard';
+        return false;
+      }
+
+      return true;
+    }
+
+    async function initialize() {
+      if (!auth.checkAuth()) {
+        return;
+      }
+
+      if (!token) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      try {
+        const canOpen = await ensurePageAccess();
+        if (!canOpen) {
+          return;
+        }
+
+        await auth.configureHeaderButtons();
+        await loadPendingRecords();
+      } catch (error) {
+        document.getElementById('listWrap').innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initialize);
+    window.openRecipeDetail = openRecipeDetail;
+    window.submitApprovalAction = submitApprovalAction;
+  </script>
+</body>
+</html>

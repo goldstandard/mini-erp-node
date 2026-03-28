@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Polymer Resin Index Management</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="/styles.css" />
   <style>
     body { background: #f5f5f5; }
     .page { max-width: 1400px; margin: 0 auto; padding: 16px; }
@@ -33,13 +33,22 @@
 </head>
 <body>
   <div class="page">
-    <div class="card row" style="justify-content: space-between;">
-      <h2 style="margin:0;">Polymer Resin Index Management</h2>
-      <div class="row">
-        <button onclick="window.location.href='/dashboard'">Return to Dashboard</button>
-        <button onclick="window.location.href='/polymer-indexes.html'" class="btn-primary">Return to Index Data</button>
+    <header class="app-header">
+      <div class="app-branding">
+        <img src="/data/PFN_logo.png" alt="PFN" class="company-logo" />
+        <div class="app-title-wrap">
+          <h1>Polymer Resin Index Management</h1>
+          <p>Define indexes and maintain historical values</p>
+        </div>
       </div>
-    </div>
+      <div class="app-top-actions">
+        <button class="action-btn btn-nav" onclick="window.location.href='/dashboard'">Back to Dashboard</button>
+        <button class="action-btn btn-nav" onclick="window.location.href='/polymer-indexes.html'">Back to Index Data</button>
+        <button id="changePasswordBtn" class="action-btn btn-password" style="display:none;">Change Password</button>
+        <button id="adminBtn" class="action-btn btn-admin" style="display:none;">Admin</button>
+        <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
+      </div>
+    </header>
 
     <div id="status" class="card muted">Ready</div>
 
@@ -172,11 +181,11 @@
     </div>
   </div>
 
+  <script src="/auth.js"></script>
   <script>
     const token = localStorage.getItem('authToken');
     let indexes = [];
     let currentEditIndexId = null;
-    let isAdminGroupMember = false;
     let isProcurementOrAdmin = false;
     let baseIndexMap = new Map();
     let indexVariantMap = new Map();
@@ -237,25 +246,16 @@
 
     async function loadUserGroupAccess() {
       try {
-        const groups = await api('/api/auth/me/groups');
-        isAdminGroupMember = Array.isArray(groups)
-          ? groups.some(group => String(group?.name || '').toLowerCase() === 'admin')
-          : false;
-        
-        isProcurementOrAdmin = Array.isArray(groups)
-          ? groups.some(group => {
-              const groupName = String(group?.name || '').toLowerCase();
-              return groupName === 'admin' || groupName === 'procurement';
-            })
-          : false;
+        const access = await api('/api/auth/me/access-permissions');
+        const polymerAccess = access?.pages?.['polymer-indexes'] || { read: true, modify: false };
+        isProcurementOrAdmin = !!polymerAccess.modify;
 
-        // Redirect if user is not in Admin or Procurement group
+        // Redirect if user is not in Admin or Procurement Team group.
         if (!isProcurementOrAdmin) {
-          setStatus('Access denied: Only Admin and Procurement team members can access this page', 'danger');
+          setStatus('Access denied: Modify access is required for Polymer Index Management', 'danger');
           setTimeout(() => window.location.href = '/polymer-indexes.html', 2000);
         }
       } catch (err) {
-        isAdminGroupMember = false;
         isProcurementOrAdmin = false;
         console.warn('Could not determine group membership:', err.message);
         setTimeout(() => window.location.href = '/polymer-indexes.html', 2000);
@@ -313,10 +313,10 @@
           <td>${i.is_active ? 'Yes' : 'No'}</td>
           <td>
             <button onclick="openEditModal('${i.id}')" style="font-size:11px; margin-right:4px;">Edit</button>
-            ${isAdminGroupMember
+            ${isProcurementOrAdmin
               ? `<button onclick="toggleActive('${i.id}', ${i.is_active ? 0 : 1})" style="font-size:11px; margin-right:4px;">${i.is_active ? 'Deactivate' : 'Activate'}</button>`
               : ''}
-            ${isAdminGroupMember && !i.is_active
+            ${isProcurementOrAdmin && !i.is_active
               ? `<button onclick="deleteIndex('${i.id}')" style="font-size:11px;">Delete</button>`
               : ''}
           </td>
@@ -384,8 +384,8 @@
     }
 
     async function toggleActive(indexId, isActive) {
-      if (!isAdminGroupMember) {
-        return setStatus('Only Admin group members can activate or deactivate indexes', 'danger');
+      if (!isProcurementOrAdmin) {
+        return setStatus('Only Admin and Procurement Team can activate or deactivate indexes', 'danger');
       }
 
       const idx = indexes.find(i => i.id === indexId);
@@ -399,8 +399,8 @@
     }
 
     async function deleteIndex(indexId) {
-      if (!isAdminGroupMember) {
-        return setStatus('Only Admin group members can delete indexes', 'danger');
+      if (!isProcurementOrAdmin) {
+        return setStatus('Only Admin and Procurement Team can delete indexes', 'danger');
       }
 
       const idx = indexes.find(i => i.id === indexId);
@@ -596,6 +596,7 @@ const r = result.result || result;
 
       try {
         setStatus('Loading...');
+        await auth.configureHeaderButtons();
         await loadUserGroupAccess();
         // Only proceed if user has access
         if (isProcurementOrAdmin) {

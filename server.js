@@ -3,15 +3,18 @@ const path = require("path");
 const cors = require("cors");
 const fs = require("fs");
 
-const { computeCosts } = require("./src/backend/costing");
 const { loadProducts } = require("./src/backend/products");
 const { loadLines } = require("./src/backend/lines");
 const { loadMaterials } = require("./src/backend/materials");
-const { loadFxRates } = require("./src/backend/fx");
-const { getEditableProducts, updateProduct, searchProducts, duplicateProduct, deleteProduct } = require("./src/backend/products-editor");
+const { loadFxRates, convert } = require("./src/backend/fx");
 const db = require("./src/backend/db/connection");
 const auth = require("./src/backend/auth");
 const polymerIndexes = require("./src/backend/polymer-indexes");
+const rmPrices = require("./src/backend/rm-prices");
+const fxRatesDb = require("./src/backend/fx-rates-db");
+const fxRatesImport = require("./src/backend/fx-rates-import");
+const lineRatesDb = require("./src/backend/line-rates-db");
+const { parseLineRatesMatrix } = require("./src/backend/line-rates-import");
 const XLSX = require("xlsx");
 
 const app = express();
@@ -36,6 +39,19 @@ const DESCRIPTION_LIST_CONFIG = [
   { key: "cores", sourceHeader: "Cores", editable: 0 }
 ];
 
+const DESCRIPTION_LIST_COLUMN_MAP = {
+  marketSegment: "market_segment",
+  application: "application",
+  smms: "smms",
+  monoBico: "mono_bico",
+  structure: "structure",
+  bicoRatioDesc: "bico_ratio_desc",
+  mainRawMat: "main_raw_mat",
+  bonding: "bonding",
+  treatment: "treatment",
+  color: "color"
+};
+
 const MATERIAL_LIST_CONFIG = [
   { key: "list_sb", columnIndex: 0 },
   { key: "list_mb", columnIndex: 1 },
@@ -43,6 +59,23 @@ const MATERIAL_LIST_CONFIG = [
   { key: "list_additive", columnIndex: 3 },
   { key: "list_surfactant", columnIndex: 4, numericColumnIndex: 5 }
 ];
+
+const PAGE_ACCESS_MATRIX_CONFIGURED = "page:matrix:configured";
+const ACCESS_PERMISSION_PAGES = [
+  { key: "dashboard", title: "Dashboard", path: "/dashboard" },
+  { key: "bom-calculator", title: "BOM Calculator", path: "/bom-calculator" },
+  { key: "bom-recipe-browser", title: "BOM Recipe Browser", path: "/bom-recipe-browser" },
+  { key: "recipe-edit-clone", title: "Recipe Edit/Clone", path: "/recipe-edit-clone" },
+  { key: "recipe-approval", title: "Recipe Approval", path: "/recipe-approval" },
+  { key: "rm-prices", title: "RM Prices", path: "/rm-prices" },
+  { key: "polymer-indexes", title: "Polymer Indexes", path: "/polymer-indexes" },
+  { key: "fx-rates", title: "FX Rates", path: "/fx-rates" },
+  { key: "line-rates", title: "Line Rates", path: "/line-rates" },
+  { key: "admin-access", title: "Admin Access", path: "/admin-access.html" }
+];
+
+const RECIPE_APPROVAL_REGIONS = ["CZ", "EG", "RSA"];
+const RECIPE_APPROVAL_GROUP_ALIASES = ["admin", "recipe approvals", "recipe approval"];
 
 function normalizeUniqueStrings(values) {
   const seen = new Set();
@@ -73,15 +106,45 @@ function isNaDisplayValue(value) {
 }
 
 function sortValuesForDisplay(values) {
-  return [...(values || [])].sort((a, b) => {
-    const aIsNa = isNaDisplayValue(a);
-    const bIsNa = isNaDisplayValue(b);
+  return [...(values || [])].sort(compareValuesForDisplay);
+}
 
-    if (aIsNa && !bIsNa) return 1;
-    if (!aIsNa && bIsNa) return -1;
+function compareValuesForDisplay(a, b) {
+  const aIsNa = isNaDisplayValue(a);
+  const bIsNa = isNaDisplayValue(b);
 
-    return String(a).localeCompare(String(b), undefined, { sensitivity: "base", numeric: true });
-  });
+  if (aIsNa && !bIsNa) return 1;
+  if (!aIsNa && bIsNa) return -1;
+
+  return String(a).localeCompare(String(b), undefined, { sensitivity: "base", numeric: true });
+}
+
+function normalizeGroupName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeApprovalRegion(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (raw === "ZA" || raw === "ZAF" || raw === "RSA") return "RSA";
+  if (raw === "CZ" || raw === "CZE") return "CZ";
+  if (raw === "EG" || raw === "EGY") return "EG";
+  return "";
+}
+
+function inferRecipeRegionFromLine(lineId, lineCountry = "") {
+  const lineText = String(lineId || "").trim();
+  const fromLine = normalizeApprovalRegion(rmPrices.getPlantFromLine(lineText));
+  if (fromLine) return fromLine;
+
+  const fromCountry = normalizeApprovalRegion(lineCountry);
+  if (fromCountry) return fromCountry;
+
+  const normalizedLine = lineText.toUpperCase();
+  if (normalizedLine.startsWith("CZ")) return "CZ";
+  if (normalizedLine.startsWith("EG")) return "EG";
+  if (normalizedLine.startsWith("ZA") || normalizedLine.startsWith("RSA")) return "RSA";
+
+  return "";
 }
 
 function readLegacyCustomerListFile() {
@@ -119,6 +182,823 @@ function hasCaseInsensitiveDuplicates(values) {
   }
 
   return false;
+}
+
+function toMultiValueArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v ?? "").trim()).filter(Boolean);
+  }
+  if (value === undefined || value === null) {
+    return [];
+  }
+  const text = String(value).trim();
+  return text ? [text] : [];
+}
+
+function safeNumber(value, fallback = 0) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function parseOptionalYear(value) {
+  const year = Number(value);
+  if (!Number.isInteger(year) || year < 2000 || year > 9999) {
+    return null;
+  }
+  return year;
+}
+
+async function getLinesForYear(yearValue) {
+  const baseLines = loadLines() || {};
+  const year = parseOptionalYear(yearValue);
+  if (!year) {
+    return baseLines;
+  }
+
+  try {
+    const dbRows = await lineRatesDb.getLineRatesForYear(year);
+    if (!Array.isArray(dbRows) || dbRows.length === 0) {
+      return baseLines;
+    }
+
+    const merged = { ...baseLines };
+
+    for (const row of dbRows) {
+      const lineId = (row.line_id || "").toString().trim();
+      if (!lineId) continue;
+
+      const existing = merged[lineId] || { lineId };
+      const next = {
+        ...existing,
+        lineId,
+        country: ((row.country || existing.country || "").toString().trim() || ""),
+        currency: ((row.currency || existing.currency || "USD").toString().trim().toUpperCase() || "USD")
+      };
+
+      for (const key of lineRatesDb.NUMERIC_FIELDS) {
+        next[key] = safeNumber(row[key], safeNumber(existing[key], 0));
+      }
+
+      merged[lineId] = next;
+    }
+
+    return merged;
+  } catch (err) {
+    console.error(`Failed to load line rates for year ${year}:`, err);
+    return baseLines;
+  }
+}
+
+function matchesFilter(value, allowedValues) {
+  if (!Array.isArray(allowedValues) || allowedValues.length === 0) {
+    return true;
+  }
+  return allowedValues.some((allowed) => String(value ?? "") === String(allowed));
+}
+
+async function applyRenamePairsToBomRecordColumn(columnName, renamePairs) {
+  if (!columnName || !Array.isArray(renamePairs) || renamePairs.length === 0) {
+    return;
+  }
+
+  const effectivePairs = renamePairs
+    .map((pair) => ({
+      from: String(pair?.from ?? "").trim(),
+      to: String(pair?.to ?? "").trim()
+    }))
+    .filter((pair) => pair.from && pair.to && pair.from.toLowerCase() !== pair.to.toLowerCase());
+
+  if (!effectivePairs.length) {
+    return;
+  }
+
+  const stamp = Date.now();
+  const staged = [];
+
+  for (let i = 0; i < effectivePairs.length; i++) {
+    const pair = effectivePairs[i];
+    const marker = `__rename__${columnName}__${stamp}__${i}__`;
+
+    await db.run(
+      `UPDATE bom_records
+       SET ${columnName} = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE ${columnName} = ? COLLATE NOCASE`,
+      [marker, pair.from]
+    );
+
+    staged.push({ marker, to: pair.to });
+  }
+
+  for (const row of staged) {
+    await db.run(
+      `UPDATE bom_records
+       SET ${columnName} = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE ${columnName} = ?`,
+      [row.to, row.marker]
+    );
+  }
+}
+
+function normalizeRenamePairs(renamePairs, existingValues = []) {
+  if (!Array.isArray(renamePairs) || renamePairs.length === 0) {
+    return [];
+  }
+
+  const existingByKey = new Map(
+    (existingValues || [])
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean)
+      .map((value) => [value.toLowerCase(), value])
+  );
+  const seenFromKeys = new Set();
+  const normalized = [];
+
+  for (const pair of renamePairs) {
+    const fromRaw = String(pair?.from ?? "").trim();
+    const to = String(pair?.to ?? "").trim();
+    if (!fromRaw || !to) {
+      continue;
+    }
+
+    const fromKey = fromRaw.toLowerCase();
+    const canonicalFrom = existingByKey.get(fromKey);
+    if (!canonicalFrom || seenFromKeys.has(fromKey)) {
+      continue;
+    }
+
+    seenFromKeys.add(fromKey);
+    normalized.push({ from: canonicalFrom, to });
+  }
+
+  return normalized;
+}
+
+async function buildDbMaterialPricesForLines(lineIds, { year, month } = {}) {
+  const uniqueLines = [...new Set((lineIds || []).map((lineId) => (lineId || "").toString().trim()).filter(Boolean))];
+  if (!uniqueLines.length) {
+    return {};
+  }
+
+  const lines = loadLines() || {};
+  const fxRates = loadFxRates() || {};
+  const dbMaterialPrices = {};
+
+  const plants = [...new Set(uniqueLines
+    .map((lineId) => {
+      const fromLinePrefix = rmPrices.getPlantFromLine(lineId);
+      if (fromLinePrefix) return fromLinePrefix;
+
+      const fallbackCountry = (lines[lineId]?.country || "").toString().trim().toUpperCase();
+      return ["CZ", "EG", "ZA"].includes(fallbackCountry) ? fallbackCountry : null;
+    })
+    .filter(Boolean))];
+
+  if (!plants.length) {
+    return {};
+  }
+
+  const now = new Date();
+  const normalizedYear = Number.isInteger(Number(year)) ? Number(year) : now.getFullYear();
+  const normalizedMonthCandidate = Number.isInteger(Number(month)) ? Number(month) : (now.getMonth() + 1);
+  const normalizedMonth = Math.min(12, Math.max(1, normalizedMonthCandidate));
+  const ymLimit = (normalizedYear * 100) + normalizedMonth;
+
+  const plantPlaceholders = plants.map(() => "?").join(",");
+  const rows = await db.all(
+    `SELECT p.material_name, p.plant, p.price, p.currency
+     FROM rm_prices p
+     JOIN (
+       SELECT material_name, plant, MAX((year * 100) + month) AS ym
+       FROM rm_prices
+       WHERE plant IN (${plantPlaceholders}) AND ((year * 100) + month) <= ?
+       GROUP BY material_name, plant
+     ) latest
+       ON latest.material_name = p.material_name
+      AND latest.plant = p.plant
+      AND latest.ym = ((p.year * 100) + p.month)
+     WHERE p.plant IN (${plantPlaceholders})`,
+    [...plants, ymLimit, ...plants]
+  );
+
+  for (const row of rows) {
+    if (row.price == null) continue;
+    const currency = (row.currency || "USD").toUpperCase();
+    const priceUSD = safeNumber(convert(Number(row.price), currency, "USD", fxRates));
+    const key = `${String(row.material_name || "").toLowerCase()}__${String(row.plant || "").toUpperCase()}`;
+    if (!key.startsWith("__")) {
+      dbMaterialPrices[key] = {
+        priceUSD,
+        currency,
+        plant: row.plant,
+        material: row.material_name
+      };
+    }
+  }
+
+  return dbMaterialPrices;
+}
+
+function parseCalculationSnapshot(rawSnapshot) {
+  if (!rawSnapshot) return null;
+  try {
+    const parsed = JSON.parse(rawSnapshot);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeCalculationSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return null;
+  if (!snapshot.item || typeof snapshot.item !== "object") return null;
+
+  return {
+    version: Number.isFinite(Number(snapshot.version)) ? Number(snapshot.version) : 1,
+    generatedAt: snapshot.generatedAt || new Date().toISOString(),
+    currency: (snapshot.currency || snapshot.item.currency || "USD").toString().toUpperCase(),
+    item: snapshot.item
+  };
+}
+
+function normalizeRecipeDecisionInput(action) {
+  const normalized = String(action || "").trim().toLowerCase();
+  if (["approve", "approved"].includes(normalized)) {
+    return "approve";
+  }
+  if (["revise", "recommend", "recommend-change", "recommend_changes", "needs-update", "needs_update"].includes(normalized)) {
+    return "revise";
+  }
+  if (["reject", "rejected", "deny"].includes(normalized)) {
+    return "reject";
+  }
+  return "";
+}
+
+function mapRecipeDecisionToStatus(action) {
+  if (action === "approve") {
+    return { recipeApproved: "Yes", approvalDecision: "Approved", label: "Approved" };
+  }
+  if (action === "revise") {
+    return { recipeApproved: "No", approvalDecision: "Needs Update", label: "Recommended for Update" };
+  }
+  return { recipeApproved: "No", approvalDecision: "Rejected", label: "Rejected" };
+}
+
+function getFirstEnvValue(keys) {
+  for (const key of keys || []) {
+    const value = process.env[key];
+    if (value === undefined || value === null) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function parseBooleanEnv(value, fallback = false) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "y", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "n", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
+function parseEmailList(raw) {
+  if (!raw) return [];
+  return normalizeUniqueStrings(
+    String(raw)
+      .split(/[;,]/)
+      .map((part) => part.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function getRecipeMailFromAddress() {
+  return getFirstEnvValue([
+    "APPROVAL_FROM_EMAIL",
+    "RECIPE_FROM_EMAIL",
+    "SMTP_FROM_EMAIL",
+    "MAIL_FROM",
+    "SMTP_USER",
+    "SMTP_USERNAME",
+    "MAIL_USER",
+    "MAIL_USERNAME"
+  ]);
+}
+
+function getRecipeMailTransportConfig() {
+  const host = getFirstEnvValue(["SMTP_HOST", "MAIL_HOST"]);
+  const user = getFirstEnvValue(["SMTP_USER", "SMTP_USERNAME", "MAIL_USER", "MAIL_USERNAME"]);
+  const pass = getFirstEnvValue(["SMTP_PASS", "SMTP_PASSWORD", "MAIL_PASS", "MAIL_PASSWORD"]);
+  const port = Number(getFirstEnvValue(["SMTP_PORT", "MAIL_PORT"]) || 587);
+  const secure = parseBooleanEnv(getFirstEnvValue(["SMTP_SECURE", "MAIL_SECURE"]), port === 465);
+  const rejectUnauthorized = parseBooleanEnv(getFirstEnvValue(["SMTP_TLS_REJECT_UNAUTHORIZED", "MAIL_TLS_REJECT_UNAUTHORIZED"]), true);
+
+  if (!host || !user || !pass) {
+    return null;
+  }
+
+  return {
+    host,
+    port,
+    secure,
+    tls: { rejectUnauthorized },
+    auth: { user, pass }
+  };
+}
+
+async function resolveRecipeApprovalRecipientEmails() {
+  const configured = getFirstEnvValue([
+    "RECIPE_APPROVAL_NOTIFY_TO",
+    "RECIPE_SUBMISSION_NOTIFY_TO",
+    "APPROVAL_NOTIFY_TO"
+  ]);
+
+  const configuredRecipients = parseEmailList(configured);
+  if (configuredRecipients.length > 0) {
+    return configuredRecipients;
+  }
+
+  const users = await db.all(
+    `SELECT id, email
+     FROM users
+     WHERE is_active = 1
+       AND email IS NOT NULL
+       AND TRIM(email) <> ''`
+  );
+
+  if (!Array.isArray(users) || users.length === 0) {
+    return [];
+  }
+
+  const checks = await Promise.all(users.map(async (user) => {
+    const canModifyApproval = await hasPagePermission(user.id, "recipe-approval", "modify");
+    return {
+      email: String(user.email || "").trim().toLowerCase(),
+      canModifyApproval
+    };
+  }));
+
+  return normalizeUniqueStrings(
+    checks
+      .filter((entry) => entry.canModifyApproval && entry.email)
+      .map((entry) => entry.email)
+  );
+}
+
+function resolveAuthorEmailFromRecord(record) {
+  const author = String(record?.author || "").trim().toLowerCase();
+  return author.includes("@") ? author : null;
+}
+
+async function sendRecipeMail({ toEmails, subject, lines }) {
+  const recipients = normalizeUniqueStrings(Array.isArray(toEmails) ? toEmails : [toEmails]);
+  if (recipients.length === 0) {
+    return { sent: false, reason: "missing_recipients" };
+  }
+
+  const transportConfig = getRecipeMailTransportConfig();
+  if (!transportConfig) {
+    return { sent: false, reason: "smtp_not_configured" };
+  }
+
+  const from = getRecipeMailFromAddress();
+  if (!from) {
+    return { sent: false, reason: "missing_from_email" };
+  }
+
+  let nodemailer;
+  try {
+    nodemailer = require("nodemailer");
+  } catch (_err) {
+    return { sent: false, reason: "nodemailer_not_installed" };
+  }
+
+  const transporter = nodemailer.createTransport(transportConfig);
+  await transporter.sendMail({
+    from,
+    to: recipients.join(", "),
+    subject,
+    text: (lines || []).join("\n")
+  });
+
+  return { sent: true, recipients };
+}
+
+async function getRecipeApprovalCandidateUsers() {
+  const allUsers = await auth.getAllUsers();
+  const aliasSet = new Set(RECIPE_APPROVAL_GROUP_ALIASES.map((name) => normalizeGroupName(name)));
+
+  return (allUsers || [])
+    .filter((user) => {
+      const groups = Array.isArray(user.groups) ? user.groups : [];
+      return groups.some((groupName) => aliasSet.has(normalizeGroupName(groupName)));
+    })
+    .map((user) => ({
+      id: String(user.id || "").trim(),
+      name: String(user.name || "").trim(),
+      email: String(user.email || "").trim().toLowerCase(),
+      groups: Array.isArray(user.groups) ? user.groups : []
+    }))
+    .filter((user) => user.id && user.email)
+    .sort((a, b) => {
+      const byName = String(a.name || a.email).localeCompare(String(b.name || b.email), undefined, { sensitivity: "base", numeric: true });
+      if (byName !== 0) return byName;
+      return a.email.localeCompare(b.email, undefined, { sensitivity: "base", numeric: true });
+    });
+}
+
+async function getRecipeApprovalRegionAssignmentsMap() {
+  await ensureBomRecordStoreReady();
+  const rows = await db.all(`
+    SELECT user_id, region
+    FROM recipe_approval_region_assignments
+    ORDER BY user_id, region
+  `);
+
+  const map = new Map();
+  (rows || []).forEach((row) => {
+    const userId = String(row.user_id || "").trim();
+    const region = normalizeApprovalRegion(row.region);
+    if (!userId || !region) return;
+    if (!map.has(userId)) map.set(userId, new Set());
+    map.get(userId).add(region);
+  });
+
+  return map;
+}
+
+async function resolveRecipeApprovalRecipientEmails(recipeRecord = {}) {
+  const targetRegion = inferRecipeRegionFromLine(recipeRecord.line, recipeRecord.country);
+  if (!targetRegion) {
+    return { recipients: [], region: "", reason: "unknown_line_region" };
+  }
+
+  const candidates = await getRecipeApprovalCandidateUsers();
+  if (!candidates.length) {
+    return { recipients: [], region: targetRegion, reason: "no_candidate_users" };
+  }
+
+  const assignmentMap = await getRecipeApprovalRegionAssignmentsMap();
+  const recipients = normalizeUniqueStrings(
+    candidates
+      .filter((candidate) => assignmentMap.has(candidate.id) && assignmentMap.get(candidate.id).has(targetRegion))
+      .map((candidate) => candidate.email)
+  );
+
+  if (recipients.length > 0) {
+    return { recipients, region: targetRegion, reason: "region_matrix" };
+  }
+
+  const configured = getFirstEnvValue([
+    "RECIPE_APPROVAL_NOTIFY_TO",
+    "RECIPE_SUBMISSION_NOTIFY_TO",
+    "APPROVAL_NOTIFY_TO"
+  ]);
+  const configuredRecipients = parseEmailList(configured);
+  if (configuredRecipients.length > 0) {
+    return { recipients: configuredRecipients, region: targetRegion, reason: "env_fallback" };
+  }
+
+  return { recipients: [], region: targetRegion, reason: "no_assignee_for_region" };
+}
+
+async function sendRecipeSubmissionEmail({ recipeRecord, actorName, sourceRecordId = null, requestAfterEdit = false }) {
+  const resolvedRecipients = await resolveRecipeApprovalRecipientEmails(recipeRecord || {});
+  const recipients = resolvedRecipients.recipients || [];
+
+  if (!recipients.length) {
+    return {
+      sent: false,
+      reason: `missing_approval_recipients:${resolvedRecipients.reason || "unknown"}`,
+      region: resolvedRecipients.region || ""
+    };
+  }
+
+  let clonedFromPdId = null;
+  if (Number.isFinite(Number(sourceRecordId))) {
+    const sourceRecord = await db.get(
+      'SELECT pd_id FROM bom_records WHERE id = ? LIMIT 1',
+      [Number(sourceRecordId)]
+    ).catch(() => null);
+    clonedFromPdId = sourceRecord?.pd_id ? String(sourceRecord.pd_id).trim() : null;
+  }
+
+  const subjectPrefix = requestAfterEdit ? 'Approval requested after recipe edit | ' : '';
+  const subject = `${subjectPrefix}Pending Approval | PD ID ${recipeRecord.pd_id || "N/A"}`;
+  const lines = [
+    requestAfterEdit ? "Approval requested after recipe edit" : null,
+    requestAfterEdit ? "" : null,
+    `PD ID: ${recipeRecord.pd_id || "N/A"}`,
+    `Customer: ${recipeRecord.customer || "N/A"}`,
+    `Line: ${recipeRecord.line || "N/A"}`,
+    `Approval region: ${resolvedRecipients.region || "N/A"}`,
+    `Submitted by: ${actorName || "Unknown"}`,
+    sourceRecordId ? `Cloned from PD ID: ${clonedFromPdId || `N/A (source recipe ID ${sourceRecordId})`}` : null,
+    "",
+    "Open Recipe Approval page for review."
+  ].filter(Boolean);
+
+  return sendRecipeMail({ toEmails: recipients, subject, lines });
+}
+
+async function sendRecipeEditApprovalRequestEmail({ recipeRecord, actorName }) {
+  const resolvedRecipients = await resolveRecipeApprovalRecipientEmails(recipeRecord || {});
+  const recipients = resolvedRecipients.recipients || [];
+
+  if (!recipients.length) {
+    return {
+      sent: false,
+      reason: `missing_approval_recipients:${resolvedRecipients.reason || "unknown"}`,
+      region: resolvedRecipients.region || ""
+    };
+  }
+
+  const subject = `Approval requested after recipe edit | Pending Approval | PD ID ${recipeRecord.pd_id || "N/A"}`;
+  const lines = [
+    "Approval requested after recipe edit",
+    "",
+    `PD ID: ${recipeRecord.pd_id || "N/A"}`,
+    `Customer: ${recipeRecord.customer || "N/A"}`,
+    `Line: ${recipeRecord.line || "N/A"}`,
+    `Approval region: ${resolvedRecipients.region || "N/A"}`,
+    `Submitted by: ${actorName || "Unknown"}`,
+    "",
+    "Open Recipe Approval page for review."
+  ];
+
+  return sendRecipeMail({ toEmails: recipients, subject, lines });
+}
+
+async function sendRecipeDecisionEmail({ toEmail, reviewerName, decisionLabel, comment, recipeRecord }) {
+  if (!toEmail) {
+    return { sent: false, reason: "missing_author_email" };
+  }
+
+  const subject = `Recipe Decision: ${decisionLabel} | PD ${recipeRecord.pd_id || "N/A"}`;
+  const lines = [
+    "Recipe approval update",
+    "",
+    `Decision: ${decisionLabel}`,
+    `Reviewer: ${reviewerName || "Unknown"}`,
+    `PD ID: ${recipeRecord.pd_id || "N/A"}`,
+    `Customer: ${recipeRecord.customer || "N/A"}`,
+    `Line: ${recipeRecord.line || "N/A"}`,
+    "",
+    "Comment:",
+    comment,
+    "",
+    "Open mini-ERP for details."
+  ];
+
+  return sendRecipeMail({ toEmails: [toEmail], subject, lines });
+}
+
+async function resolveAuthorEmailByUserId(userId) {
+  if (!userId) {
+    return null;
+  }
+
+  try {
+    const user = await auth.getCurrentUser(userId);
+    return user && user.email ? String(user.email).trim().toLowerCase() : null;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function computeBomRecipeCostItem({ record, recordMaterials, displayCurrency, dbMaterialPrices = {}, fx, lines, loaded }) {
+  const lineId = (record.line || "").toString().trim();
+  if (!lineId) return null;
+
+  const line = lines[lineId];
+  if (!line) return null;
+
+  const country = (line.country || "").toString().trim();
+  const pricingRegion = rmPrices.getPlantFromLine(lineId) || country;
+  const overconsRaw = safeNumber(record.overconsumption, 0);
+  const overconsumption = overconsRaw > 1 ? (overconsRaw / 100) : overconsRaw;
+  const grossYieldRaw = safeNumber(record.gross_yield_percent, 100);
+  const grossYieldFraction = grossYieldRaw > 1 ? (grossYieldRaw / 100) : grossYieldRaw;
+  const grossYield = grossYieldFraction > 0 ? grossYieldFraction : 1;
+  const throughput = safeNumber(record.total_throughput, 1) || 1;
+
+  const projection = {
+    sapId: record.sap_id,
+    pfnId: record.pd_id,
+    recipeApproved: record.recipe_approved,
+    customer: record.customer,
+    marketSegment: record.market_segment,
+    application: record.application,
+    s_sms: record.smms,
+    bonding: record.bonding,
+    basisWeight: record.customer_bw,
+    slitWidth: record.slit_width,
+    treatment: record.treatment,
+    author: record.author,
+    lineId,
+    country,
+    overconsumption: overconsRaw
+  };
+
+  const lineCurrency = line.currency || "USD";
+  const energy = safeNumber(line.energy);
+  const wages = safeNumber(line.wages);
+  const maintenance = safeNumber(line.maintenance);
+  const other = safeNumber(line.other_costs);
+  const sgna = safeNumber(line.sga_and_overhead);
+  const cores = safeNumber(line.cores);
+  const packaging = safeNumber(line.packaging);
+  const pallets = safeNumber(line.pallets);
+
+  const hourlyCostLocal = energy + wages + maintenance + other + sgna;
+  const perTonCostLocal = cores + packaging + pallets;
+
+  const hourlyCostUSD = safeNumber(convert(hourlyCostLocal, lineCurrency, "USD", fx));
+  const perTonCostUSD = safeNumber(convert(perTonCostLocal, lineCurrency, "USD", fx));
+
+  let materialCostPerKgUSD = 0;
+  let baseMaterialCostPerKgUSD = 0;
+  const materialBreakdown = [];
+
+  for (const m of (recordMaterials || [])) {
+    const materialName = (m.material_name || "").toString().trim();
+    if (!materialName) continue;
+
+    const pct = safeNumber(m.percentage, 0) / 100;
+    if (pct <= 0) continue;
+
+    const effectivePct = pct * (1 + overconsumption);
+    const key = `${materialName}__${pricingRegion}`;
+    const dbKey = `${materialName.toLowerCase()}__${pricingRegion}`;
+    const priced = dbMaterialPrices[dbKey] || loaded.materials[key];
+
+    let priceUSD = null;
+    let baseCost = 0;
+    let finalCost = 0;
+    let missingPrice = true;
+
+    if (priced) {
+      priceUSD = safeNumber(priced.priceUSD);
+      baseCost = pct * priceUSD;
+      finalCost = effectivePct * priceUSD;
+      missingPrice = false;
+
+      baseMaterialCostPerKgUSD += baseCost;
+      materialCostPerKgUSD += finalCost;
+    }
+
+    materialBreakdown.push({
+      material: materialName,
+      basePct: pct,
+      effectivePct,
+      priceUSD,
+      baseCost,
+      finalCost,
+      missingPrice
+    });
+  }
+
+  const overconsumptionImpact = materialCostPerKgUSD - baseMaterialCostPerKgUSD;
+  const scrapFraction = 1 - grossYield;
+  const sikoCostUSD = safeNumber(loaded.siko[pricingRegion] ?? loaded.siko[country]);
+  const netCostBeforeScrapUSD = materialCostPerKgUSD / grossYield;
+  const scrapValueUSD = (scrapFraction / grossYield) * sikoCostUSD;
+  const netMaterialCostPerKgUSD = netCostBeforeScrapUSD - scrapValueUSD;
+
+  const hoursPerTon = (1000 / grossYield) / throughput;
+  const hourlyCostContribution = (hourlyCostUSD * hoursPerTon) / 1000;
+  const perTonCostContribution = perTonCostUSD / 1000;
+  const processCostPerKgUSD = hourlyCostContribution + perTonCostContribution;
+  const totalCostPerKgUSD = netMaterialCostPerKgUSD + processCostPerKgUSD;
+
+  const materialCostGross = safeNumber(convert(materialCostPerKgUSD, "USD", displayCurrency, fx));
+  const materialCostNet = safeNumber(convert(netMaterialCostPerKgUSD, "USD", displayCurrency, fx));
+  const processCost = safeNumber(convert(processCostPerKgUSD, "USD", displayCurrency, fx));
+  const totalCost = safeNumber(convert(totalCostPerKgUSD, "USD", displayCurrency, fx));
+
+  return {
+    id: record.id,
+    sapId: projection.sapId,
+    pfnId: projection.pfnId,
+    recipeApproved: projection.recipeApproved || "",
+    customer: projection.customer,
+    marketSegment: projection.marketSegment,
+    application: projection.application,
+    s_sms: projection.s_sms,
+    bonding: projection.bonding,
+    basisWeight: projection.basisWeight,
+    slitWidth: projection.slitWidth,
+    treatment: projection.treatment,
+    author: projection.author,
+    lineId: projection.lineId,
+    country: projection.country,
+    grossYield,
+    throughput,
+    overconsumption,
+
+    materialCostGross,
+    materialCostNet,
+    materialCost: materialCostNet,
+    processCost,
+    totalCost,
+    currency: displayCurrency,
+
+    fxRates: fx,
+    details: {
+      materials: materialBreakdown,
+      baseMaterialCostPerKgUSD,
+      finalMaterialCostPerKgUSD: materialCostPerKgUSD,
+      overconsumptionImpact,
+      netMaterialCostPerKgUSD,
+      sikoCostUSD,
+      scrapFraction,
+      grossYield,
+      process: {
+        hoursPerTon,
+        hourlyCostUSD,
+        perTonCostUSD,
+        hourlyCostContribution,
+        perTonCostContribution,
+        hourlyComponents: {
+          energyUSD: safeNumber(convert(energy, lineCurrency, "USD", fx)),
+          wagesUSD: safeNumber(convert(wages, lineCurrency, "USD", fx)),
+          maintenanceUSD: safeNumber(convert(maintenance, lineCurrency, "USD", fx)),
+          otherUSD: safeNumber(convert(other, lineCurrency, "USD", fx)),
+          sgnaUSD: safeNumber(convert(sgna, lineCurrency, "USD", fx))
+        },
+        perTonComponents: {
+          coresUSD: safeNumber(convert(cores, lineCurrency, "USD", fx)),
+          packagingUSD: safeNumber(convert(packaging, lineCurrency, "USD", fx)),
+          palletsUSD: safeNumber(convert(pallets, lineCurrency, "USD", fx))
+        }
+      }
+    }
+  };
+}
+
+function computeBomRecipeSummaryCosts({ records, materialsByRecord, displayCurrency, filters, dbMaterialPrices = {}, linesOverride = null }) {
+  const fx = loadFxRates() || {};
+  const lines = linesOverride || loadLines() || {};
+  const loaded = loadMaterials(fx) || {};
+  const results = [];
+
+  for (const record of records) {
+    try {
+      const projection = {
+        sapId: record.sap_id,
+        pfnId: record.pd_id,
+        customer: record.customer,
+        marketSegment: record.market_segment,
+        application: record.application,
+        s_sms: record.smms,
+        bonding: record.bonding,
+        basisWeight: record.customer_bw,
+        slitWidth: record.slit_width,
+        treatment: record.treatment,
+        author: record.author,
+        lineId: (record.line || "").toString().trim(),
+        country: ((lines[(record.line || "").toString().trim()] || {}).country || "").toString().trim(),
+        overconsumption: safeNumber(record.overconsumption, 0)
+      };
+
+      if (!matchesFilter(projection.sapId, filters.sapId)) continue;
+      if (!matchesFilter(projection.pfnId, filters.pfnId)) continue;
+      if (!matchesFilter(projection.customer, filters.customer)) continue;
+      if (!matchesFilter(projection.marketSegment, filters.marketSegment)) continue;
+      if (!matchesFilter(projection.application, filters.application)) continue;
+      if (!matchesFilter(projection.s_sms, filters.s_sms)) continue;
+      if (!matchesFilter(projection.bonding, filters.bonding)) continue;
+      if (!matchesFilter(projection.basisWeight, filters.basisWeight)) continue;
+      if (!matchesFilter(projection.slitWidth, filters.slitWidth)) continue;
+      if (!matchesFilter(projection.treatment, filters.treatment)) continue;
+      if (!matchesFilter(projection.author, filters.author)) continue;
+      if (!matchesFilter(projection.lineId, filters.lineId)) continue;
+      if (!matchesFilter(projection.country, filters.country)) continue;
+      if (!matchesFilter(projection.overconsumption, filters.overconsumption)) continue;
+
+      const recordMaterials = materialsByRecord.get(record.id) || [];
+      const item = computeBomRecipeCostItem({
+        record,
+        recordMaterials,
+        displayCurrency,
+        dbMaterialPrices,
+        fx,
+        lines,
+        loaded
+      });
+
+      if (!item) continue;
+
+      item.createdAt = record.created_at || null;
+      item.updatedAt = record.updated_at || null;
+      item.savedSnapshot = parseCalculationSnapshot(record.calculation_snapshot_json);
+      results.push(item);
+    } catch (err) {
+      console.error("Error computing recipe summary item", record?.id, err);
+    }
+  }
+
+  return results;
 }
 
 function getCustomerSeedValuesFromSources() {
@@ -178,6 +1058,333 @@ function getListsSheetRowsFromSources() {
     headers: [],
     rows: []
   };
+}
+
+async function hasGroupPermission(userId, permission) {
+  const groups = await auth.getUserGroups(userId);
+  return groups.some((group) => Array.isArray(group.permissions) && group.permissions.includes(permission));
+}
+
+function pageReadPermissionKey(pageKey) {
+  return `page:${pageKey}:read`;
+}
+
+function pageModifyPermissionKey(pageKey) {
+  return `page:${pageKey}:modify`;
+}
+
+function normalizeGroupPermissions(group) {
+  if (!group || !Array.isArray(group.permissions)) {
+    return [];
+  }
+
+  return group.permissions
+    .map((permission) => String(permission || "").trim())
+    .filter(Boolean);
+}
+
+function hasConfiguredPageMatrix(permissions) {
+  return permissions.includes(PAGE_ACCESS_MATRIX_CONFIGURED);
+}
+
+function getLegacyPageDefaultsForGroup(group, pageKey) {
+  const groupName = String(group?.name || "").trim().toLowerCase();
+  const permissions = normalizeGroupPermissions(group);
+
+  const isAdminGroup = groupName === "admin";
+  const isFinanceGroup = groupName === "finance group";
+  const isProcurementTeamGroup = groupName === "procurement team";
+  const hasUserManage = permissions.includes("user:manage") || permissions.includes("system:admin");
+
+  let modify = false;
+  if (isAdminGroup || hasUserManage) {
+    modify = true;
+  } else if (pageKey === "fx-rates" && isFinanceGroup) {
+    modify = true;
+  } else if (pageKey === "polymer-indexes" && isProcurementTeamGroup) {
+    modify = true;
+  } else if (pageKey === "rm-prices" && permissions.includes("rm_prices:manage")) {
+    modify = true;
+  }
+
+  return {
+    read: true,
+    modify
+  };
+}
+
+function getGroupPagePermissions(group, pageKey) {
+  const permissions = normalizeGroupPermissions(group);
+  const hasConfiguredMatrix = hasConfiguredPageMatrix(permissions);
+
+  const explicitRead = permissions.includes(pageReadPermissionKey(pageKey));
+  const explicitModify = permissions.includes(pageModifyPermissionKey(pageKey));
+
+  if (hasConfiguredMatrix) {
+    return {
+      read: explicitRead || explicitModify,
+      modify: explicitModify
+    };
+  }
+
+  if (explicitRead || explicitModify) {
+    return {
+      read: explicitRead || explicitModify,
+      modify: explicitModify
+    };
+  }
+
+  return getLegacyPageDefaultsForGroup(group, pageKey);
+}
+
+async function hasPagePermission(userId, pageKey, accessLevel = "read") {
+  const groups = await auth.getUserGroups(userId);
+
+  if (!Array.isArray(groups) || groups.length === 0) {
+    return false;
+  }
+
+  return groups.some((group) => {
+    const pagePermissions = getGroupPagePermissions(group, pageKey);
+    if (accessLevel === "modify") {
+      return pagePermissions.modify;
+    }
+    return pagePermissions.read;
+  });
+}
+
+function getPermissionsWithoutPageKeys(permissions) {
+  return (permissions || []).filter((permission) => !String(permission).startsWith("page:"));
+}
+
+function buildPagePermissionTokens(matrixByPage) {
+  const permissions = [PAGE_ACCESS_MATRIX_CONFIGURED];
+
+  ACCESS_PERMISSION_PAGES.forEach((page) => {
+    const row = matrixByPage && typeof matrixByPage === "object" ? matrixByPage[page.key] : null;
+    const read = !!(row && row.read);
+    const modify = !!(row && row.modify);
+
+    if (read || modify) {
+      permissions.push(pageReadPermissionKey(page.key));
+    }
+    if (modify) {
+      permissions.push(pageModifyPermissionKey(page.key));
+    }
+  });
+
+  return permissions;
+}
+
+function buildAccessMatrixRow(group) {
+  const pagePermissions = {};
+
+  ACCESS_PERMISSION_PAGES.forEach((page) => {
+    pagePermissions[page.key] = getGroupPagePermissions(group, page.key);
+  });
+
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description || "",
+    created_at: group.created_at,
+    pagePermissions
+  };
+}
+
+function requireRmPricesManage(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      if (auth.hasPermission(req.user.role, "user:manage")) {
+        return true;
+      }
+      if (await hasPagePermission(req.user.id, "rm-prices", "modify")) {
+        return true;
+      }
+      return hasGroupPermission(req.user.id, "rm_prices:manage");
+    })
+    .then((allowed) => {
+      if (!allowed) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+      return next();
+    })
+    .catch((err) => {
+      console.error("rm_prices permission check failed:", err);
+      return res.status(500).json({ error: "Failed to verify permissions" });
+    });
+}
+
+function requireFxRatesManage(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      if (auth.hasPermission(req.user.role, "user:manage")) {
+        return true;
+      }
+      return hasPagePermission(req.user.id, "fx-rates", "modify");
+    })
+    .then((allowed) => {
+      if (!allowed) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+      return next();
+    })
+    .catch((err) => {
+      console.error("fx_rates permission check failed:", err);
+      return res.status(500).json({ error: "Failed to verify permissions" });
+    });
+}
+
+function requirePolymerIndexManage(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      if (auth.hasPermission(req.user.role, "user:manage")) {
+        return true;
+      }
+      return hasPagePermission(req.user.id, "polymer-indexes", "modify");
+    })
+    .then((allowed) => {
+      if (!allowed) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+      return next();
+    })
+    .catch((err) => {
+      console.error("polymer index permission check failed:", err);
+      return res.status(500).json({ error: "Failed to verify permissions" });
+    });
+}
+
+function requireRecipeApprovalRead(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      if (auth.hasPermission(req.user.role, "user:manage")) {
+        return true;
+      }
+      return hasPagePermission(req.user.id, "recipe-approval", "read");
+    })
+    .then((allowed) => {
+      if (!allowed) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+      return next();
+    })
+    .catch((err) => {
+      console.error("recipe approval read permission check failed:", err);
+      return res.status(500).json({ error: "Failed to verify permissions" });
+    });
+}
+
+function requireRecipeApprovalModify(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      if (auth.hasPermission(req.user.role, "user:manage")) {
+        return true;
+      }
+      return hasPagePermission(req.user.id, "recipe-approval", "modify");
+    })
+    .then((allowed) => {
+      if (!allowed) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+      return next();
+    })
+    .catch((err) => {
+      console.error("recipe approval modify permission check failed:", err);
+      return res.status(500).json({ error: "Failed to verify permissions" });
+    });
+}
+
+function requireRecipeEditCloneRead(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      if (auth.hasPermission(req.user.role, "user:manage")) {
+        return true;
+      }
+      return hasPagePermission(req.user.id, "recipe-edit-clone", "read");
+    })
+    .then((allowed) => {
+      if (!allowed) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+      return next();
+    })
+    .catch((err) => {
+      console.error("recipe edit/clone read permission check failed:", err);
+      return res.status(500).json({ error: "Failed to verify permissions" });
+    });
+}
+
+function requireRecipeEditCloneModify(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      if (auth.hasPermission(req.user.role, "user:manage")) {
+        return true;
+      }
+      return hasPagePermission(req.user.id, "recipe-edit-clone", "modify");
+    })
+    .then((allowed) => {
+      if (!allowed) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+      return next();
+    })
+    .catch((err) => {
+      console.error("recipe edit/clone modify permission check failed:", err);
+      return res.status(500).json({ error: "Failed to verify permissions" });
+    });
+}
+
+async function isUserInAdminGroup(userId) {
+  const groups = await auth.getUserGroups(userId);
+  return Array.isArray(groups) && groups.some((group) => String(group?.name || "").trim().toLowerCase() === "admin");
+}
+
+function requireRecipeDeleteAdminGroup(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      const allowed = await isUserInAdminGroup(req.user.id);
+      if (!allowed) {
+        return res.status(403).json({ error: "Delete is allowed only for Admin group users" });
+      }
+      return next();
+    })
+    .catch((err) => {
+      console.error("recipe delete admin-group check failed:", err);
+      return res.status(500).json({ error: "Failed to verify permissions" });
+    });
 }
 
 async function ensureBomListStoreReady() {
@@ -346,7 +1553,7 @@ async function getDescriptionListValues() {
   return result;
 }
 
-async function saveDescriptionListValuesWithoutDeletion(listKey, values) {
+async function saveDescriptionListValuesWithoutDeletion(listKey, values, renamePairsInput = []) {
   await ensureBomListStoreReady();
 
   const config = DESCRIPTION_LIST_CONFIG.find((item) => item.key === listKey);
@@ -374,6 +1581,7 @@ async function saveDescriptionListValuesWithoutDeletion(listKey, values) {
     "SELECT id, value FROM bom_dropdown_list_items WHERE list_id = ? ORDER BY sort_order, id",
     [listRow.id]
   );
+  const orderedRows = [...existingRows].sort((a, b) => compareValuesForDisplay(a.value, b.value));
 
   if (normalized.length < existingRows.length) {
     const error = new Error("Removing existing values is not allowed.");
@@ -384,28 +1592,38 @@ async function saveDescriptionListValuesWithoutDeletion(listKey, values) {
   await db.run("BEGIN IMMEDIATE TRANSACTION");
   try {
     const timestamp = Date.now();
+    const inferredRenamePairs = orderedRows.map((row, index) => ({
+      from: row.value,
+      to: normalized[index]
+    }));
+    const renamePairs = normalizeRenamePairs(renamePairsInput, orderedRows.map((row) => row.value));
 
-    for (const row of existingRows) {
+    for (const row of orderedRows) {
       await db.run(
         "UPDATE bom_dropdown_list_items SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         [`__tmp__${row.id}__${timestamp}`, row.id]
       );
     }
 
-    for (let i = 0; i < existingRows.length; i++) {
+    for (let i = 0; i < orderedRows.length; i++) {
       await db.run(
         `UPDATE bom_dropdown_list_items
          SET value = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
-        [normalized[i], i, existingRows[i].id]
+        [normalized[i], i, orderedRows[i].id]
       );
     }
 
-    for (let i = existingRows.length; i < normalized.length; i++) {
+    for (let i = orderedRows.length; i < normalized.length; i++) {
       await db.run(
         "INSERT INTO bom_dropdown_list_items (list_id, value, sort_order) VALUES (?, ?, ?)",
         [listRow.id, normalized[i], i]
       );
+    }
+
+    const targetColumn = DESCRIPTION_LIST_COLUMN_MAP[listKey];
+    if (targetColumn) {
+      await applyRenamePairsToBomRecordColumn(targetColumn, renamePairs.length ? renamePairs : inferredRenamePairs);
     }
 
     await db.run("COMMIT");
@@ -521,9 +1739,10 @@ async function getCustomerNames() {
   return sortValuesForDisplay(rows.map((row) => row.name));
 }
 
-async function saveCustomerNamesWithoutDeletion(customers) {
+async function saveCustomerNamesWithoutDeletion(customers, renamePairsInput = []) {
   const normalized = normalizeUniqueStrings(customers);
   const existingRows = await getCustomerRowsById();
+  const orderedRows = [...existingRows].sort((a, b) => compareValuesForDisplay(a.name, b.name));
 
   if (normalized.length < existingRows.length) {
     const error = new Error("Removing existing customers is not allowed.");
@@ -534,28 +1753,35 @@ async function saveCustomerNamesWithoutDeletion(customers) {
   await db.run("BEGIN IMMEDIATE TRANSACTION");
   try {
     const timestamp = Date.now();
+    const inferredRenamePairs = orderedRows.map((row, index) => ({
+      from: row.name,
+      to: normalized[index]
+    }));
+    const renamePairs = normalizeRenamePairs(renamePairsInput, orderedRows.map((row) => row.name));
 
     // Two-phase rename avoids unique collisions during swaps (e.g. A->B and B->A).
-    for (const row of existingRows) {
+    for (const row of orderedRows) {
       await db.run(
         "UPDATE bom_customers SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         [`__tmp__${row.id}__${timestamp}`, row.id]
       );
     }
 
-    for (let i = 0; i < existingRows.length; i++) {
+    for (let i = 0; i < orderedRows.length; i++) {
       await db.run(
         "UPDATE bom_customers SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        [normalized[i], existingRows[i].id]
+        [normalized[i], orderedRows[i].id]
       );
     }
 
-    for (let i = existingRows.length; i < normalized.length; i++) {
+    for (let i = orderedRows.length; i < normalized.length; i++) {
       await db.run(
         "INSERT INTO bom_customers (name) VALUES (?)",
         [normalized[i]]
       );
     }
+
+    await applyRenamePairsToBomRecordColumn("customer", renamePairs.length ? renamePairs : inferredRenamePairs);
 
     await db.run("COMMIT");
   } catch (error) {
@@ -613,8 +1839,10 @@ async function ensureBomRecordStoreReady() {
           roll_diameter REAL,
           target_production REAL,
           target_unit TEXT,
+          overconsumption REAL,
           notes TEXT,
           author TEXT,
+          recipe_approved TEXT DEFAULT 'Yes',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           created_by INTEGER
@@ -632,6 +1860,82 @@ async function ensureBomRecordStoreReady() {
         }
       };
 
+      // Migration: Add overconsumption column if it doesn't exist
+      try {
+        await db.run('ALTER TABLE bom_records ADD COLUMN overconsumption REAL');
+        console.log('[MIGRATION] Added overconsumption column to bom_records');
+      } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding overconsumption column:', err.message);
+        }
+      };
+
+      // Migration: Add immutable calculation snapshot if it doesn't exist
+      try {
+        await db.run('ALTER TABLE bom_records ADD COLUMN calculation_snapshot_json TEXT');
+        console.log('[MIGRATION] Added calculation_snapshot_json column to bom_records');
+      } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding calculation_snapshot_json column:', err.message);
+        }
+      };
+
+      // Migration: Add recipe_approved column if it doesn't exist
+      try {
+        await db.run("ALTER TABLE bom_records ADD COLUMN recipe_approved TEXT DEFAULT 'Yes'");
+        console.log('[MIGRATION] Added recipe_approved column to bom_records');
+      } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding recipe_approved column:', err.message);
+        }
+      };
+
+      // One-time backfill for legacy records: mark existing records as approved.
+      await db.run("UPDATE bom_records SET recipe_approved = 'Yes' WHERE recipe_approved IS NULL OR TRIM(recipe_approved) = ''");
+
+      // Migration: Add approval_decision column if it doesn't exist
+      try {
+        await db.run("ALTER TABLE bom_records ADD COLUMN approval_decision TEXT DEFAULT 'Approved'");
+        console.log('[MIGRATION] Added approval_decision column to bom_records');
+      } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding approval_decision column:', err.message);
+        }
+      }
+
+      // Migration: Add approval_comment column if it doesn't exist
+      try {
+        await db.run("ALTER TABLE bom_records ADD COLUMN approval_comment TEXT");
+        console.log('[MIGRATION] Added approval_comment column to bom_records');
+      } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding approval_comment column:', err.message);
+        }
+      }
+
+      // Migration: Add approval_reviewed_by column if it doesn't exist
+      try {
+        await db.run("ALTER TABLE bom_records ADD COLUMN approval_reviewed_by TEXT");
+        console.log('[MIGRATION] Added approval_reviewed_by column to bom_records');
+      } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding approval_reviewed_by column:', err.message);
+        }
+      }
+
+      // Migration: Add approval_reviewed_at column if it doesn't exist
+      try {
+        await db.run("ALTER TABLE bom_records ADD COLUMN approval_reviewed_at DATETIME");
+        console.log('[MIGRATION] Added approval_reviewed_at column to bom_records');
+      } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding approval_reviewed_at column:', err.message);
+        }
+      }
+
+      await db.run("UPDATE bom_records SET approval_decision = 'Approved' WHERE recipe_approved = 'Yes' AND (approval_decision IS NULL OR TRIM(approval_decision) = '')");
+      await db.run("UPDATE bom_records SET approval_decision = 'Pending' WHERE recipe_approved = 'No' AND (approval_decision IS NULL OR TRIM(approval_decision) = '' OR LOWER(TRIM(approval_decision)) = 'approved')");
+
       await db.run(`
         CREATE TABLE IF NOT EXISTS bom_record_materials (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -643,6 +1947,17 @@ async function ensureBomRecordStoreReady() {
           FOREIGN KEY (record_id) REFERENCES bom_records(id) ON DELETE CASCADE
         )
       `);
+
+      await db.run(`
+        CREATE TABLE IF NOT EXISTS recipe_approval_region_assignments (
+          user_id TEXT NOT NULL,
+          region TEXT NOT NULL,
+          updated_by TEXT,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (user_id, region),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
     })();
   }
   return bomRecordStoreInitPromise;
@@ -650,32 +1965,6 @@ async function ensureBomRecordStoreReady() {
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-
-// Initialize database on startup
-auth.initializeDatabase().catch(err => {
-  console.error("Failed to initialize database:", err);
-  process.exit(1);
-});
-
-polymerIndexes.initializeDatabase().catch(err => {
-  console.error("Failed to initialize polymer index database:", err);
-  process.exit(1);
-});
-
-ensureCustomerStoreReady().catch(err => {
-  console.error("Failed to initialize customer store:", err);
-  process.exit(1);
-});
-
-ensureBomListStoreReady().catch(err => {
-  console.error("Failed to initialize BOM list store:", err);
-  process.exit(1);
-});
-
-ensureBomRecordStoreReady().catch(err => {
-  console.error("Failed to initialize BOM record store:", err);
-  process.exit(1);
-});
 
 // ==================== FRONTEND ROUTING ====================
 
@@ -739,18 +2028,66 @@ app.get("/bom-recipe-browser", (req, res, next) => {
   }
 });
 
-app.get("/products", (req, res, next) => {
+app.get("/recipe-edit-clone", (req, res, next) => {
   try {
-    const filePath = path.join(__dirname, "src", "frontend", "products-editor.html");
-    console.log("[ROUTE] GET /products - Serving:", filePath);
+    const filePath = path.join(__dirname, "src", "frontend", "recipe-edit-clone.html");
+    console.log("[ROUTE] GET /recipe-edit-clone - Serving:", filePath);
     res.sendFile(filePath, (err) => {
       if (err) {
-        console.error("[ERROR] Failed to send products-editor.html:", err);
+        console.error("[ERROR] Failed to send recipe-edit-clone.html:", err);
         next(err);
       }
     });
   } catch (err) {
-    console.error("[ERROR] Products route error:", err);
+    console.error("[ERROR] Recipe edit/clone route error:", err);
+    next(err);
+  }
+});
+
+app.get("/recipe-approval", (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, "src", "frontend", "recipe-approval.html");
+    console.log("[ROUTE] GET /recipe-approval - Serving:", filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("[ERROR] Failed to send recipe-approval.html:", err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error("[ERROR] Recipe approval route error:", err);
+    next(err);
+  }
+});
+
+app.get("/rm-prices", (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, "src", "frontend", "rm-prices.html");
+    console.log("[ROUTE] GET /rm-prices - Serving:", filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("[ERROR] Failed to send rm-prices.html:", err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error("[ERROR] RM prices route error:", err);
+    next(err);
+  }
+});
+
+app.get("/rm-prices/availability", (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, "src", "frontend", "rm-price-availability.html");
+    console.log("[ROUTE] GET /rm-prices/availability - Serving:", filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("[ERROR] Failed to send rm-price-availability.html:", err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error("[ERROR] RM price availability route error:", err);
     next(err);
   }
 });
@@ -771,6 +2108,38 @@ app.get("/polymer-indexes", (req, res, next) => {
   }
 });
 
+app.get("/fx-rates", (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, "src", "frontend", "fx-rates-management.html");
+    console.log("[ROUTE] GET /fx-rates - Serving:", filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("[ERROR] Failed to send fx-rates-management.html:", err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error("[ERROR] FX rates route error:", err);
+    next(err);
+  }
+});
+
+app.get("/line-rates", (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, "src", "frontend", "line-rates-management.html");
+    console.log("[ROUTE] GET /line-rates - Serving:", filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("[ERROR] Failed to send line-rates-management.html:", err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error("[ERROR] Line rates route error:", err);
+    next(err);
+  }
+});
+
 // Public static files (CSS, JS, HTML, etc.)
 app.use(express.static(path.join(__dirname, "src", "frontend"), {
   dotfiles: 'deny',
@@ -779,6 +2148,11 @@ app.use(express.static(path.join(__dirname, "src", "frontend"), {
 
 // Serve data files (e.g., PFN_logo.png) from /data
 app.use('/data', express.static(path.join(__dirname, 'data')));
+
+// Serve xlsx browser bundle locally (avoid CDN dependency)
+app.get('/vendor/xlsx.full.min.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'node_modules', 'xlsx', 'dist', 'xlsx.full.min.js'));
+});
 
 // Health check
 app.get("/api/health", (req, res) => {
@@ -820,6 +2194,23 @@ app.get("/api/auth/me/groups", auth.authMiddleware, async (req, res) => {
     res.json(groups);
   } catch (err) {
     console.error(`[ERROR] /api/auth/me/groups error:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/auth/me/access-permissions", auth.authMiddleware, async (req, res) => {
+  try {
+    const pagePermissions = {};
+
+    for (const page of ACCESS_PERMISSION_PAGES) {
+      pagePermissions[page.key] = {
+        read: await hasPagePermission(req.user.id, page.key, "read"),
+        modify: await hasPagePermission(req.user.id, page.key, "modify")
+      };
+    }
+
+    res.json({ pages: pagePermissions });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -948,12 +2339,175 @@ app.post("/api/admin/groups", auth.authMiddleware, auth.requirePermission('user:
 // Update group (admin only)
 app.put("/api/admin/groups/:id", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const group = await auth.updateGroup(req.params.id, name, description);
+    const { name, description, permissions } = req.body;
+    const hasPermissionsPayload = Object.prototype.hasOwnProperty.call(req.body || {}, "permissions");
+    const group = await auth.updateGroup(
+      req.params.id,
+      name,
+      description,
+      hasPermissionsPayload ? permissions : null
+    );
     res.json({
       success: true,
       message: 'Group updated successfully.',
       group
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/admin/access-permissions/matrix", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const groups = await auth.getGroups();
+    const matrix = groups.map((group) => buildAccessMatrixRow(group));
+
+    res.json({
+      pages: ACCESS_PERMISSION_PAGES,
+      matrix
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put("/api/admin/groups/:id/access-permissions", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const { pagePermissions } = req.body || {};
+
+    if (!pagePermissions || typeof pagePermissions !== "object") {
+      return res.status(400).json({ success: false, error: "pagePermissions object is required" });
+    }
+
+    const groups = await auth.getGroups();
+    const existingGroup = groups.find((group) => String(group.id) === String(groupId));
+    if (!existingGroup) {
+      return res.status(404).json({ success: false, error: "Group not found" });
+    }
+
+    const nonPagePermissions = getPermissionsWithoutPageKeys(existingGroup.permissions);
+    const pagePermissionTokens = buildPagePermissionTokens(pagePermissions);
+    const mergedPermissions = Array.from(new Set([...nonPagePermissions, ...pagePermissionTokens]));
+
+    const updatedGroup = await auth.updateGroup(
+      groupId,
+      existingGroup.name,
+      existingGroup.description || "",
+      mergedPermissions
+    );
+
+    res.json({
+      success: true,
+      message: "Access permissions updated successfully.",
+      group: buildAccessMatrixRow(updatedGroup)
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/admin/recipe-approval-region-matrix", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const users = await getRecipeApprovalCandidateUsers();
+    const assignmentMap = await getRecipeApprovalRegionAssignmentsMap();
+
+    const matrix = users.map((user) => {
+      const assigned = assignmentMap.has(user.id) ? Array.from(assignmentMap.get(user.id)) : [];
+      return {
+        userId: user.id,
+        name: user.name || user.email,
+        email: user.email,
+        groups: user.groups,
+        regions: RECIPE_APPROVAL_REGIONS.reduce((acc, region) => {
+          acc[region] = assigned.includes(region);
+          return acc;
+        }, {})
+      };
+    });
+
+    res.json({
+      success: true,
+      regions: RECIPE_APPROVAL_REGIONS,
+      matrix
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put("/api/admin/recipe-approval-region-matrix", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const incomingMatrix = Array.isArray(req.body?.matrix) ? req.body.matrix : null;
+    if (!incomingMatrix) {
+      return res.status(400).json({ success: false, error: "matrix array is required" });
+    }
+
+    const allowedUsers = await getRecipeApprovalCandidateUsers();
+    const allowedUserIds = new Set(allowedUsers.map((user) => user.id));
+    const allowedRegions = new Set(RECIPE_APPROVAL_REGIONS);
+
+    const normalizedAssignments = [];
+
+    for (const entry of incomingMatrix) {
+      const userId = String(entry?.userId || "").trim();
+      if (!userId || !allowedUserIds.has(userId)) {
+        continue;
+      }
+
+      const entryRegions = entry?.regions && typeof entry.regions === "object" ? entry.regions : {};
+      RECIPE_APPROVAL_REGIONS.forEach((region) => {
+        if (entryRegions[region]) {
+          normalizedAssignments.push({ userId, region });
+        }
+      });
+    }
+
+    // Safety: remove duplicates and keep only known regions.
+    const unique = new Map();
+    normalizedAssignments.forEach((assignment) => {
+      const region = normalizeApprovalRegion(assignment.region);
+      if (!allowedRegions.has(region)) return;
+      const key = `${assignment.userId}__${region}`;
+      unique.set(key, { userId: assignment.userId, region });
+    });
+
+    await db.run('BEGIN');
+    try {
+      await db.run('DELETE FROM recipe_approval_region_assignments');
+      for (const assignment of unique.values()) {
+        await db.run(
+          `INSERT INTO recipe_approval_region_assignments (user_id, region, updated_by, updated_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+          [assignment.userId, assignment.region, req.user.id || null]
+        );
+      }
+      await db.run('COMMIT');
+    } catch (innerErr) {
+      await db.run('ROLLBACK').catch(() => {});
+      throw innerErr;
+    }
+
+    const assignmentMap = await getRecipeApprovalRegionAssignmentsMap();
+    const matrix = allowedUsers.map((user) => {
+      const assigned = assignmentMap.has(user.id) ? Array.from(assignmentMap.get(user.id)) : [];
+      return {
+        userId: user.id,
+        name: user.name || user.email,
+        email: user.email,
+        groups: user.groups,
+        regions: RECIPE_APPROVAL_REGIONS.reduce((acc, region) => {
+          acc[region] = assigned.includes(region);
+          return acc;
+        }, {})
+      };
+    });
+
+    res.json({
+      success: true,
+      message: "Recipe approval region matrix saved.",
+      regions: RECIPE_APPROVAL_REGIONS,
+      matrix
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -1076,7 +2630,27 @@ app.get("/api/admin/audit-logs/stats", auth.authMiddleware, auth.requirePermissi
 
 // ==================== POLYMER INDEX ENDPOINTS ====================
 
-app.get("/api/admin/polymer-indexes", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.get("/api/polymer-indexes", auth.authMiddleware, async (req, res) => {
+  try {
+    const indexes = await polymerIndexes.getIndexes(false);
+    res.json({ success: true, indexes });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/polymer-indexes/data/by-week", auth.authMiddleware, async (req, res) => {
+  try {
+    const startYear = Number(req.query.startYear) || 2020;
+    const endYear = Number(req.query.endYear) || 2026;
+    const data = await polymerIndexes.getDataByWeek({ startYear, endYear });
+    res.json({ success: true, weeks: data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/admin/polymer-indexes", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === 'true';
     const indexes = await polymerIndexes.getIndexes(includeInactive);
@@ -1086,7 +2660,7 @@ app.get("/api/admin/polymer-indexes", auth.authMiddleware, auth.requirePermissio
   }
 });
 
-app.post("/api/admin/polymer-indexes", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.post("/api/admin/polymer-indexes", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const index = await polymerIndexes.createIndex(req.body || {});
     await auth.auditLog(req.user.id, 'INDEX_DEFINITION_CREATED', 'polymer_indexes', {
@@ -1099,30 +2673,9 @@ app.post("/api/admin/polymer-indexes", auth.authMiddleware, auth.requirePermissi
   }
 });
 
-app.put("/api/admin/polymer-indexes/:id", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.put("/api/admin/polymer-indexes/:id", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const payload = req.body || {};
-
-    if (Object.prototype.hasOwnProperty.call(payload, 'isActive')) {
-      const existing = await auth.dbGet('SELECT is_active FROM polymer_indexes WHERE id = ?', [req.params.id]);
-      if (!existing) {
-        return res.status(404).json({ success: false, error: 'Index not found' });
-      }
-
-      const requestedIsActive = payload.isActive ? 1 : 0;
-      if (requestedIsActive !== existing.is_active) {
-        const groups = await auth.getUserGroups(req.user.id);
-        const isAdminGroupMember = groups.some(group => String(group?.name || '').toLowerCase() === 'admin');
-
-        if (!isAdminGroupMember) {
-          return res.status(403).json({
-            success: false,
-            error: 'Only Admin group members can activate or deactivate indexes'
-          });
-        }
-      }
-    }
-
     const index = await polymerIndexes.updateIndex(req.params.id, payload);
     await auth.auditLog(req.user.id, 'INDEX_DEFINITION_UPDATED', 'polymer_indexes', {
       indexId: index.id,
@@ -1134,18 +2687,8 @@ app.put("/api/admin/polymer-indexes/:id", auth.authMiddleware, auth.requirePermi
   }
 });
 
-app.delete("/api/admin/polymer-indexes/:id", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.delete("/api/admin/polymer-indexes/:id", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
-    const groups = await auth.getUserGroups(req.user.id);
-    const isAdminGroupMember = groups.some(group => String(group?.name || '').toLowerCase() === 'admin');
-
-    if (!isAdminGroupMember) {
-      return res.status(403).json({
-        success: false,
-        error: 'Only Admin group members can delete indexes'
-      });
-    }
-
     const result = await polymerIndexes.deleteIndex(req.params.id);
 
     await auth.auditLog(req.user.id, 'INDEX_DEFINITION_DELETED', 'polymer_indexes', {
@@ -1164,7 +2707,7 @@ app.delete("/api/admin/polymer-indexes/:id", auth.authMiddleware, auth.requirePe
   }
 });
 
-app.get("/api/admin/polymer-indexes/:id/values", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.get("/api/admin/polymer-indexes/:id/values", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const values = await polymerIndexes.getIndexValues(req.params.id, {
       startDate: req.query.startDate || null,
@@ -1177,7 +2720,7 @@ app.get("/api/admin/polymer-indexes/:id/values", auth.authMiddleware, auth.requi
   }
 });
 
-app.post("/api/admin/polymer-indexes/:id/values", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.post("/api/admin/polymer-indexes/:id/values", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const value = await polymerIndexes.upsertIndexValue(req.params.id, req.body || {}, req.user.id);
     res.status(201).json({ success: true, value });
@@ -1186,7 +2729,7 @@ app.post("/api/admin/polymer-indexes/:id/values", auth.authMiddleware, auth.requ
   }
 });
 
-app.post("/api/admin/polymer-indexes/import", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.post("/api/admin/polymer-indexes/import", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     const result = await polymerIndexes.bulkImport(rows, req.user.id);
@@ -1196,7 +2739,7 @@ app.post("/api/admin/polymer-indexes/import", auth.authMiddleware, auth.requireP
   }
 });
 
-app.get("/api/admin/polymer-indexes/reminders/due", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.get("/api/admin/polymer-indexes/reminders/due", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const due = await polymerIndexes.getDueReminders(new Date());
     res.json({ success: true, due });
@@ -1205,7 +2748,7 @@ app.get("/api/admin/polymer-indexes/reminders/due", auth.authMiddleware, auth.re
   }
 });
 
-app.get("/api/admin/polymer-indexes/data/by-week", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.get("/api/admin/polymer-indexes/data/by-week", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const startYear = Number(req.query.startYear) || 2020;
     const endYear = Number(req.query.endYear) || 2026;
@@ -1216,7 +2759,7 @@ app.get("/api/admin/polymer-indexes/data/by-week", auth.authMiddleware, auth.req
   }
 });
 
-app.delete("/api/admin/polymer-indexes/data/all", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.delete("/api/admin/polymer-indexes/data/all", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const result = await polymerIndexes.clearAllIndexValues();
     await auth.auditLog(req.user.id, 'DELETE_ALL_INDEX_VALUES', 'polymer_index_values', null, { deletedCount: result.deletedCount });
@@ -1226,7 +2769,7 @@ app.delete("/api/admin/polymer-indexes/data/all", auth.authMiddleware, auth.requ
   }
 });
 
-app.post("/api/admin/polymer-indexes/recalculate-mid", auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+app.post("/api/admin/polymer-indexes/recalculate-mid", auth.authMiddleware, requirePolymerIndexManage, async (req, res) => {
   try {
     const result = await polymerIndexes.recalculateAllMidValues(req.user.id);
     res.json({ success: true, result });
@@ -1235,158 +2778,7 @@ app.post("/api/admin/polymer-indexes/recalculate-mid", auth.authMiddleware, auth
   }
 });
 
-// Main costing endpoint
-app.get("/api/costs", (req, res) => {
-  try {
-    const displayCurrency = req.query.currency || "USD";
-
-    const filters = {
-      sapId: req.query.sapId || null,
-      pfnId: req.query.pfnId || null,
-      customer: req.query.customer || null,
-      marketSegment: req.query.marketSegment || null,
-      application: req.query.application || null,
-      s_sms: req.query.s_sms || null,
-      bonding: req.query.bonding || null,
-      basisWeight: req.query.basisWeight || null,
-      slitWidth: req.query.slitWidth || null,
-      treatment: req.query.treatment || null,
-      author: req.query.author || null,
-      lineId: req.query.lineId || null,
-      country: req.query.country || null,
-      overconsumption: req.query.overconsumption || null
-    };
-
-    const data = computeCosts(displayCurrency, filters);
-    res.json(data);
-
-  } catch (err) {
-    console.error("Error in /api/costs:", err);
-    res.status(500).json({ error: "Failed to compute costs", details: err.message });
-  }
-});
-
-// Metadata endpoint: get available filters and options
-app.get("/api/metadata", (req, res) => {
-  try {
-    const products = loadProducts();
-    
-    const sapIds = [...new Set(products.map(p => p.sapId).filter(Boolean))].sort();
-    const pfnIds = [...new Set(products.map(p => p.pfnId).filter(Boolean))].sort();
-    const customers = [...new Set(products.map(p => p.customer).filter(Boolean))].sort();
-    const marketSegments = [...new Set(products.map(p => p.marketSegment).filter(Boolean))].sort();
-    const applications = [...new Set(products.map(p => p.application).filter(Boolean))].sort();
-    const smsOptions = [...new Set(products.map(p => p.s_sms).filter(Boolean))].sort();
-    const bondings = [...new Set(products.map(p => p.bonding).filter(Boolean))].sort();
-    const basisWeights = [...new Set(products.map(p => p.basisWeight).filter(Boolean))].sort((a, b) => parseFloat(a) - parseFloat(b));
-    const slitWidths = [...new Set(products.map(p => p.slitWidth).filter(Boolean))].sort((a, b) => parseFloat(a) - parseFloat(b));
-    const treatments = [...new Set(products.map(p => p.treatment).filter(Boolean))].sort();
-    const authors = [...new Set(products.map(p => p.author).filter(Boolean))].sort();
-    const overconsumptions = [...new Set(products.map(p => p.overconsumption))].sort((a, b) => a - b);
-    
-    const lineIds = [...new Set(products.map(p => p.lineId))].sort();
-    const countries = [...new Set(products.map(p => p.country))].sort();
-    const currencies = ["USD", "CZK", "EUR", "ZAR", "GBP"];
-
-    res.json({
-      sapIds,
-      pfnIds,
-      customers,
-      marketSegments,
-      applications,
-      smsOptions,
-      bondings,
-      basisWeights,
-      slitWidths,
-      treatments,
-      authors,
-      overconsumptions,
-      lineIds,
-      countries,
-      currencies,
-      totalProducts: products.length
-    });
-
-  } catch (err) {
-    console.error("Error in /api/metadata:", err);
-    res.status(500).json({ error: "Failed to load metadata", details: err.message });
-  }
-});
-
-// Export data endpoint (CSV)
-app.get("/api/export/costs", (req, res) => {
-  try {
-    const displayCurrency = req.query.currency || "USD";
-    const filters = {
-      sapId: req.query.sapId || null,
-      pfnId: req.query.pfnId || null,
-      customer: req.query.customer || null,
-      marketSegment: req.query.marketSegment || null,
-      application: req.query.application || null,
-      s_sms: req.query.s_sms || null,
-      bonding: req.query.bonding || null,
-      basisWeight: req.query.basisWeight || null,
-      slitWidth: req.query.slitWidth || null,
-      treatment: req.query.treatment || null,
-      author: req.query.author || null,
-      lineId: req.query.lineId || null,
-      country: req.query.country || null,
-      overconsumption: req.query.overconsumption || null
-    };
-
-    const data = computeCosts(displayCurrency, filters);
-
-    if (data.length === 0) {
-      return res.status(404).json({ error: "No data to export" });
-    }
-
-    // Convert to CSV
-    const headers = [
-      "Product ID",
-      "Line",
-      "Country",
-      "Material Cost (Net)",
-      "Process Cost",
-      "Total Cost",
-      "Currency"
-    ];
-
-    const rows = data.map(item => [
-      item.productId,
-      item.lineId,
-      item.country,
-      (item.materialCostNet ?? item.materialCost ?? 0).toFixed(4),
-      item.processCost.toFixed(4),
-      item.totalCost.toFixed(4),
-      item.currency
-    ]);
-
-    const csv = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
-    ].join("\n");
-
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="costs-${new Date().toISOString().split('T')[0]}.csv"`);
-    res.send(csv);
-
-  } catch (err) {
-    console.error("Error in /api/export/costs:", err);
-    res.status(500).json({ error: "Failed to export costs", details: err.message });
-  }
-});
-
 // Debug endpoints
-app.get("/api/debug/products", (req, res) => {
-  try {
-    const products = loadProducts();
-    res.json(products);
-  } catch (err) {
-    console.error("Debug products error:", err);
-    res.status(500).json({ error: "Failed to load products", details: err.message });
-  }
-});
-
 app.get("/api/debug/lines", (req, res) => {
   try {
     const lines = loadLines();
@@ -1418,45 +2810,6 @@ app.get("/api/debug/fx", (req, res) => {
   }
 });
 
-app.get("/api/debug/costs", (req, res) => {
-  try {
-    const displayCurrency = req.query.currency || "USD";
-    const filters = {
-      productId: req.query.productId || null,
-      lineId: req.query.lineId || null,
-      country: req.query.country || null
-    };
-
-    const data = computeCosts(displayCurrency, filters);
-
-    res.json({
-      currency: displayCurrency,
-      filters,
-      count: data.length,
-      costs: data
-    });
-
-  } catch (err) {
-    console.error("Debug costs error:", err);
-    res.status(500).json({ error: "Failed to compute debug costs", details: err.message });
-  }
-});
-
-// Product editor endpoints
-app.get("/api/products/editable", (req, res) => {
-  try {
-    const search = req.query.search || "";
-    const products = search ? searchProducts(search) : getEditableProducts();
-    res.json({
-      count: products.length,
-      products: products
-    });
-  } catch (err) {
-    console.error("Error loading editable products:", err);
-    res.status(500).json({ error: "Failed to load editable products", details: err.message });
-  }
-});
-
 // BOM Calculator endpoints
 app.get("/api/bom/lists", async (req, res) => {
   try {
@@ -1481,7 +2834,7 @@ app.get("/api/bom/description-lists", async (req, res) => {
 app.put("/api/bom/description-lists/:listKey", async (req, res) => {
   try {
     const { listKey } = req.params;
-    const { values } = req.body || {};
+    const { values, renamePairs } = req.body || {};
 
     if (!Array.isArray(values)) {
       return res.status(400).json({ error: "Request body must include a values array." });
@@ -1496,7 +2849,7 @@ app.put("/api/bom/description-lists/:listKey", async (req, res) => {
       return res.status(400).json({ error: "List cannot be empty." });
     }
 
-    const updatedValues = await saveDescriptionListValuesWithoutDeletion(listKey, normalized);
+    const updatedValues = await saveDescriptionListValuesWithoutDeletion(listKey, normalized, renamePairs);
     res.json({ success: true, values: updatedValues });
   } catch (err) {
     if (err.code === "DESCRIPTION_LIST_UNKNOWN") {
@@ -1534,7 +2887,7 @@ app.get("/api/bom/customers", async (req, res) => {
 
 app.put("/api/bom/customers", async (req, res) => {
   try {
-    const { customers } = req.body || {};
+    const { customers, renamePairs } = req.body || {};
     if (!Array.isArray(customers)) {
       return res.status(400).json({ error: "Request body must include a customers array." });
     }
@@ -1548,7 +2901,7 @@ app.put("/api/bom/customers", async (req, res) => {
       return res.status(400).json({ error: "Customer list cannot be empty." });
     }
 
-    const savedCustomers = await saveCustomerNamesWithoutDeletion(normalized);
+    const savedCustomers = await saveCustomerNamesWithoutDeletion(normalized, renamePairs);
     res.json({ success: true, customers: savedCustomers });
   } catch (err) {
     if (err.code === "CUSTOMER_REMOVAL_NOT_ALLOWED") {
@@ -1566,12 +2919,861 @@ app.put("/api/bom/customers", async (req, res) => {
   }
 });
 
+// Raw Material Prices endpoints
+app.get("/api/rm-prices/sheet", auth.authMiddleware, async (req, res) => {
+  try {
+    const now = new Date();
+    const year = req.query.year ? Number(req.query.year) : now.getFullYear();
+    const month = req.query.month ? Number(req.query.month) : (now.getMonth() + 1);
+    const plant = req.query.plant;
+
+    const sheet = await rmPrices.getMonthlyPlantPriceSheet({ plant, year, month });
+    res.json(sheet);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to load raw material price sheet" });
+  }
+});
+
+app.get("/api/rm-prices/current-for-line", auth.authMiddleware, async (req, res) => {
+  try {
+    const { line } = req.query;
+    if (!line) {
+      return res.status(400).json({ error: "line query parameter is required" });
+    }
+
+    const payload = await rmPrices.getCurrentPricesForLine({
+      line,
+      year: req.query.year ? Number(req.query.year) : undefined,
+      month: req.query.month ? Number(req.query.month) : undefined
+    });
+
+    res.json(payload);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to load current prices for line" });
+  }
+});
+
+app.get("/api/rm-prices/formulas", auth.authMiddleware, async (req, res) => {
+  try {
+    const formulas = await rmPrices.listFormulas();
+    res.json({ formulas });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load formulas", details: err.message });
+  }
+});
+
+app.get("/api/rm-prices/plant-materials", auth.authMiddleware, async (req, res) => {
+  try {
+    const rows = await rmPrices.getPlantMaterials();
+    res.json({ rows });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load plant materials", details: err.message });
+  }
+});
+
+app.post("/api/rm-prices", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const { material_list_key, material_name, plant, year, month, price, currency } = req.body || {};
+
+    const result = await rmPrices.upsertManualPrice({
+      materialListKey: material_list_key,
+      materialName: material_name,
+      plant,
+      year,
+      month,
+      price,
+      currency,
+      userId: req.user.id
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to save price" });
+  }
+});
+
+app.post("/api/rm-prices/import", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const { rows } = req.body || {};
+    const result = await rmPrices.importPrices(rows, req.user.id);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to import prices" });
+  }
+});
+
+app.post("/api/rm-prices/import-non-polymer", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const { rows } = req.body || {};
+    const result = await rmPrices.importNonPolymerPrices(rows, req.user.id);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to import non-polymer prices" });
+  }
+});
+
+app.post("/api/rm-prices/calculate-polymer", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const now = new Date();
+    const plant = req.body?.plant || req.query?.plant;
+    const year = req.body?.year ?? req.query?.year ?? now.getFullYear();
+    const month = req.body?.month ?? req.query?.month ?? (now.getMonth() + 1);
+
+    const result = await rmPrices.calculatePolymerPrices({
+      plant,
+      year: Number(year),
+      month: Number(month),
+      userId: req.user.id
+    });
+
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to calculate polymer prices" });
+  }
+});
+
+app.get("/api/line-rates/years", auth.authMiddleware, async (req, res) => {
+  try {
+    const years = await lineRatesDb.listLineRateYears();
+    res.json({ years });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load line rate years", details: err.message });
+  }
+});
+
+app.get("/api/line-rates/:year", auth.authMiddleware, async (req, res) => {
+  try {
+    const year = parseOptionalYear(req.params.year);
+    if (!year) {
+      return res.status(400).json({ error: "Invalid year" });
+    }
+
+    const rows = await lineRatesDb.getLineRatesForYear(year);
+    res.json({ year, rows });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load line rates", details: err.message });
+  }
+});
+
+app.post("/api/line-rates/import", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const { year, raw, rows, overwrite } = req.body || {};
+    const normalizedYear = parseOptionalYear(year);
+    if (!normalizedYear) {
+      return res.status(400).json({ error: "Invalid year" });
+    }
+
+    let parsedRows = [];
+    if (Array.isArray(rows) && rows.length) {
+      parsedRows = rows;
+    } else if (Array.isArray(raw) && raw.length) {
+      parsedRows = parseLineRatesMatrix(raw);
+    } else {
+      return res.status(400).json({ error: "Import payload must include raw matrix data or parsed rows" });
+    }
+
+    const result = await lineRatesDb.importLineRates({
+      year: normalizedYear,
+      lines: parsedRows,
+      overwrite: !!overwrite,
+      userId: req.user.id
+    });
+
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to import line rates" });
+  }
+});
+
+app.post("/api/rm-prices/formulas", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const result = await rmPrices.upsertFormula(req.body || {});
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to save formula" });
+  }
+});
+
+app.delete("/api/rm-prices/formulas/:id", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const result = await rmPrices.deleteFormula(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to delete formula" });
+  }
+});
+
+app.put("/api/rm-prices/plant-materials", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const { assignments } = req.body || {};
+    const result = await rmPrices.updatePlantMaterials(assignments);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to update plant material assignments" });
+  }
+});
+
+app.post("/api/rm-prices/materials/add", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const { material_list_key, material_name, numeric_value, plants } = req.body || {};
+    const result = await rmPrices.addMaterialToList({
+      materialListKey: material_list_key,
+      materialName: material_name,
+      numericValue: numeric_value,
+      plants
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to add material" });
+  }
+});
+
+app.delete("/api/rm-prices/materials", auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const { material_list_key, material_name } = req.body || {};
+    const result = await rmPrices.deleteMaterialEverywhere({
+      materialListKey: material_list_key,
+      materialName: material_name
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to delete material" });
+  }
+});
+
+// ==================== FX RATES MANAGEMENT ====================
+
+// Get available FX rate periods
+app.get("/api/fx-rates/periods", auth.authMiddleware, async (req, res) => {
+  try {
+    const periods = await fxRatesDb.getAvailableFxPeriods();
+    res.json({ periods });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load FX periods", details: err.message });
+  }
+});
+
+// Get FX rates for a specific period
+app.get("/api/fx-rates/:year/:month", auth.authMiddleware, async (req, res) => {
+  try {
+    const { year, month } = req.params;
+    const yearNum = parseInt(year);
+    const monthNum = parseInt(month);
+    
+    if (!Number.isFinite(yearNum) || !Number.isFinite(monthNum)) {
+      return res.status(400).json({ error: "Invalid year or month" });
+    }
+    
+    const rates = await fxRatesDb.getFxRatesForPeriod(yearNum, monthNum);
+    res.json({ rates });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load FX rates", details: err.message });
+  }
+});
+
+// Get FX rates matrix for a specific year (Budget + months 1..12)
+app.get("/api/fx-rates-matrix/:year", auth.authMiddleware, async (req, res) => {
+  try {
+    const yearNum = parseInt(req.params.year, 10);
+    if (!Number.isFinite(yearNum) || yearNum < 2000) {
+      return res.status(400).json({ error: "Invalid year" });
+    }
+
+    const records = await fxRatesDb.getFxRatesForYear(yearNum);
+    const monthSlots = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+    const currencies = new Set();
+    const byMonth = new Map();
+
+    for (const rec of records) {
+      const pair = String(rec.currency_pair || '').trim().toUpperCase();
+      if (!/^[A-Z]{6}$/.test(pair)) continue;
+
+      const month = Number(rec.month);
+      if (!Number.isFinite(month) || month < 0 || month > 12) continue;
+
+      const rate = Number(rec.rate);
+      if (!Number.isFinite(rate) || rate <= 0) continue;
+
+      const c1 = pair.slice(0, 3);
+      const c2 = pair.slice(3, 6);
+      currencies.add(c1);
+      currencies.add(c2);
+
+      if (!byMonth.has(month)) {
+        byMonth.set(month, {
+          rates: new Map(),
+          meta: new Map()
+        });
+      }
+
+      const slot = byMonth.get(month);
+      if (!slot.rates.has(pair)) {
+        slot.rates.set(pair, rate);
+        slot.meta.set(pair, {
+          source: 'imported',
+          created_at: rec.created_at,
+          updated_at: rec.updated_at
+        });
+      }
+    }
+
+    const matrixCurrencies = ['EUR', 'USD', 'CZK', 'ZAR'];
+    const discoveredCurrencies = new Set(Array.from(currencies));
+    const allCurrencies = matrixCurrencies.filter((ccy) => discoveredCurrencies.has(ccy));
+
+    function findPathRate(from, to, edgeMap) {
+      if (from === to) return { rate: 1, steps: 0 };
+      const queue = [{ ccy: from, rate: 1, steps: 0 }];
+      const visited = new Set([from]);
+      let head = 0;
+
+      while (head < queue.length) {
+        const current = queue[head++];
+        const edges = edgeMap.get(current.ccy) || [];
+
+        for (const edge of edges) {
+          if (visited.has(edge.to)) continue;
+          const nextRate = current.rate * edge.rate;
+          if (!Number.isFinite(nextRate) || nextRate <= 0) continue;
+
+          if (edge.to === to) {
+            return { rate: nextRate, steps: current.steps + 1 };
+          }
+
+          visited.add(edge.to);
+          queue.push({ ccy: edge.to, rate: nextRate, steps: current.steps + 1 });
+        }
+      }
+
+      return null;
+    }
+
+    function resolvePairRate(month, from, to) {
+      const pair = from + to;
+      const reverse = to + from;
+      const slot = byMonth.get(month);
+      if (!slot) return null;
+
+      const direct = slot.rates.get(pair);
+      if (Number.isFinite(direct) && direct > 0) {
+        return {
+          rate: direct,
+          source: slot.meta.get(pair)?.source || 'imported',
+          created_at: slot.meta.get(pair)?.created_at || null
+        };
+      }
+
+      const rev = slot.rates.get(reverse);
+      if (Number.isFinite(rev) && rev > 0) {
+        return {
+          rate: 1 / rev,
+          source: 'inverse',
+          created_at: slot.meta.get(reverse)?.created_at || null
+        };
+      }
+
+      const edgeMap = new Map();
+      for (const [storedPair, storedRate] of slot.rates.entries()) {
+        if (!Number.isFinite(storedRate) || storedRate <= 0) continue;
+        const a = storedPair.slice(0, 3);
+        const b = storedPair.slice(3, 6);
+
+        if (!edgeMap.has(a)) edgeMap.set(a, []);
+        if (!edgeMap.has(b)) edgeMap.set(b, []);
+
+        edgeMap.get(a).push({ to: b, rate: storedRate });
+        edgeMap.get(b).push({ to: a, rate: 1 / storedRate });
+      }
+
+      const pathRate = findPathRate(from, to, edgeMap);
+      if (!pathRate) return null;
+
+      return {
+        rate: pathRate.rate,
+        source: pathRate.steps > 1 ? 'derived' : 'inverse',
+        created_at: null
+      };
+    }
+
+    const pairRows = [];
+    for (let i = 0; i < allCurrencies.length; i++) {
+      for (let j = 0; j < allCurrencies.length; j++) {
+        const from = allCurrencies[i];
+        const to = allCurrencies[j];
+        if (!from || !to) continue;
+        if (from === to) continue;
+
+        const row = {
+          currency1: from,
+          currency2: to,
+          currency_pair: from + to,
+          budget: null,
+          months: {},
+          sources: {}
+        };
+
+        for (const month of monthSlots) {
+          let resolved = resolvePairRate(month, from, to);
+
+          // If budget rate is missing, fallback to the first available month in the year.
+          if (month === 0 && !resolved) {
+            for (let fallbackMonth = 1; fallbackMonth <= 12; fallbackMonth++) {
+              const fallbackResolved = resolvePairRate(fallbackMonth, from, to);
+              if (fallbackResolved) {
+                resolved = {
+                  ...fallbackResolved,
+                  source: `budget-fallback-m${fallbackMonth}`
+                };
+                break;
+              }
+            }
+          }
+
+          const key = month === 0 ? 'budget' : String(month);
+          const rounded = resolved && Number.isFinite(resolved.rate)
+            ? Math.round(resolved.rate * 1000000) / 1000000
+            : null;
+
+          if (month === 0) row.budget = rounded;
+          else row.months[key] = rounded;
+
+          row.sources[key] = resolved ? resolved.source : null;
+        }
+
+        pairRows.push(row);
+      }
+    }
+
+    const matrixCurrencySet = new Set(matrixCurrencies);
+    const filteredRows = pairRows.filter((row) => (
+      matrixCurrencySet.has(row.currency1) && matrixCurrencySet.has(row.currency2)
+    ));
+    const responseCurrencies = allCurrencies.filter((ccy) => matrixCurrencySet.has(ccy));
+
+    res.json({
+      year: yearNum,
+      months: monthSlots,
+      currencies: responseCurrencies,
+      rows: filteredRows
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load FX matrix", details: err.message });
+  }
+});
+
+// Import FX rates from file
+app.post("/api/fx-rates/import", auth.authMiddleware, requireFxRatesManage, async (req, res) => {
+  try {
+    const { rows, overwrite } = req.body || {};
+    
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: "No data to import" });
+    }
+    
+    // Parse and group rates
+    const normalized = fxRatesImport.normalizeFxRateData(rows);
+    if (normalized.length === 0) {
+      return res.status(400).json({ error: "No valid FX rate entries found in data" });
+    }
+    
+    const grouped = fxRatesImport.groupByPeriod(normalized);
+    const results = [];
+    
+    // Save each period
+    for (const period of grouped) {
+      // Check if period exists
+      const exists = await fxRatesDb.fxRatesPeriodExists(period.year, period.month);
+      
+      if (exists && !overwrite) {
+        const periodToken = period.month === 0 ? 'budget' : String(period.month).padStart(2, '0');
+        results.push({
+          period: `${period.year}-${periodToken}`,
+          status: 'skipped',
+          message: 'Period already exists, skipped to avoid overwrite'
+        });
+        continue;
+      }
+      
+      const result = await fxRatesDb.saveFxRates(period.year, period.month, period.rates, overwrite);
+      const periodToken = period.month === 0 ? 'budget' : String(period.month).padStart(2, '0');
+      results.push({
+        period: `${period.year}-${periodToken}`,
+        ...result
+      });
+    }
+    
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Failed to import FX rates" });
+  }
+});
+
+// Delete a single FX rate
+app.delete("/api/fx-rates/:id", auth.authMiddleware, requireFxRatesManage, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await fxRatesDb.deleteFxRate(parseInt(id));
+    
+    if (!result.success) {
+      return res.status(404).json({ error: "FX rate not found" });
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete FX rate", details: err.message });
+  }
+});
+
 // ==================== BOM RECORD ENDPOINTS ====================
 
-app.post("/api/bom/records", auth.authMiddleware, async (req, res) => {
+function normalizeText(value) {
+  return (value ?? "").toString().trim();
+}
+
+function normalizeLower(value) {
+  return normalizeText(value).toLowerCase();
+}
+
+function parsePositiveInt(value) {
+  const n = Number.parseInt(value, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseCsvMultiValues(queryValue) {
+  return toMultiValueArray(queryValue)
+    .map((value) => normalizeText(value))
+    .filter(Boolean);
+}
+
+function matchesFilterValue(sourceValue, acceptedValues) {
+  if (!Array.isArray(acceptedValues) || acceptedValues.length === 0) {
+    return true;
+  }
+
+  const source = normalizeLower(sourceValue);
+  if (!source) return false;
+
+  const accepted = new Set(acceptedValues.map((v) => normalizeLower(v)).filter(Boolean));
+  return accepted.has(source);
+}
+
+function validateAndNormalizeBomMaterials(materials) {
+  if (!Array.isArray(materials) || materials.length === 0) {
+    const error = new Error("At least one BOM material row is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  let totalNonSurfactant = 0;
+  const normalized = materials.map((raw, index) => {
+    const percentage = Number(raw?.percentage);
+    if (!Number.isFinite(percentage) || percentage < 0) {
+      const error = new Error(`Material percentage is invalid at row ${index + 1}.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const materialLabel = normalizeText(raw?.material_label);
+    const isSurfactant = normalizeLower(materialLabel) === "surfactant";
+    if (!isSurfactant) {
+      totalNonSurfactant += percentage;
+    }
+
+    return {
+      material_label: materialLabel,
+      material_name: normalizeText(raw?.material_name),
+      percentage,
+      sort_order: Number.isFinite(Number(raw?.sort_order)) ? Number(raw.sort_order) : index
+    };
+  });
+
+  if (Math.abs(totalNonSurfactant - 100) > 0.01) {
+    const error = new Error(`BOM non-surfactant percentages must sum to 100.00% (current total: ${totalNonSurfactant.toFixed(2)}%).`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalized;
+}
+
+function validatePdIdOrThrow(pdIdRaw) {
+  const pdId = normalizeText(pdIdRaw);
+  if (!pdId) return "";
+  if (!/^\d+$/.test(pdId)) {
+    const error = new Error("PD ID must contain only numeric characters.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return pdId;
+}
+
+async function findDuplicateSapLineRecord(sapIdRaw, lineRaw, excludeRecordId = null) {
+  const sapId = normalizeText(sapIdRaw);
+  const line = normalizeText(lineRaw);
+  if (!sapId || !line) return null;
+
+  if (Number.isFinite(Number(excludeRecordId))) {
+    return db.get(
+      `SELECT id, sap_id, line
+       FROM bom_records
+       WHERE lower(trim(coalesce(sap_id, ''))) = lower(trim(?))
+         AND lower(trim(coalesce(line, ''))) = lower(trim(?))
+         AND id != ?
+       LIMIT 1`,
+      [sapId, line, Number(excludeRecordId)]
+    );
+  }
+
+  return db.get(
+    `SELECT id, sap_id, line
+     FROM bom_records
+     WHERE lower(trim(coalesce(sap_id, ''))) = lower(trim(?))
+       AND lower(trim(coalesce(line, ''))) = lower(trim(?))
+     LIMIT 1`,
+    [sapId, line]
+  );
+}
+
+  async function getNextAvailablePdId() {
+    try {
+      // Get all PD IDs >= 10000 as numbers, sorted
+      const rows = await db.all(
+        "SELECT pd_id FROM bom_records WHERE pd_id IS NOT NULL AND CAST(pd_id AS INTEGER) >= 10000 ORDER BY CAST(pd_id AS INTEGER)",
+        []
+      );
+
+      if (rows.length === 0) {
+        return "10000"; // First available
+      }
+
+      const usedIds = rows
+        .map(r => {
+          const num = parseInt(r.pd_id, 10);
+          return Number.isFinite(num) ? num : null;
+        })
+        .filter(n => n !== null)
+        .sort((a, b) => a - b);
+
+      // Find first gap (or max+1)
+      for (let i = 0; i < usedIds.length; i++) {
+        const expected = 10000 + i;
+        if (usedIds[i] !== expected) {
+          return String(expected);
+        }
+      }
+
+      return String(usedIds[usedIds.length - 1] + 1);
+    } catch (err) {
+      console.error('Error getting next available PD ID:', err);
+      return null;
+    }
+  }
+
+function requireBomRecordWrite(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      if (auth.hasPermission(req.user.role, "user:manage")) {
+        return true;
+      }
+
+      const [calculatorModify, recipeEditModify] = await Promise.all([
+        hasPagePermission(req.user.id, "bom-calculator", "modify"),
+        hasPagePermission(req.user.id, "recipe-edit-clone", "modify")
+      ]);
+
+      return calculatorModify || recipeEditModify;
+    })
+    .then((allowed) => {
+      if (!allowed) {
+        return res.status(403).json({ error: "Insufficient permissions" });
+      }
+      return next();
+    })
+    .catch((err) => {
+      console.error("bom record write permission check failed:", err);
+      return res.status(500).json({ error: "Failed to verify permissions" });
+    });
+}
+
+app.get("/api/bom/edit-clone/metadata", auth.authMiddleware, requireRecipeEditCloneRead, async (req, res) => {
   try {
     await ensureBomRecordStoreReady();
-    const { record, materials } = req.body || {};
+    const selectedYear = parseOptionalYear(req.query.year);
+    const lines = await getLinesForYear(selectedYear);
+
+    const [rows, customersPayload, descriptionListsPayload, materialListsPayload] = await Promise.all([
+      db.all(`
+        SELECT sap_id, pd_id, customer, market_segment, application, smms, mono_bico,
+               structure, bico_ratio_desc, main_raw_mat, treatment, color, bonding,
+               customer_bw, slit_width, author, line, recipe_approved
+        FROM bom_records
+        ORDER BY updated_at DESC, created_at DESC
+      `),
+      getCustomerNames(),
+      getDescriptionListValues(),
+      getMaterialListValues()
+    ]);
+
+    const toUnique = (values) => [...new Set((values || []).filter((v) => v !== null && v !== undefined && `${v}`.trim() !== ""))];
+
+    const sapIds = toUnique(rows.map((r) => r.sap_id)).sort(compareValuesForDisplay);
+    const pfnIds = toUnique(rows.map((r) => r.pd_id)).sort(compareValuesForDisplay);
+    const customers = toUnique(rows.map((r) => r.customer)).sort(compareValuesForDisplay);
+    const marketSegments = toUnique(rows.map((r) => r.market_segment)).sort(compareValuesForDisplay);
+    const applications = toUnique(rows.map((r) => r.application)).sort(compareValuesForDisplay);
+    const smsOptions = toUnique(rows.map((r) => r.smms)).sort(compareValuesForDisplay);
+    const monoBicoOptions = toUnique(rows.map((r) => r.mono_bico)).sort(compareValuesForDisplay);
+    const structures = toUnique(rows.map((r) => r.structure)).sort(compareValuesForDisplay);
+    const bicoRatios = toUnique(rows.map((r) => r.bico_ratio_desc)).sort(compareValuesForDisplay);
+    const mainRawMats = toUnique(rows.map((r) => r.main_raw_mat)).sort(compareValuesForDisplay);
+    const treatments = toUnique(rows.map((r) => r.treatment)).sort(compareValuesForDisplay);
+    const colors = toUnique(rows.map((r) => r.color)).sort(compareValuesForDisplay);
+    const bondings = toUnique(rows.map((r) => r.bonding)).sort(compareValuesForDisplay);
+    const basisWeights = toUnique(rows.map((r) => r.customer_bw)).sort((a, b) => Number(a) - Number(b));
+    const slitWidths = toUnique(rows.map((r) => r.slit_width)).sort((a, b) => Number(a) - Number(b));
+    const authors = toUnique(rows.map((r) => r.author)).sort(compareValuesForDisplay);
+    const lineIds = toUnique(rows.map((r) => r.line)).sort(compareValuesForDisplay);
+    const recipeApprovedValues = toUnique(rows.map((r) => r.recipe_approved || "No")).sort(compareValuesForDisplay);
+    const countries = toUnique(
+      rows.map((r) => {
+        const key = normalizeText(r.line);
+        return key ? (lines[key]?.country || "") : "";
+      })
+    ).sort(compareValuesForDisplay);
+
+    res.json({
+      filters: {
+        sapIds,
+        pfnIds,
+        customers,
+        marketSegments,
+        applications,
+        smsOptions,
+        bondings,
+        basisWeights,
+        slitWidths,
+        treatments,
+        authors,
+        lineIds,
+        countries,
+        recipeApprovedValues
+      },
+      editor: {
+        customers: normalizeUniqueStrings(customersPayload || []),
+        descriptionLists: descriptionListsPayload || {},
+        materialLists: materialListsPayload || {},
+        lineIds,
+        monoBicoOptions,
+        structures,
+        bicoRatios,
+        mainRawMats,
+        colors,
+        bondings,
+        targetUnits: ["tons", "kg"]
+      }
+    });
+  } catch (err) {
+    console.error("Error loading recipe edit/clone metadata:", err);
+    res.status(500).json({ error: "Failed to load recipe edit/clone metadata", details: err.message });
+  }
+});
+
+app.get("/api/bom/edit-clone/rows", auth.authMiddleware, requireRecipeEditCloneRead, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const selectedYear = parseOptionalYear(req.query.year);
+    const lines = await getLinesForYear(selectedYear);
+
+    const filters = {
+      sapId: parseCsvMultiValues(req.query.sapId),
+      pfnId: parseCsvMultiValues(req.query.pfnId),
+      customer: parseCsvMultiValues(req.query.customer),
+      marketSegment: parseCsvMultiValues(req.query.marketSegment),
+      application: parseCsvMultiValues(req.query.application),
+      s_sms: parseCsvMultiValues(req.query.s_sms),
+      bonding: parseCsvMultiValues(req.query.bonding),
+      basisWeight: parseCsvMultiValues(req.query.basisWeight),
+      slitWidth: parseCsvMultiValues(req.query.slitWidth),
+      treatment: parseCsvMultiValues(req.query.treatment),
+      author: parseCsvMultiValues(req.query.author),
+      lineId: parseCsvMultiValues(req.query.lineId),
+      country: parseCsvMultiValues(req.query.country),
+      recipeApproved: parseCsvMultiValues(req.query.recipeApproved)
+    };
+
+    const [records, materialRows] = await Promise.all([
+      db.all(`SELECT * FROM bom_records ORDER BY updated_at DESC, created_at DESC`),
+      db.all(`
+        SELECT record_id, material_label, material_name, percentage, sort_order
+        FROM bom_record_materials
+        ORDER BY record_id, sort_order
+      `)
+    ]);
+
+    const materialsByRecord = new Map();
+    for (const row of materialRows || []) {
+      if (!materialsByRecord.has(row.record_id)) {
+        materialsByRecord.set(row.record_id, []);
+      }
+      materialsByRecord.get(row.record_id).push({
+        material_label: row.material_label,
+        material_name: row.material_name,
+        percentage: Number(row.percentage) || 0,
+        sort_order: Number(row.sort_order) || 0
+      });
+    }
+
+    const filtered = (records || []).filter((record) => {
+      const lineKey = normalizeText(record.line);
+      const country = lineKey ? (lines[lineKey]?.country || "") : "";
+
+      return (
+        matchesFilterValue(record.sap_id, filters.sapId) &&
+        matchesFilterValue(record.pd_id, filters.pfnId) &&
+        matchesFilterValue(record.customer, filters.customer) &&
+        matchesFilterValue(record.market_segment, filters.marketSegment) &&
+        matchesFilterValue(record.application, filters.application) &&
+        matchesFilterValue(record.smms, filters.s_sms) &&
+        matchesFilterValue(record.bonding, filters.bonding) &&
+        matchesFilterValue(record.customer_bw, filters.basisWeight) &&
+        matchesFilterValue(record.slit_width, filters.slitWidth) &&
+        matchesFilterValue(record.treatment, filters.treatment) &&
+        matchesFilterValue(record.author, filters.author) &&
+        matchesFilterValue(record.line, filters.lineId) &&
+        matchesFilterValue(country, filters.country) &&
+        matchesFilterValue(record.recipe_approved || "No", filters.recipeApproved)
+      );
+    }).map((record) => {
+      const materials = materialsByRecord.get(record.id) || [];
+      const total = materials.reduce((sum, m) => sum + (Number(m.percentage) || 0), 0);
+      const lineKey = normalizeText(record.line);
+
+      return {
+        ...record,
+        country: lineKey ? (lines[lineKey]?.country || "") : "",
+        materials,
+        material_total_percent: Math.round(total * 10000) / 10000
+      };
+    });
+
+    res.json({ rows: filtered });
+  } catch (err) {
+    console.error("Error loading recipe edit/clone rows:", err);
+    res.status(500).json({ error: "Failed to load recipe edit/clone rows", details: err.message });
+  }
+});
+
+app.post("/api/bom/records", auth.authMiddleware, requireBomRecordWrite, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const { record, materials, calculationSnapshot, sourceRecordId } = req.body || {};
     if (!record || typeof record !== 'object') {
       return res.status(400).json({ error: 'Request body must include a record object.' });
     }
@@ -1579,9 +3781,29 @@ app.post("/api/bom/records", auth.authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Request body must include a materials array.' });
     }
 
-    // Validate PD ID - must be numeric only
-    if (record.pd_id && !/^\d+$/.test(String(record.pd_id).trim())) {
-      return res.status(400).json({ error: 'PD ID must contain only numeric characters.' });
+    // Auto-assign next available PD ID (>= 10000) for new/cloned recipes.
+    const nextPdId = await getNextAvailablePdId();
+    if (!nextPdId) {
+      return res.status(500).json({ error: 'Failed to generate PD ID.' });
+    }
+    record.pd_id = nextPdId;
+
+    try {
+      validatePdIdOrThrow(record.pd_id);
+    } catch (validationErr) {
+      return res.status(validationErr.statusCode || 400).json({ error: validationErr.message });
+    }
+
+    let normalizedMaterials;
+    try {
+      normalizedMaterials = validateAndNormalizeBomMaterials(materials);
+    } catch (validationErr) {
+      return res.status(validationErr.statusCode || 400).json({ error: validationErr.message });
+    }
+
+    const duplicate = await findDuplicateSapLineRecord(record.sap_id, record.line);
+    if (duplicate) {
+      return res.status(409).json({ error: 'Duplicate recipe exists for this SAP ID and Line. Please use another SAP ID/Line combination.' });
     }
 
     await db.run('BEGIN');
@@ -1600,6 +3822,8 @@ app.post("/api/bom/records", auth.authMiddleware, async (req, res) => {
         throw new Error('Unable to allocate BOM record ID.');
       }
 
+      const snapshotToStore = normalizeCalculationSnapshot(calculationSnapshot);
+
       const result = await db.run(`
         INSERT INTO bom_records (
           id,
@@ -1610,8 +3834,9 @@ app.post("/api/bom/records", auth.authMiddleware, async (req, res) => {
           other_scrap_percent, total_scrap_percent, gross_yield_percent,
           s_beams, m_beams, sb_throughput, mb_throughput, total_throughput, production_time,
           cores, slit_width, length_meters, roll_diameter,
-          target_production, target_unit, notes, author, created_by
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          target_production, target_unit, overconsumption, notes, author, created_by, recipe_approved, calculation_snapshot_json
+          , approval_decision
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         recordId,
         record.sap_id || null, record.pd_id || null, record.customer || null,
@@ -1629,15 +3854,20 @@ app.post("/api/bom/records", auth.authMiddleware, async (req, res) => {
         record.total_throughput || null, record.production_time || null,
         record.cores || null, record.slit_width || null, record.length_meters || null,
         record.roll_diameter || null, record.target_production || null,
-        record.target_unit || null, record.notes || null, req.user.name || 'Unknown', req.user.id
+        record.target_unit || null,
+        Number.isFinite(Number(record.overconsumption)) ? Number(record.overconsumption) : null,
+        record.notes || null, req.user.name || 'Unknown', req.user.id,
+        'No',
+        snapshotToStore ? JSON.stringify(snapshotToStore) : null,
+        'Pending'
       ]);
 
       if (!result || result.changes !== 1) {
         throw new Error('Failed to insert BOM record header.');
       }
 
-      for (let i = 0; i < materials.length; i++) {
-        const m = materials[i] || {};
+      for (let i = 0; i < normalizedMaterials.length; i++) {
+        const m = normalizedMaterials[i] || {};
         const materialLabel = m.material_label || '';
         const materialName = m.material_name || '';
         const materialPercentage = Number.isFinite(Number(m.percentage)) ? Number(m.percentage) : 0;
@@ -1653,7 +3883,44 @@ app.post("/api/bom/records", auth.authMiddleware, async (req, res) => {
       }
 
       await db.run('COMMIT');
-      res.status(201).json({ success: true, id: recordId });
+      const sourceId = parsePositiveInt(sourceRecordId);
+      if (sourceId) {
+        await auth.auditLog(req.user.id, 'BOM_RECORD_CLONED', 'bom_record', {
+          sourceRecordId: sourceId,
+          newRecordId: recordId
+        });
+      } else {
+        await auth.auditLog(req.user.id, 'BOM_RECORD_CREATED', 'bom_record', { recordId });
+      }
+
+      let submissionEmailResult = { sent: false, reason: 'not_attempted' };
+      try {
+        submissionEmailResult = await sendRecipeSubmissionEmail({
+          recipeRecord: {
+            id: recordId,
+            sap_id: record.sap_id,
+            pd_id: nextPdId,
+            customer: record.customer,
+            line: record.line
+          },
+          actorName: req.user.name || req.user.email || 'Unknown',
+          sourceRecordId: sourceId || null
+        });
+      } catch (mailErr) {
+        submissionEmailResult = { sent: false, reason: mailErr.message || 'mail_send_failed' };
+      }
+
+      if (!submissionEmailResult.sent) {
+        console.warn('Recipe submission email was not sent:', submissionEmailResult.reason);
+      }
+
+      res.status(201).json({
+        success: true,
+        id: recordId,
+        pd_id: record.pd_id || null,
+        emailSent: !!submissionEmailResult.sent,
+        emailReason: submissionEmailResult.reason || null
+      });
     } catch (innerErr) {
       await db.run('ROLLBACK').catch(() => {});
       throw innerErr;
@@ -1680,6 +3947,248 @@ app.get("/api/bom/records", auth.authMiddleware, async (req, res) => {
   }
 });
 
+app.get("/api/bom/recipe-summary/metadata", auth.authMiddleware, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const selectedYear = parseOptionalYear(req.query.year);
+    const lines = await getLinesForYear(selectedYear);
+    const rows = await db.all(`
+      SELECT sap_id, pd_id, customer, market_segment, application, smms, bonding,
+             customer_bw, slit_width, treatment, author, line, overconsumption
+      FROM bom_records
+      ORDER BY created_at DESC
+    `);
+
+    const sapIds = [...new Set(rows.map((r) => r.sap_id).filter(Boolean))].sort();
+    const pfnIds = [...new Set(rows.map((r) => r.pd_id).filter(Boolean))].sort();
+    const customers = [...new Set(rows.map((r) => r.customer).filter(Boolean))].sort();
+    const marketSegments = [...new Set(rows.map((r) => r.market_segment).filter(Boolean))].sort();
+    const applications = [...new Set(rows.map((r) => r.application).filter(Boolean))].sort();
+    const smsOptions = [...new Set(rows.map((r) => r.smms).filter(Boolean))].sort();
+    const bondings = [...new Set(rows.map((r) => r.bonding).filter(Boolean))].sort();
+    const basisWeights = [...new Set(rows.map((r) => r.customer_bw).filter((v) => v !== null && v !== undefined))]
+      .sort((a, b) => Number(a) - Number(b));
+    const slitWidths = [...new Set(rows.map((r) => r.slit_width).filter((v) => v !== null && v !== undefined))]
+      .sort((a, b) => Number(a) - Number(b));
+    const treatments = [...new Set(rows.map((r) => r.treatment).filter(Boolean))].sort();
+    const authors = [...new Set(rows.map((r) => r.author).filter(Boolean))].sort();
+    const overconsumptions = [...new Set(rows.map((r) => r.overconsumption).filter((v) => v !== null && v !== undefined))]
+      .sort((a, b) => Number(a) - Number(b));
+    const lineIds = [...new Set(rows.map((r) => r.line).filter(Boolean))].sort();
+    const countries = [...new Set(
+      rows
+        .map((r) => (lines[(r.line || "").toString().trim()] || {}).country)
+        .filter(Boolean)
+    )].sort();
+
+    res.json({
+      sapIds,
+      pfnIds,
+      customers,
+      marketSegments,
+      applications,
+      smsOptions,
+      bondings,
+      basisWeights,
+      slitWidths,
+      treatments,
+      authors,
+      overconsumptions,
+      lineIds,
+      countries,
+      currencies: ["USD", "CZK", "EUR", "ZAR", "GBP"],
+      totalRecords: rows.length
+    });
+  } catch (err) {
+    console.error("Error loading BOM recipe summary metadata:", err);
+    res.status(500).json({ error: "Failed to load recipe summary metadata", details: err.message });
+  }
+});
+
+app.get("/api/bom/recipe-summary", auth.authMiddleware, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const displayCurrency = req.query.currency || "USD";
+    const selectedYear = parseOptionalYear(req.query.year);
+    const lines = await getLinesForYear(selectedYear);
+
+    const filters = {
+      sapId: toMultiValueArray(req.query.sapId),
+      pfnId: toMultiValueArray(req.query.pfnId),
+      customer: toMultiValueArray(req.query.customer),
+      marketSegment: toMultiValueArray(req.query.marketSegment),
+      application: toMultiValueArray(req.query.application),
+      s_sms: toMultiValueArray(req.query.s_sms),
+      bonding: toMultiValueArray(req.query.bonding),
+      basisWeight: toMultiValueArray(req.query.basisWeight),
+      slitWidth: toMultiValueArray(req.query.slitWidth),
+      treatment: toMultiValueArray(req.query.treatment),
+      author: toMultiValueArray(req.query.author),
+      lineId: toMultiValueArray(req.query.lineId),
+      country: toMultiValueArray(req.query.country),
+      overconsumption: toMultiValueArray(req.query.overconsumption)
+    };
+
+    const records = await db.all(`
+      SELECT id, sap_id, pd_id, customer, market_segment, application, smms, bonding,
+             customer_bw, slit_width, treatment, author, line,
+             gross_yield_percent, total_throughput, overconsumption,
+             recipe_approved, calculation_snapshot_json, created_at, updated_at
+      FROM bom_records
+      ORDER BY created_at DESC
+    `);
+
+    const materialRows = await db.all(`
+      SELECT record_id, material_name, percentage, sort_order
+      FROM bom_record_materials
+      ORDER BY record_id, sort_order
+    `);
+
+    const materialsByRecord = new Map();
+    for (const row of materialRows) {
+      if (!materialsByRecord.has(row.record_id)) {
+        materialsByRecord.set(row.record_id, []);
+      }
+      materialsByRecord.get(row.record_id).push(row);
+    }
+
+    const dbMaterialPrices = await buildDbMaterialPricesForLines(records.map((r) => r.line));
+
+    const data = computeBomRecipeSummaryCosts({
+      records,
+      materialsByRecord,
+      displayCurrency,
+      filters,
+      dbMaterialPrices,
+      linesOverride: lines
+    });
+
+    res.json(data);
+  } catch (err) {
+    console.error("Error loading BOM recipe summary:", err);
+    res.status(500).json({ error: "Failed to load recipe summary", details: err.message });
+  }
+});
+
+app.get("/api/bom/recipe-summary/export", auth.authMiddleware, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const displayCurrency = req.query.currency || "USD";
+    const format = String(req.query.format || "csv").toLowerCase();
+    const selectedYear = parseOptionalYear(req.query.year);
+    const lines = await getLinesForYear(selectedYear);
+
+    const filters = {
+      sapId: toMultiValueArray(req.query.sapId),
+      pfnId: toMultiValueArray(req.query.pfnId),
+      customer: toMultiValueArray(req.query.customer),
+      marketSegment: toMultiValueArray(req.query.marketSegment),
+      application: toMultiValueArray(req.query.application),
+      s_sms: toMultiValueArray(req.query.s_sms),
+      bonding: toMultiValueArray(req.query.bonding),
+      basisWeight: toMultiValueArray(req.query.basisWeight),
+      slitWidth: toMultiValueArray(req.query.slitWidth),
+      treatment: toMultiValueArray(req.query.treatment),
+      author: toMultiValueArray(req.query.author),
+      lineId: toMultiValueArray(req.query.lineId),
+      country: toMultiValueArray(req.query.country),
+      overconsumption: toMultiValueArray(req.query.overconsumption)
+    };
+
+    const records = await db.all(`
+      SELECT id, sap_id, pd_id, customer, market_segment, application, smms, bonding,
+             customer_bw, slit_width, treatment, author, line,
+             gross_yield_percent, total_throughput, overconsumption,
+             recipe_approved, calculation_snapshot_json, created_at, updated_at
+      FROM bom_records
+      ORDER BY created_at DESC
+    `);
+
+    const materialRows = await db.all(`
+      SELECT record_id, material_name, percentage, sort_order
+      FROM bom_record_materials
+      ORDER BY record_id, sort_order
+    `);
+
+    const materialsByRecord = new Map();
+    for (const row of materialRows) {
+      if (!materialsByRecord.has(row.record_id)) {
+        materialsByRecord.set(row.record_id, []);
+      }
+      materialsByRecord.get(row.record_id).push(row);
+    }
+
+    const dbMaterialPrices = await buildDbMaterialPricesForLines(records.map((r) => r.line));
+
+    const data = computeBomRecipeSummaryCosts({
+      records,
+      materialsByRecord,
+      displayCurrency,
+      filters,
+      dbMaterialPrices,
+      linesOverride: lines
+    });
+
+    if (!data.length) {
+      return res.status(404).json({ error: "No data to export" });
+    }
+
+    const rows = data.map((item) => ({
+      "Recipe Approved": item.recipeApproved || "",
+      "SAP ID": item.sapId || "",
+      "PD ID": item.pfnId || "",
+      "Customer": item.customer || "",
+      "Market Segment": item.marketSegment || "",
+      "Application": item.application || "",
+      "S/SMS": item.s_sms || "",
+      "Bonding": item.bonding || "",
+      "Basis Weight": item.basisWeight || "",
+      "Slit Width": item.slitWidth || "",
+      "Treatment": item.treatment || "",
+      "Author": item.author || "",
+      "Gross Yield %": Number.isFinite(Number(item.grossYield)) ? (Number(item.grossYield) * 100) : "",
+      "Throughput": item.throughput || "",
+      "Line": item.lineId || "",
+      "Country": item.country || "",
+      "Overconsumption %": Number.isFinite(Number(item.overconsumption)) ? (Number(item.overconsumption) * 100) : "",
+      "Material Cost": Number.isFinite(Number(item.materialCostNet)) ? Number(item.materialCostNet) : "",
+      "Process Cost": Number.isFinite(Number(item.processCost)) ? Number(item.processCost) : "",
+      "Total Cost": Number.isFinite(Number(item.totalCost)) ? Number(item.totalCost) : "",
+      "Currency": item.currency || displayCurrency
+    }));
+
+    const safeDate = new Date().toISOString().slice(0, 10);
+
+    if (format === "xlsx" || format === "excel") {
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Recipe Summary");
+      const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="recipe-summary-${safeDate}.xlsx"`);
+      return res.send(buffer);
+    }
+
+    const headers = Object.keys(rows[0]);
+    const escapeCsvCell = (value) => {
+      const text = String(value ?? "");
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const csv = [
+      headers.map(escapeCsvCell).join(","),
+      ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(","))
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="recipe-summary-${safeDate}.csv"`);
+    return res.send(csv);
+  } catch (err) {
+    console.error("Error exporting BOM recipe summary:", err);
+    res.status(500).json({ error: "Failed to export recipe summary", details: err.message });
+  }
+});
+
 app.get("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
   try {
     await ensureBomRecordStoreReady();
@@ -1700,13 +4209,162 @@ app.get("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
   }
 });
 
-app.put("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
+app.get("/api/bom/approvals/pending", auth.authMiddleware, requireRecipeApprovalRead, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const rows = await db.all(`
+      SELECT
+        br.id,
+        br.sap_id,
+        br.pd_id,
+        br.customer,
+        br.line,
+        br.author,
+        br.created_by,
+        br.created_at,
+        br.updated_at,
+        br.recipe_approved,
+        br.approval_decision,
+        br.approval_comment,
+        br.approval_reviewed_at
+      FROM bom_records br
+      WHERE COALESCE(br.recipe_approved, 'Yes') = 'No'
+      ORDER BY br.updated_at DESC, br.created_at DESC
+    `);
+
+    const enrichedRows = await Promise.all((rows || []).map(async (row) => {
+      const rawDecision = String(row.approval_decision || '').trim();
+      const normalizedDecision = rawDecision.toLowerCase() === 'approved' ? 'Pending' : (rawDecision || 'Pending');
+
+      return {
+        ...row,
+        approval_decision: normalizedDecision,
+        author_email: await resolveAuthorEmailByUserId(row.created_by)
+      };
+    }));
+
+    res.json({ records: enrichedRows });
+  } catch (err) {
+    console.error("Error loading pending recipe approvals:", err);
+    res.status(500).json({ error: "Failed to load pending approvals", details: err.message });
+  }
+});
+
+app.get("/api/bom/approvals/:id", auth.authMiddleware, requireRecipeApprovalRead, async (req, res) => {
   try {
     await ensureBomRecordStoreReady();
     const id = parseInt(req.params.id, 10);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid record ID.' });
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: "Invalid record ID." });
+    }
 
-    const { record, materials } = req.body || {};
+    const record = await db.get('SELECT * FROM bom_records WHERE id = ?', [id]);
+
+    if (!record) {
+      return res.status(404).json({ error: "Record not found." });
+    }
+
+    record.author_email = await resolveAuthorEmailByUserId(record.created_by);
+    if (!record.author_email) {
+      record.author_email = resolveAuthorEmailFromRecord(record);
+    }
+
+    const materials = await db.all(
+      "SELECT material_label, material_name, percentage, sort_order FROM bom_record_materials WHERE record_id = ? ORDER BY sort_order",
+      [id]
+    );
+
+    res.json({ record, materials });
+  } catch (err) {
+    console.error("Error loading recipe approval detail:", err);
+    res.status(500).json({ error: "Failed to load recipe detail", details: err.message });
+  }
+});
+
+app.post("/api/bom/approvals/:id/action", auth.authMiddleware, requireRecipeApprovalModify, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: "Invalid record ID." });
+    }
+
+    const normalizedAction = normalizeRecipeDecisionInput(req.body?.action);
+    if (!normalizedAction) {
+      return res.status(400).json({ error: "Action must be one of: approve, revise, reject." });
+    }
+
+    const comment = String(req.body?.comment || "").trim();
+    if (!comment) {
+      return res.status(400).json({ error: "Comment is required." });
+    }
+
+    const record = await db.get('SELECT * FROM bom_records WHERE id = ?', [id]);
+
+    if (!record) {
+      return res.status(404).json({ error: "Record not found." });
+    }
+
+    record.author_email = await resolveAuthorEmailByUserId(record.created_by);
+
+    const mapped = mapRecipeDecisionToStatus(normalizedAction);
+
+    await db.run(
+      `UPDATE bom_records
+       SET recipe_approved = ?,
+           approval_decision = ?,
+           approval_comment = ?,
+           approval_reviewed_by = ?,
+           approval_reviewed_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [mapped.recipeApproved, mapped.approvalDecision, comment, req.user.id, id]
+    );
+
+    await auth.auditLog(req.user.id, "RECIPE_APPROVAL_ACTION", "bom_record", {
+      recordId: id,
+      action: normalizedAction,
+      decision: mapped.approvalDecision
+    });
+
+    let emailResult = { sent: false, reason: "not_attempted" };
+    try {
+      emailResult = await sendRecipeDecisionEmail({
+        toEmail: record.author_email,
+        reviewerName: req.user.name || req.user.email || "Unknown",
+        decisionLabel: mapped.label,
+        comment,
+        recipeRecord: record
+      });
+    } catch (mailErr) {
+      emailResult = { sent: false, reason: mailErr.message || "mail_send_failed" };
+    }
+
+    if (!emailResult.sent) {
+      console.warn("Recipe approval email was not sent:", emailResult.reason);
+    }
+
+    res.json({
+      success: true,
+      message: `Recipe ${mapped.label.toLowerCase()}.`,
+      result: {
+        id,
+        recipeApproved: mapped.recipeApproved,
+        approvalDecision: mapped.approvalDecision,
+        comment,
+        emailSent: !!emailResult.sent,
+        emailReason: emailResult.reason || null
+      }
+    });
+  } catch (err) {
+    console.error("Error applying recipe approval action:", err);
+    res.status(500).json({ error: "Failed to process approval action", details: err.message });
+  }
+});
+
+app.post("/api/bom/cost-preview", auth.authMiddleware, async (req, res) => {
+  try {
+    const { record, materials, currency, year } = req.body || {};
     if (!record || typeof record !== 'object') {
       return res.status(400).json({ error: 'Request body must include a record object.' });
     }
@@ -1714,8 +4372,66 @@ app.put("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Request body must include a materials array.' });
     }
 
-    const existing = await db.get('SELECT id FROM bom_records WHERE id = ?', [id]);
+    const fx = loadFxRates() || {};
+  const lines = await getLinesForYear(year || req.query.year);
+    const loaded = loadMaterials(fx) || { materials: {}, siko: {} };
+    const dbMaterialPrices = await buildDbMaterialPricesForLines([record.line]);
+    const item = computeBomRecipeCostItem({
+      record,
+      recordMaterials: materials,
+      displayCurrency: currency || 'USD',
+      dbMaterialPrices,
+      fx,
+      lines,
+      loaded
+    });
+
+    if (!item) {
+      return res.status(400).json({ error: 'Unable to compute cost preview. Please verify line and required inputs.' });
+    }
+
+    res.json({ item });
+  } catch (err) {
+    console.error('Error computing BOM cost preview:', err);
+    res.status(500).json({ error: 'Failed to compute BOM cost preview', details: err.message });
+  }
+});
+
+app.put("/api/bom/records/:id", auth.authMiddleware, requireBomRecordWrite, async (req, res) => {
+  try {
+    await ensureBomRecordStoreReady();
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid record ID.' });
+
+    const { record, materials, sendApprovalRequest } = req.body || {};
+    if (!record || typeof record !== 'object') {
+      return res.status(400).json({ error: 'Request body must include a record object.' });
+    }
+    if (!Array.isArray(materials)) {
+      return res.status(400).json({ error: 'Request body must include a materials array.' });
+    }
+
+    const existing = await db.get('SELECT id, pd_id, recipe_approved, approval_decision, approval_comment, line, customer FROM bom_records WHERE id = ?', [id]);
     if (!existing) return res.status(404).json({ error: 'Record not found.' });
+
+    let normalizedMaterials;
+    try {
+      normalizedMaterials = validateAndNormalizeBomMaterials(materials);
+      validatePdIdOrThrow(record.pd_id);
+    } catch (validationErr) {
+      return res.status(validationErr.statusCode || 400).json({ error: validationErr.message });
+    }
+
+    const existingPd = normalizeText(existing.pd_id);
+    const nextPd = normalizeText(record.pd_id);
+    if (existingPd && nextPd !== existingPd) {
+      return res.status(400).json({ error: 'Existing PD ID cannot be changed in Edit mode.' });
+    }
+
+    const duplicate = await findDuplicateSapLineRecord(record.sap_id, record.line, id);
+    if (duplicate) {
+      return res.status(409).json({ error: 'Duplicate recipe exists for this SAP ID and Line. Please use another SAP ID/Line combination.' });
+    }
 
     await db.run('BEGIN');
     try {
@@ -1728,7 +4444,9 @@ app.put("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
           other_scrap_percent=?, total_scrap_percent=?, gross_yield_percent=?,
           s_beams=?, m_beams=?, sb_throughput=?, mb_throughput=?, total_throughput=?, production_time=?,
           cores=?, slit_width=?, length_meters=?, roll_diameter=?,
-          target_production=?, target_unit=?, notes=?,
+          target_production=?, target_unit=?, overconsumption=?, notes=?,
+          recipe_approved=?, approval_decision=?, approval_comment=?,
+          approval_reviewed_by=NULL, approval_reviewed_at=NULL,
           updated_at=CURRENT_TIMESTAMP
         WHERE id=?
       `, [
@@ -1747,13 +4465,19 @@ app.put("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
         record.total_throughput || null, record.production_time || null,
         record.cores || null, record.slit_width || null, record.length_meters || null,
         record.roll_diameter || null, record.target_production || null,
-        record.target_unit || null, record.notes || null, id
+        record.target_unit || null,
+        Number.isFinite(Number(record.overconsumption)) ? Number(record.overconsumption) : null,
+        record.notes || null,
+        existing.recipe_approved || 'No',
+        existing.approval_decision || 'Pending',
+        existing.approval_comment || null,
+        id
       ]);
 
       await db.run('DELETE FROM bom_record_materials WHERE record_id = ?', [id]);
 
-      for (let i = 0; i < materials.length; i++) {
-        const m = materials[i];
+      for (let i = 0; i < normalizedMaterials.length; i++) {
+        const m = normalizedMaterials[i];
         await db.run(
           'INSERT INTO bom_record_materials (record_id, sort_order, material_label, material_name, percentage) VALUES (?,?,?,?,?)',
           [id, i, m.material_label || '', m.material_name || '', m.percentage || 0]
@@ -1761,7 +4485,36 @@ app.put("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
       }
 
       await db.run('COMMIT');
-      res.json({ success: true, id });
+      await auth.auditLog(req.user.id, 'BOM_RECORD_UPDATED', 'bom_record', { recordId: id });
+
+      let submissionEmailResult = { sent: false, reason: 'not_requested' };
+      if (sendApprovalRequest) {
+        try {
+          submissionEmailResult = await sendRecipeEditApprovalRequestEmail({
+            recipeRecord: {
+              id,
+              sap_id: record.sap_id,
+              pd_id: record.pd_id,
+              customer: record.customer || existing.customer,
+              line: record.line || existing.line
+            },
+            actorName: req.user.name || req.user.email || 'Unknown'
+          });
+        } catch (mailErr) {
+          submissionEmailResult = { sent: false, reason: mailErr.message || 'mail_send_failed' };
+        }
+
+        if (!submissionEmailResult.sent) {
+          console.warn('Recipe submission email was not sent on update:', submissionEmailResult.reason);
+        }
+      }
+
+      res.json({
+        success: true,
+        id,
+        emailSent: !!submissionEmailResult.sent,
+        emailReason: submissionEmailResult.reason || null
+      });
     } catch (innerErr) {
       await db.run('ROLLBACK').catch(() => {});
       throw innerErr;
@@ -1772,57 +4525,43 @@ app.put("/api/bom/records/:id", auth.authMiddleware, async (req, res) => {
   }
 });
 
-app.post("/api/products/update", (req, res) => {
+app.delete("/api/bom/records/:id", auth.authMiddleware, requireRecipeDeleteAdminGroup, async (req, res) => {
   try {
-    const { rowIndex, updates } = req.body;
-    
-    if (rowIndex === undefined || rowIndex === null) {
-      return res.status(400).json({ error: "Missing rowIndex in request body" });
-    }
-    
-    if (!updates || typeof updates !== "object") {
-      return res.status(400).json({ error: "Missing or invalid updates in request body" });
+    await ensureBomRecordStoreReady();
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: "Invalid record ID." });
     }
 
-    const result = updateProduct(rowIndex, updates);
-    res.json(result);
+    const existing = await db.get("SELECT id, pd_id, sap_id FROM bom_records WHERE id = ?", [id]);
+    if (!existing) {
+      return res.status(404).json({ error: "Record not found." });
+    }
+
+    await db.run("BEGIN");
+    try {
+      await db.run("DELETE FROM bom_record_materials WHERE record_id = ?", [id]);
+      await db.run("DELETE FROM bom_records WHERE id = ?", [id]);
+      await db.run("COMMIT");
+    } catch (txErr) {
+      await db.run("ROLLBACK").catch(() => {});
+      throw txErr;
+    }
+
+    await auth.auditLog(req.user.id, "BOM_RECORD_DELETED", "bom_record", {
+      recordId: id,
+      pdId: existing.pd_id || null,
+      sapId: existing.sap_id || null
+    });
+
+    return res.json({
+      success: true,
+      id,
+      message: "Recipe deleted."
+    });
   } catch (err) {
-    console.error("Error updating product:", err);
-    res.status(500).json({ error: "Failed to update product", details: err.message });
-  }
-});
-
-// Duplicate (copy) a product
-app.post("/api/products/duplicate", (req, res) => {
-  try {
-    const { rowIndex } = req.body;
-    
-    if (rowIndex === undefined || rowIndex === null) {
-      return res.status(400).json({ error: "Missing rowIndex in request body" });
-    }
-
-    const newRowIndex = duplicateProduct(rowIndex);
-    res.json({ success: true, newRowIndex });
-  } catch (err) {
-    console.error("Error duplicating product:", err);
-    res.status(500).json({ error: "Failed to duplicate product", details: err.message });
-  }
-});
-
-// Delete a product
-app.post("/api/products/delete", (req, res) => {
-  try {
-    const { rowIndex } = req.body;
-    
-    if (rowIndex === undefined || rowIndex === null) {
-      return res.status(400).json({ error: "Missing rowIndex in request body" });
-    }
-
-    deleteProduct(rowIndex);
-    res.json({ success: true, message: "Product deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting product:", err);
-    res.status(500).json({ error: "Failed to delete product", details: err.message });
+    console.error("Error deleting BOM record:", err);
+    return res.status(500).json({ error: "Failed to delete BOM record", details: err.message });
   }
 });
 
@@ -1858,26 +4597,49 @@ console.log(`[STARTUP] Node version: ${process.version}`);
 console.log(`[STARTUP] Working directory: ${process.cwd()}`);
 console.log(`[STARTUP] __dirname: ${__dirname}`);
 
-app.listen(PORT, () => {
-  console.log(`✓ Server running at http://localhost:${PORT}`);
-  console.log(`✓ Database initialized at ${path.join(__dirname, 'data', 'mini_erp.db')}`);
-  console.log(``);
-  console.log(`Frontend routes:`);
-  console.log(`  - GET / → /login.html (redirect)`);
-  console.log(`  - GET /dashboard → index.html`);
-  console.log(`  - GET /bom-calculator → bom-calculator.html`);
-  console.log(`  - GET /bom-recipe-browser → bom-recipe-browser.html`);
-  console.log(`  - GET /products → products-editor.html`);
-  console.log(``);
-  console.log(`API endpoints:`);
-  console.log(`  - GET /api/health - Health check`);
-  console.log(`  - POST /api/auth/login - User login`);
-  console.log(`  - GET /api/metadata - Available filters`);
-  console.log(`  - GET /api/costs - Main costing endpoint`);
-  console.log(`  - GET /api/export/costs - Export to CSV`);
-  console.log(`Debug endpoints:`);
-  console.log(`  - GET /api/debug/products`);
-  console.log(`  - GET /api/debug/lines`);
-  console.log(`  - GET /api/debug/materials`);
-  console.log(`  - GET /api/debug/fx`);
-});
+async function initializeStartupStores() {
+  await auth.initializeDatabase();
+  await polymerIndexes.initializeDatabase();
+  await ensureCustomerStoreReady();
+  await ensureBomListStoreReady();
+  await ensureBomRecordStoreReady();
+  await rmPrices.ensureReady();
+  await fxRatesDb.initFxRatesTable();
+  await lineRatesDb.initLineRatesTable();
+}
+
+async function startServer() {
+  try {
+    await initializeStartupStores();
+
+    app.listen(PORT, () => {
+      console.log(`✓ Server running at http://localhost:${PORT}`);
+      console.log(`✓ Database initialized at ${path.join(__dirname, 'data', 'mini_erp.db')}`);
+      console.log(``);
+      console.log(`Frontend routes:`);
+      console.log(`  - GET / → /login.html (redirect)`);
+      console.log(`  - GET /dashboard → index.html`);
+      console.log(`  - GET /bom-calculator → bom-calculator.html`);
+      console.log(`  - GET /bom-recipe-browser → bom-recipe-browser.html`);
+      console.log(`  - GET /recipe-edit-clone → recipe-edit-clone.html`);
+      console.log(`  - GET /rm-prices → rm-prices.html`);
+      console.log(`  - GET /rm-prices/availability → rm-price-availability.html`);
+      console.log(`  - GET /polymer-indexes → polymer-indexes.html`);
+      console.log(`  - GET /fx-rates → fx-rates-management.html`);
+      console.log(`  - GET /line-rates → line-rates-management.html`);
+      console.log(``);
+      console.log(`API endpoints:`);
+      console.log(`  - GET /api/health - Health check`);
+      console.log(`  - POST /api/auth/login - User login`);
+      console.log(`Debug endpoints:`);
+      console.log(`  - GET /api/debug/lines`);
+      console.log(`  - GET /api/debug/materials`);
+      console.log(`  - GET /api/debug/fx`);
+    });
+  } catch (err) {
+    console.error('Failed to initialize startup stores:', err);
+    process.exit(1);
+  }
+}
+
+startServer();

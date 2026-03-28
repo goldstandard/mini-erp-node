@@ -11,8 +11,8 @@ const path = require('path');
 const fs = require('fs');
 
 // Database path
-const dbPath = path.join(__dirname, '..', 'data', 'mini_erp.db');
-const dataDir = path.join(__dirname, '..', 'data');
+const dbPath = path.join(__dirname, '..', '..', 'data', 'mini_erp.db');
+const dataDir = path.join(__dirname, '..', '..', 'data');
 
 // Ensure data directory exists
 if (!fs.existsSync(dataDir)) {
@@ -204,6 +204,27 @@ function extractToken(req) {
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
+}
+
+function parsePermissions(rawPermissions) {
+  try {
+    const parsed = JSON.parse(rawPermissions || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function normalizePermissions(permissions) {
+  if (!Array.isArray(permissions)) {
+    return [];
+  }
+
+  const cleaned = permissions
+    .map((permission) => String(permission || '').trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(cleaned));
 }
 
 function isCorporateEmail(email) {
@@ -547,16 +568,18 @@ async function createGroup(name, description = '', permissions = []) {
     throw new Error('Group already exists');
   }
 
+  const normalizedGroupPermissions = normalizePermissions(permissions);
+
   const result = await dbRun(
     'INSERT INTO groups (name, description, permissions) VALUES (?, ?, ?)',
-    [name, description, JSON.stringify(permissions)]
+    [name, description, JSON.stringify(normalizedGroupPermissions)]
   );
 
   return {
     id: result.id,
     name,
     description,
-    permissions
+    permissions: normalizedGroupPermissions
   };
 }
 
@@ -564,7 +587,7 @@ async function getGroups() {
   const groups = await dbAll('SELECT * FROM groups ORDER BY name');
   return groups.map(g => ({
     ...g,
-    permissions: JSON.parse(g.permissions)
+    permissions: parsePermissions(g.permissions)
   }));
 }
 
@@ -617,11 +640,11 @@ async function getUserGroups(userId) {
 
   return groups.map(g => ({
     ...g,
-    permissions: JSON.parse(g.permissions)
+    permissions: parsePermissions(g.permissions)
   }));
 }
 
-async function updateGroup(groupId, name, description = '') {
+async function updateGroup(groupId, name, description = '', permissions = null) {
   // Verify group exists
   const group = await dbGet('SELECT id FROM groups WHERE id = ?', [groupId]);
   if (!group) {
@@ -634,12 +657,28 @@ async function updateGroup(groupId, name, description = '') {
     throw new Error('Group name already exists');
   }
 
+  const updates = ['name = ?', 'description = ?'];
+  const params = [name, description];
+
+  if (permissions !== null) {
+    updates.push('permissions = ?');
+    params.push(JSON.stringify(normalizePermissions(permissions)));
+  }
+
+  params.push(groupId);
+
   await dbRun(
-    'UPDATE groups SET name = ?, description = ? WHERE id = ?',
-    [name, description, groupId]
+    `UPDATE groups SET ${updates.join(', ')} WHERE id = ?`,
+    params
   );
 
-  return { id: groupId, name, description };
+  const updated = await dbGet('SELECT * FROM groups WHERE id = ?', [groupId]);
+  return {
+    id: updated.id,
+    name: updated.name,
+    description: updated.description,
+    permissions: parsePermissions(updated.permissions)
+  };
 }
 
 async function deleteGroup(groupId) {
