@@ -355,6 +355,15 @@
         const groups = groupsResp.ok ? await groupsResp.json() : [];
         const access = accessResp.ok ? await accessResp.json() : {};
 
+        if (me && me.role !== 'admin') {
+          const canRead = !!(access && access.pages && access.pages['line-rates'] && access.pages['line-rates'].read);
+          if (!canRead) {
+            alert('You do not have read access to Line Rates.');
+            window.location.href = '/dashboard';
+            return;
+          }
+        }
+
         if (me && me.role === 'admin') {
           canManage = true;
         } else {
