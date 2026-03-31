@@ -221,6 +221,15 @@
             background-color: #da190b;
         }
 
+        .btn-delete-request {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-delete-request:hover {
+            background-color: #5a6268;
+        }
+
         .btn-primary {
             background-color: #2196F3;
             color: white;
@@ -1130,6 +1139,10 @@
                             <button class="btn-approve" onclick="approveRequest('${req.id}')">Approve</button>
                             <button class="btn-deny" onclick="showDenyModal('${req.id}')">Deny</button>
                         `;
+                    } else if (req.status === 'denied') {
+                        html += `
+                            <button class="btn-delete-request" onclick="deleteDeniedRequest('${req.id}')">Delete</button>
+                        `;
                     }
 
                     html += `
@@ -1210,6 +1223,32 @@
                     loadAccessRequests();
                 } else {
                     showAlert('alertError', '❌ ' + data.error, 'error');
+                }
+            } catch (err) {
+                showAlert('alertError', '❌ Error: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteDeniedRequest(requestId) {
+            if (!confirm('Delete this denied access request? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/access-requests/${requestId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json().catch(() => ({}));
+
+                if (response.ok) {
+                    showAlert('alertSuccess', '✅ Denied request deleted');
+                    loadAccessRequests();
+                } else {
+                    showAlert('alertError', '❌ ' + (data.error || 'Failed to delete request'), 'error');
                 }
             } catch (err) {
                 showAlert('alertError', '❌ Error: ' + err.message, 'error');

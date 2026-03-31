@@ -38,6 +38,8 @@ Test credentials (created by setup script):
 
 - Authenticated web app with role and group based access controls
 - Admin Access Management panel now includes a per-page Access Permissions matrix for groups (Read/Modify)
+- Access Request submission sends email notifications to active admins (using configured SMTP transport)
+- Shared page header displays pending Access Request count as a badge on the Admin button
 - Access Permissions matrix supports row Save, Save All for changed groups, explanatory tooltips, and visual highlighting of unsaved changes
 - Admin Access Management includes a Recipe Approval Region matrix (`CZ`, `EG`, `RSA`) to assign users from Admin + Recipe Approvals groups; one user can be assigned to multiple regions
 - Per-user effective page permissions are exposed from backend and consumed by admin-sensitive pages (FX rates, polymer pages)
@@ -45,6 +47,7 @@ Test credentials (created by setup script):
 - In Line Rates module, users with page-level `Modify` on `line-rates` can import annual rate matrices (same module-level write capability as Admin)
 - All module pages enforce Read permission on load: if a non-admin user navigates directly to a module URL without `Read` access, they receive an alert and are redirected to the dashboard. Dashboard tile hiding provides an additional layer (tiles are not rendered for pages the user cannot read)
 - Admin Access Management includes a Maintenance tab with a one-click SQLite snapshot download (`GET /api/admin/db-download`)
+- In Admin Access > Access Requests, denied requests can be permanently removed via a dedicated Delete action (Delete is available only for denied status)
 - Cost dashboard with filters, currency conversion, and export
 - Product editor (search, duplicate, update, delete)
 - BOM calculator with list-driven dropdowns, throughput calculations, and recipe persistence
@@ -59,6 +62,7 @@ Test credentials (created by setup script):
 - BOM Work in Progress (Save WIP / Load WIP) preserves surfactant rows including concentration + OPU values
 - Recipe submission email routing is region-aware: recipients are resolved by recipe line region from the Admin Recipe Approval Region matrix (with optional env fallback)
 - If recipe line cannot be mapped to a known region, submission email still uses env fallback recipients (`RECIPE_SUBMISSION_NOTIFY_TO`, `RECIPE_APPROVAL_NOTIFY_TO`, `APPROVAL_NOTIFY_TO`)
+- SMTP configuration accepts canonical and alias env names: `SMTP_HOST`/`MAIL_HOST`, `SMTP_USER`/`SMTP_USERNAME`, `SMTP_PASS`/`SMTP_PASSWORD`, `SMTP_PORT`/`MAIL_PORT`, optional `SMTP_SECURE`
 - Recipe decision emails sent to authors omit SAP ID in subject/body and omit Recipe ID from the body
 - Recipe Approval pending list shows `PD ID` as the first table column (`PD ID`, `Customer`, `Line`, `Author`, `Status`, `Updated`)
 - Recipe Edit/Clone includes Created and Updated timestamps in the grid and an Admin-only Delete action

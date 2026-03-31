@@ -607,6 +607,28 @@ async function getAccessRequests(status = null) {
   return dbAll(sql, params);
 }
 
+async function getPendingAccessRequestsCount() {
+  const row = await dbGet("SELECT COUNT(1) AS cnt FROM access_requests WHERE status = 'pending'");
+  return Number(row?.cnt || 0);
+}
+
+async function getAdminNotificationEmails() {
+  const rows = await dbAll(
+    `SELECT DISTINCT LOWER(TRIM(u.email)) AS email
+     FROM users u
+     LEFT JOIN user_groups ug ON ug.user_id = u.id
+     LEFT JOIN groups g ON g.id = ug.group_id
+     WHERE u.is_active = 1
+       AND u.email IS NOT NULL
+       AND TRIM(u.email) <> ''
+       AND (LOWER(COALESCE(u.role, '')) = 'admin' OR LOWER(COALESCE(g.name, '')) = 'admin')`
+  );
+
+  return (rows || [])
+    .map((row) => String(row?.email || '').trim().toLowerCase())
+    .filter(Boolean);
+}
+
 async function approveAccessRequest(requestId, adminUserId) {
   const request = await dbGet('SELECT * FROM access_requests WHERE id = ?', [requestId]);
 
@@ -673,6 +695,28 @@ async function denyAccessRequest(requestId, adminUserId, reason = '') {
   });
 
   return { status: 'denied', email: request.email };
+}
+
+async function deleteDeniedAccessRequest(requestId, adminUserId) {
+  const request = await dbGet('SELECT * FROM access_requests WHERE id = ?', [requestId]);
+
+  if (!request) {
+    throw new Error('Access request not found');
+  }
+
+  if (request.status !== 'denied') {
+    throw new Error(`Only denied requests can be deleted (current status: ${request.status})`);
+  }
+
+  await dbRun('DELETE FROM access_requests WHERE id = ?', [requestId]);
+
+  await auditLog(adminUserId, 'ACCESS_REQUEST_DELETED', 'access', {
+    requestId,
+    email: request.email,
+    previousStatus: request.status
+  });
+
+  return { status: 'deleted', email: request.email };
 }
 
 // ==================== GROUP MANAGEMENT ====================
@@ -1126,8 +1170,11 @@ module.exports = {
   // Access requests
   requestAccess,
   getAccessRequests,
+  getPendingAccessRequestsCount,
+  getAdminNotificationEmails,
   approveAccessRequest,
   denyAccessRequest,
+  deleteDeniedAccessRequest,
 
   // Groups
   createGroup,

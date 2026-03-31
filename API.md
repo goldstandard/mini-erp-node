@@ -44,8 +44,10 @@ Base URL:
 ## Admin Access Requests
 
 - `GET /api/admin/access-requests`
+- `GET /api/admin/access-requests/pending-count`
 - `POST /api/admin/access-requests/:id/approve`
 - `POST /api/admin/access-requests/:id/deny`
+- `DELETE /api/admin/access-requests/:id` (allowed only for requests with `status = denied`)
 
 ## Admin Groups
 

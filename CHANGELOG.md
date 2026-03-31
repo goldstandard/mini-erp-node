@@ -6,6 +6,14 @@ All notable changes to the Mini ERP system are documented here. For current feat
 
 ### Added
 
+#### Access Requests — Admin Notifications, Header Badge, and Denied Request Delete
+- Submitting `POST /api/auth/request-access` now triggers an email notification to active admin recipients (admin role or Admin group membership)
+- Added `GET /api/admin/access-requests/pending-count` for lightweight pending request badge checks in page headers
+- Shared header (`auth.configureHeaderButtons`) now shows a numeric badge on the **Admin** button when pending access requests exist
+- Dashboard header now uses shared header configuration, so the Admin badge behavior is consistent with other module pages
+- Added `DELETE /api/admin/access-requests/:id` endpoint to remove denied access requests (only when request status is `denied`)
+- Admin Access UI now shows **Delete** action for denied requests only
+
 #### Read Permission Enforcement on All Module Pages
 - All 10 module pages now block access when the user lacks Read permission for that page
 - Previously 6 pages only checked authentication (not page-level Read); now they fetch `/api/auth/me/access-permissions` on load and redirect to `/dashboard` with an alert if `pages[key].read` is false
@@ -40,6 +48,10 @@ All notable changes to the Mini ERP system are documented here. For current feat
 - New server route `GET /rm-prices/roll` serving `src/frontend/rm-prices-roll.html`
 
 ### Fixed
+
+#### SMTP configuration compatibility
+- Mail transport configuration now accepts documented SMTP aliases (`MAIL_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_PORT`) in addition to canonical `SMTP_*` variables
+- Added support for explicit `SMTP_SECURE=true|false` override (with fallback to `port === 465` behavior)
 
 #### Access Permissions — Modify parity with Admin (module scope)
 - RM Prices frontend permission checks now honor page-level `modify` (`page:rm-prices:modify`) in addition to legacy `rm_prices:manage`, so users with Modify can:

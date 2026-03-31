@@ -400,6 +400,88 @@ const auth = {
     }
   },
 
+  ensureAdminPendingBadgeStyle() {
+    const styleId = 'shared-admin-pending-badge-style';
+    if (document.getElementById(styleId)) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      .shared-admin-pending-badge {
+        position: absolute;
+        top: -7px;
+        right: -8px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background: #dc2626;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 18px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        pointer-events: none;
+      }
+    `;
+    document.head.appendChild(style);
+  },
+
+  clearAdminPendingBadge(adminBtn) {
+    if (!adminBtn) return;
+    const existing = adminBtn.querySelector('.shared-admin-pending-badge');
+    if (existing) {
+      existing.remove();
+    }
+  },
+
+  setAdminPendingBadge(adminBtn, pendingCount) {
+    if (!adminBtn || !Number.isFinite(Number(pendingCount)) || Number(pendingCount) <= 0) {
+      this.clearAdminPendingBadge(adminBtn);
+      return;
+    }
+
+    this.ensureAdminPendingBadgeStyle();
+    this.clearAdminPendingBadge(adminBtn);
+
+    if (!adminBtn.style.position) {
+      adminBtn.style.position = 'relative';
+    }
+
+    const badge = document.createElement('span');
+    badge.className = 'shared-admin-pending-badge';
+    badge.textContent = Number(pendingCount) > 99 ? '99+' : String(Number(pendingCount));
+    badge.title = `${badge.textContent} pending access request(s)`;
+    adminBtn.appendChild(badge);
+  },
+
+  async refreshAdminPendingBadge(adminBtn, token) {
+    if (!adminBtn || !token || adminBtn.style.display === 'none') {
+      this.clearAdminPendingBadge(adminBtn);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/access-requests/pending-count', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        this.clearAdminPendingBadge(adminBtn);
+        return;
+      }
+
+      const data = await response.json().catch(() => ({}));
+      this.setAdminPendingBadge(adminBtn, Number(data?.pendingCount || 0));
+    } catch (_error) {
+      this.clearAdminPendingBadge(adminBtn);
+    }
+  },
+
   async configureHeaderButtons(options = {}) {
     const {
       changePasswordBtnId = 'changePasswordBtn',
@@ -463,6 +545,7 @@ const auth = {
     const hasAdminPageAccess = !!pages['admin-access']?.read;
     if (adminBtn && (isAdminByGroup || hasAdminPageAccess)) {
       adminBtn.style.display = 'inline-block';
+      await this.refreshAdminPendingBadge(adminBtn, token);
     }
   },
 

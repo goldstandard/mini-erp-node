@@ -414,10 +414,12 @@ function mapRecipeDecisionToStatus(action) {
 }
 
 function getRecipeMailTransportConfig() {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const port = Number(process.env.SMTP_PORT || 587);
+  const host = process.env.SMTP_HOST || process.env.MAIL_HOST;
+  const user = process.env.SMTP_USER || process.env.SMTP_USERNAME;
+  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+  const port = Number(process.env.SMTP_PORT || process.env.MAIL_PORT || 587);
+  const secureFromEnv = String(process.env.SMTP_SECURE || '').trim().toLowerCase();
+  const secure = secureFromEnv === 'true' ? true : (secureFromEnv === 'false' ? false : port === 465);
 
   if (!host || !user || !pass) {
     return null;
@@ -426,7 +428,7 @@ function getRecipeMailTransportConfig() {
   return {
     host,
     port,
-    secure: port === 465,
+    secure,
     auth: { user, pass }
   };
 }
@@ -435,6 +437,65 @@ function getEmailVisualSpacerLines(count = 4) {
   // Many mail gateways/clients trim trailing empty lines;
   // NBSP lines stay visually blank but are less likely to be stripped.
   return Array.from({ length: count }, () => '\u00A0');
+}
+
+async function getAccessRequestAdminRecipients() {
+  try {
+    return await auth.getAdminNotificationEmails();
+  } catch (_err) {
+    return [];
+  }
+}
+
+async function sendAccessRequestSubmittedEmail(accessRequest) {
+  const recipients = await getAccessRequestAdminRecipients();
+  if (recipients.length === 0) {
+    return { sent: false, reason: 'no_admin_recipients' };
+  }
+
+  const transportConfig = getRecipeMailTransportConfig();
+  if (!transportConfig) {
+    return { sent: false, reason: 'smtp_not_configured' };
+  }
+
+  let nodemailer;
+  try {
+    nodemailer = require('nodemailer');
+  } catch (_err) {
+    return { sent: false, reason: 'nodemailer_not_installed' };
+  }
+
+  const transporter = nodemailer.createTransport(transportConfig);
+  const from = process.env.APPROVAL_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+
+  const requestedAt = accessRequest?.requested_at
+    ? new Date(accessRequest.requested_at).toISOString()
+    : new Date().toISOString();
+
+  const subject = `New Access Request: ${accessRequest?.fullName || accessRequest?.email || 'Unknown user'}`;
+  const bodyLines = [
+    'A new user access request was submitted.',
+    '',
+    `Email: ${accessRequest?.email || 'N/A'}`,
+    `Full name: ${accessRequest?.fullName || 'N/A'}`,
+    `Reason: ${(accessRequest?.reason || '').trim() || 'N/A'}`,
+    `Requested at: ${requestedAt}`,
+    '',
+    'Open mini-ERP Admin Access > Access Requests to review.',
+    ...getEmailVisualSpacerLines(4)
+  ];
+
+  try {
+    await transporter.sendMail({
+      from,
+      to: recipients.join(', '),
+      subject,
+      text: bodyLines.join('\n')
+    });
+    return { sent: true, recipients };
+  } catch (sendErr) {
+    return { sent: false, reason: sendErr.message || 'mail_send_failed' };
+  }
 }
 
 async function sendRecipeDecisionEmail({ toEmail, reviewerName, decisionLabel, comment, recipeRecord }) {
@@ -2139,6 +2200,13 @@ app.post("/api/auth/request-access", async (req, res) => {
   try {
     const { email, fullName, reason } = req.body;
     const result = await auth.requestAccess(email, fullName, reason);
+
+    // Notification failure should not block request creation.
+    const mailResult = await sendAccessRequestSubmittedEmail({ ...result, reason });
+    if (!mailResult.sent) {
+      console.warn('Access request admin notification was not sent:', mailResult.reason || 'unknown_reason');
+    }
+
     res.status(201).json({
       success: true,
       message: 'Access request submitted. Please wait for approval from an administrator.',
@@ -2155,6 +2223,26 @@ app.get("/api/admin/access-requests", auth.authMiddleware, auth.requirePermissio
     const status = req.query.status || null;
     const requests = await auth.getAccessRequests(status);
     res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/access-requests/pending-count', auth.authMiddleware, async (req, res) => {
+  try {
+    const canManageUsers = auth.hasPermission(req.user.role, 'user:manage');
+    let canReadAdminAccessPage = false;
+
+    if (!canManageUsers) {
+      canReadAdminAccessPage = await hasPagePermission(req.user.id, 'admin-access', 'read');
+    }
+
+    if (!canManageUsers && !canReadAdminAccessPage) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    const pendingCount = await auth.getPendingAccessRequestsCount();
+    res.json({ pendingCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2182,6 +2270,20 @@ app.post("/api/admin/access-requests/:id/deny", auth.authMiddleware, auth.requir
     res.json({
       success: true,
       message: 'Access request denied.',
+      data: result
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Delete denied access request (admin only)
+app.delete('/api/admin/access-requests/:id', auth.authMiddleware, auth.requirePermission('user:manage'), async (req, res) => {
+  try {
+    const result = await auth.deleteDeniedAccessRequest(req.params.id, req.user.id);
+    res.json({
+      success: true,
+      message: 'Denied access request deleted.',
       data: result
     });
   } catch (err) {

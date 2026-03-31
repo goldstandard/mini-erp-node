@@ -427,17 +427,7 @@
         return;
       }
 
-      let groups = [];
       let pagePermissions = {};
-
-      try {
-        const groupsResponse = await fetch('/api/auth/me/groups', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (groupsResponse.ok) {
-          groups = await groupsResponse.json();
-        }
-      } catch (_) {}
 
       try {
         const pagePermResponse = await fetch('/api/auth/me/access-permissions', {
@@ -449,17 +439,7 @@
         }
       } catch (_) {}
 
-      const isAdmin = groups.some((group) => group.name === 'Admin');
-      const isTestGroup = groups.some((group) => group.name === 'Test Group');
-
-      if (isAdmin) {
-        const adminBtn = document.getElementById('adminBtn');
-        if (adminBtn) adminBtn.style.display = 'inline-block';
-      }
-      if (!isTestGroup) {
-        const changePasswordBtn = document.getElementById('changePasswordBtn');
-        if (changePasswordBtn) changePasswordBtn.style.display = 'inline-block';
-      }
+      await auth.configureHeaderButtons();
 
       renderTiles(pagePermissions);
     }
