@@ -684,6 +684,9 @@
             <button class="tab" onclick="switchTab('audit')">
                 📊 Audit Logs
             </button>
+            <button class="tab" onclick="switchTab('maintenance')">
+                🛠️ Maintenance
+            </button>
         </div>
 
         <!-- Access Requests Tab -->
@@ -808,6 +811,24 @@
                         <tr><td colspan="5">No audit logs found</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Maintenance Tab -->
+        <div id="maintenance" class="tab-content">
+            <div class="access-permissions-card">
+                <div class="access-permissions-header">
+                    <div>
+                        <h3>Database Snapshot</h3>
+                        <p class="access-permissions-note">Download a copy of the live SQLite database file. Use this to backup production data or sync it to a local development environment.</p>
+                    </div>
+                </div>
+                <div style="padding: 16px 0;">
+                    <button class="btn-primary" onclick="downloadDbSnapshot()" id="downloadDbBtn">
+                        ⬇️ Download DB Snapshot
+                    </button>
+                    <span id="downloadDbStatus" style="margin-left: 14px; color: #555;"></span>
+                </div>
             </div>
         </div>
     </div>
@@ -2413,6 +2434,41 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        async function downloadDbSnapshot() {
+            const token = localStorage.getItem('token');
+            const btn = document.getElementById('downloadDbBtn');
+            const status = document.getElementById('downloadDbStatus');
+            btn.disabled = true;
+            status.textContent = '⏳ Downloading...';
+            try {
+                const response = await fetch('/api/admin/db-download', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+                const blob = await response.blob();
+                const disposition = response.headers.get('Content-Disposition') || '';
+                const match = disposition.match(/filename="([^"]+)"/);
+                const filename = match ? match[1] : `mini_erp-${new Date().toISOString().slice(0,10)}.db`;
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                status.textContent = `✅ Downloaded: ${filename}`;
+            } catch (err) {
+                console.error('DB download error:', err);
+                status.textContent = `❌ Error: ${err.message}`;
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         // Initial load

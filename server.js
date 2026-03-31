@@ -4418,6 +4418,31 @@ app.delete("/api/bom/records/:id", auth.authMiddleware, requireBomRecordDelete, 
   }
 });
 
+// DB download — admin only
+app.get("/api/admin/db-download", auth.authMiddleware, async (req, res) => {
+  if (!auth.hasPermission(req.user.role, "user:manage")) {
+    return res.status(403).json({ error: "Admin only" });
+  }
+
+  const dbFilePath = db.dbPath;
+
+  if (!fs.existsSync(dbFilePath)) {
+    return res.status(404).json({ error: "DB file not found", path: dbFilePath });
+  }
+
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const fileName = `mini_erp-prod-${stamp}.db`;
+
+  console.log(`[DB-DOWNLOAD] Admin ${req.user.email} downloaded DB snapshot: ${fileName}`);
+  await auth.auditLog(req.user.id, 'DB_DOWNLOAD', 'database', { fileName });
+
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.sendFile(dbFilePath);
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: "Endpoint not found", path: req.path });
