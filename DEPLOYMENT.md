@@ -10,9 +10,15 @@ Prerequisites:
 Setup:
 
 1. `npm install`
-2. `node scripts/setup.js`
-3. `npm start`
-4. Open `http://localhost:3000`
+2. Copy `.env.example` to `.env` and fill required values (JWT + SMTP)
+3. `node scripts/setup.js`
+4. `npm start`
+5. Open `http://localhost:3000`
+
+Environment loading behavior:
+
+- Local startup auto-loads `.env` and `.env.local`.
+- Existing process env vars always win (so Azure App Settings are authoritative in deployment).
 
 Default seeded admin account:
 
@@ -31,6 +37,7 @@ Default seeded admin account:
 3. Configure app settings:
    - `NODE_ENV=production`
    - `JWT_SECRET=<strong-random-secret>`
+   - SMTP variables in App Settings (see below)
 4. Deploy from main branch
 
 ## Production Environment Settings

@@ -2,6 +2,9 @@ const express = require("express");
 const path = require("path");
 const cors = require("cors");
 const fs = require("fs");
+const { loadEnvFiles } = require("./src/backend/utils/env");
+
+loadEnvFiles();
 
 const { loadProducts } = require("./src/backend/products");
 const { loadLines } = require("./src/backend/lines");

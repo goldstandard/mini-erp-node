@@ -1,5 +1,8 @@
 const nodemailer = require('nodemailer');
 const polymerIndexes = require('../src/backend/polymer-indexes');
+const { loadEnvFiles } = require('../src/backend/utils/env');
+
+loadEnvFiles();
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -9,6 +12,22 @@ function requiredEnv(name) {
   return value;
 }
 
+function requiredEnvAny(names) {
+  for (const name of names || []) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  throw new Error(`Missing required environment variable (any of: ${names.join(', ')})`);
+}
+
+function firstEnv(names, fallback = '') {
+  for (const name of names || []) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return fallback;
+}
+
 function getEmailVisualSpacerLines(count = 4) {
   // Trailing truly empty lines can be trimmed by mail systems.
   // NBSP lines render as visually blank separators.
@@ -16,17 +35,31 @@ function getEmailVisualSpacerLines(count = 4) {
 }
 
 async function sendReminderEmail(dueRows, dateIso) {
-  const host = requiredEnv('SMTP_HOST');
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = requiredEnv('SMTP_USER');
-  const pass = requiredEnv('SMTP_PASS');
-  const from = requiredEnv('REMINDER_FROM_EMAIL');
-  const to = requiredEnv('REMINDER_TO_EMAIL');
+  const host = requiredEnvAny(['SMTP_HOST', 'MAIL_HOST']);
+  const port = Number(firstEnv(['SMTP_PORT', 'MAIL_PORT'], '587'));
+  const user = requiredEnvAny(['SMTP_USER', 'SMTP_USERNAME']);
+  const pass = requiredEnvAny(['SMTP_PASS', 'SMTP_PASSWORD']);
+  const secureFromEnv = String(firstEnv(['SMTP_SECURE'], '')).trim().toLowerCase();
+  const secure = secureFromEnv === 'true' ? true : (secureFromEnv === 'false' ? false : port === 465);
+
+  const from = firstEnv(['REMINDER_FROM_EMAIL', 'APPROVAL_FROM_EMAIL', 'SMTP_FROM_EMAIL', 'SMTP_USER', 'SMTP_USERNAME']);
+  if (!from) {
+    throw new Error('Missing sender email variable (REMINDER_FROM_EMAIL/APPROVAL_FROM_EMAIL/SMTP_FROM_EMAIL)');
+  }
+
+  const toRaw = firstEnv(['REMINDER_TO_EMAIL', 'RECIPE_SUBMISSION_NOTIFY_TO', 'RECIPE_APPROVAL_NOTIFY_TO', 'APPROVAL_NOTIFY_TO']);
+  if (!toRaw) {
+    throw new Error('Missing recipient variable (REMINDER_TO_EMAIL/RECIPE_SUBMISSION_NOTIFY_TO/RECIPE_APPROVAL_NOTIFY_TO/APPROVAL_NOTIFY_TO)');
+  }
+  const recipients = toRaw.split(',').map((item) => item.trim()).filter(Boolean);
+  if (!recipients.length) {
+    throw new Error('No valid reminder recipients configured');
+  }
 
   const transporter = nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
+    secure,
     auth: { user, pass }
   });
 
@@ -42,7 +75,7 @@ async function sendReminderEmail(dueRows, dateIso) {
 
   await transporter.sendMail({
     from,
-    to,
+    to: recipients.join(', '),
     subject: `Polymer Index Reminder - ${dateIso} (${dueRows.length} due)` ,
     text: textBody
   });

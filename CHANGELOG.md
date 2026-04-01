@@ -76,6 +76,12 @@ All notable changes to the Mini ERP system are documented here. For current feat
 
 ### Fixed
 
+#### Environment loading and SMTP reliability (local + deployment)
+- Added startup env-file loader for `.env` and `.env.local` (without overriding existing process/App Settings values)
+- This makes SMTP/JWT/local config persistent across local restarts without depending on `run-local.cmd`
+- Deployment compatibility preserved: Azure App Settings remain authoritative and continue to work without `.env` files
+- `scripts/send-index-reminders.js` now uses the same env loading behavior and supports canonical + alias SMTP variable names
+
 #### SMTP configuration compatibility
 - Mail transport configuration now accepts documented SMTP aliases (`MAIL_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_PORT`) in addition to canonical `SMTP_*` variables
 - Added support for explicit `SMTP_SECURE=true|false` override (with fallback to `port === 465` behavior)

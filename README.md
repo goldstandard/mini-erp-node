@@ -20,6 +20,9 @@ Use these files as the canonical documentation set:
 
 ## Quick Start
 
+0. Configure environment variables (recommended)
+   - Copy `.env.example` to `.env` and fill required values (especially SMTP + JWT)
+   - `.env` / `.env.local` are auto-loaded on startup for local development
 1. Install dependencies
    - `npm install`
 2. Initialize database and seed admin user
@@ -33,6 +36,11 @@ Test credentials (created by setup script):
 
 - Email: `testuser@pfnonwovens.com`
 - Password: `TestPass123`
+
+Environment behavior:
+
+- Local: app auto-loads `.env` and `.env.local`.
+- Deployment (Azure): App Settings env vars are used and take precedence over `.env` files.
 
 ## Key Features
 
