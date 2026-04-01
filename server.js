@@ -2033,6 +2033,22 @@ app.get("/rm-prices/roll", (req, res, next) => {
   }
 });
 
+app.get('/rm-prices/remove', (req, res, next) => {
+  try {
+    const filePath = path.join(__dirname, 'src', 'frontend', 'rm-prices-remove.html');
+    console.log('[ROUTE] GET /rm-prices/remove - Serving:', filePath);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('[ERROR] Failed to send rm-prices-remove.html:', err);
+        next(err);
+      }
+    });
+  } catch (err) {
+    console.error('[ERROR] RM prices remove route error:', err);
+    next(err);
+  }
+});
+
 app.get("/polymer-indexes", (req, res, next) => {
   try {
     const filePath = path.join(__dirname, "src", "frontend", "polymer-indexes.html");
@@ -2923,6 +2939,48 @@ app.post("/api/rm-prices/roll", auth.authMiddleware, requireRmPricesManage, asyn
     res.json({ success: true, result });
   } catch (err) {
     res.status(400).json({ error: err.message || "Failed to roll prices" });
+  }
+});
+
+app.get('/api/rm-prices/remove/list', auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const now = new Date();
+    const year = req.query.year ? Number(req.query.year) : now.getFullYear();
+    const month = req.query.month ? Number(req.query.month) : (now.getMonth() + 1);
+    const plant = req.query.plant;
+    const material_list_key = req.query.material_list_key || null;
+
+    const result = await rmPrices.listExactPricesForPeriod({
+      plant,
+      year,
+      month,
+      materialListKey: material_list_key
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Failed to load removable prices' });
+  }
+});
+
+app.delete('/api/rm-prices/remove', auth.authMiddleware, requireRmPricesManage, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
+
+    if (ids && ids.length > 0) {
+      const result = await rmPrices.deleteExactPricesByIds(ids);
+      return res.json({ success: true, mode: 'ids', result });
+    }
+
+    const { plant, year, month, material_list_key } = req.body || {};
+    const result = await rmPrices.deleteExactPricesForPeriod({
+      plant,
+      year: Number(year),
+      month: Number(month),
+      materialListKey: material_list_key || null
+    });
+    return res.json({ success: true, mode: 'filter', result });
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Failed to delete prices' });
   }
 });
 

@@ -68,6 +68,8 @@ Test credentials (created by setup script):
 - Recipe Edit/Clone includes Created and Updated timestamps in the grid and an Admin-only Delete action
 - Audit Logs detail rendering now includes `PD ID` plus record context (`Record`, `Source`, `New`, `Action`, `Decision`) for BOM/approval actions
 - Raw Material Price Management by plant (CZ, EG, ZA): monthly sheets, missing/fallback statuses, inline edits, and JSON import
+- Roll Raw Material Prices copies values visible in Source (including fallback-origin prices) and refreshes Target preview after successful copy
+- Remove Prices page (`/rm-prices/remove`) supports deleting exact monthly prices by period filter (plant/year/month/category), individually or in bulk
 - RM Prices page filters: status filter (All/Priced/Fallback/Missing) and real-time material name text search, with all exports respecting the active filters
 - RM Prices page exports: Export Sheet CSV and Export Sheet Excel buttons export the currently visible (filtered) sheet; Export Missing exports only missing-price rows
 - Delete material globally: removes a material from all database tables in one transaction; per-table deletion counts shown in the Availability Matrix UI
@@ -118,6 +120,8 @@ Frontend (supplementary pages):
 - `/recipe-edit-clone` recipe editor and cloning page for approved recipes
 - `/recipe-approval` recipe approval workbench for unapproved recipes
 - `/rm-prices/availability` raw material availability matrix by plant
+- `/rm-prices/roll` raw material price rolling page (source-to-target copy)
+- `/rm-prices/remove` raw material price deletion page (exact monthly records)
 - `/request-access.html` user access request form
 - `/admin-access.html` admin panel (groups, users, access request workflow, audit logs, and per-page access matrix) — accessible to admins only
 - `/polymer-index-admin.html` polymer index definition manager — accessible to admins only

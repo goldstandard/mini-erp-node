@@ -389,6 +389,7 @@ Response shape:
 
 - `POST /api/rm-prices/roll` (auth + RM Prices modify)
   - Copies raw material prices from a source period to a target period for a given plant
+  - Source values follow RM sheet behavior: visible source prices are copied, including fallback-origin values from previous periods
   - Body fields:
     - `from_year`, `from_month` — source period
     - `to_year`, `to_month` — target period
@@ -396,6 +397,17 @@ Response shape:
     - `material_list_key` *(optional)* — limit roll to one category (e.g. `list_pigment`)
     - `overwrite` *(boolean)* — if `false`, materials already priced in the target period are skipped
   - Response: `{ success, result: { source, target, total_source, copied, skipped_existing } }`
+
+- `GET /api/rm-prices/remove/list` (auth + RM Prices modify)
+  - Lists exact monthly RM price records that can be removed for a selected filter
+  - Query: `plant`, `year`, `month`, optional `material_list_key`
+
+- `DELETE /api/rm-prices/remove` (auth + RM Prices modify)
+  - Deletes exact monthly RM price records
+  - Supports two modes:
+    - by IDs: `{ "ids": [101, 102, 103] }`
+    - by filter: `{ "plant": "CZ", "year": 2026, "month": 4, "material_list_key": "list_pigment" }`
+  - Response includes deleted count
 
 - `POST /api/rm-prices/formulas` (auth + RM Prices modify)
   - Create/update one polymer formula
@@ -589,5 +601,7 @@ All endpoints require a valid auth token.
 - `/bom-recipe-browser` — saved BOM recipe browser
 - `/rm-prices` — raw material monthly price management
 - `/rm-prices/availability` — material availability matrix by plant
+- `/rm-prices/roll` — source-to-target RM price roll page
+- `/rm-prices/remove` — exact monthly RM price removal page
 - `/polymer-indexes` — polymer index manager (displays week-based data, chart, import/export)
 - `/line-rates` — line operating rates management (annual matrix, delta comparison, import)

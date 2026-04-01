@@ -102,6 +102,7 @@
         <div class="actions">
           <button class="btn btn-primary" onclick="window.location.href='/rm-prices/availability'">Material Availability Matrix</button>
           <button class="btn btn-primary" onclick="window.location.href='/rm-prices/roll'">Roll Prices</button>
+          <button id="removePricesBtn" class="btn btn-danger hidden" onclick="window.location.href='/rm-prices/remove'">Remove Prices</button>
           <button class="btn btn-secondary" onclick="exportSheetCsv()">Export Sheet CSV</button>
           <button class="btn btn-secondary" onclick="exportSheetExcel()">Export Sheet Excel</button>
           <button class="btn btn-secondary" onclick="exportMissing()">Export Missing</button>
@@ -236,6 +237,7 @@
 
       document.getElementById('adminTools').classList.toggle('hidden', !canManage);
       document.getElementById('recalcBtn').classList.toggle('hidden', !canManage);
+      document.getElementById('removePricesBtn').classList.toggle('hidden', !canManage);
       document.getElementById('editHead').style.display = canManage ? '' : 'none';
     }
 

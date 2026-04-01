@@ -278,9 +278,15 @@
       document.getElementById('copyBtn').disabled = srcPricedCount === 0;
     }
 
-    async function previewSource() {
-      setStatus('Loading both periods...', '');
-      document.getElementById('resultBox').classList.add('hidden');
+    async function previewSource(options = {}) {
+      const { preserveResultBox = false, silentStatus = false } = options;
+
+      if (!silentStatus) {
+        setStatus('Loading both periods...', '');
+      }
+      if (!preserveResultBox) {
+        document.getElementById('resultBox').classList.add('hidden');
+      }
       document.getElementById('copyBtn').disabled = true;
 
       const fromYear = Number(document.getElementById('fromYear').value);
@@ -324,7 +330,9 @@
         });
 
         renderPreview();
-        setStatus('Periods loaded. Review and click Copy Prices.', 'ok');
+        if (!silentStatus) {
+          setStatus('Periods loaded. Review and click Copy Prices.', 'ok');
+        }
       } catch (err) {
         setStatus(`Error: ${err.message}`, 'error');
         previewRows = [];
@@ -383,7 +391,8 @@
           Skipped (already existed): <b>${r.skipped_existing}</b>
         `;
         resultEl.classList.remove('hidden');
-        setStatus('Done.', 'ok');
+        await previewSource({ preserveResultBox: true, silentStatus: true });
+        setStatus('Done. Target table refreshed.', 'ok');
         document.getElementById('copyBtn').disabled = false;
       } catch (err) {
         const resultEl = document.getElementById('resultBox');

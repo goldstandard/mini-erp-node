@@ -742,22 +742,25 @@ async function rollPrices({ fromYear, fromMonth, toYear, toMonth, plant, materia
   const normalizedListKey = materialListKey ? normalizeMaterialKey(materialListKey) : null;
   if (materialListKey && !normalizedListKey) throw new Error('Invalid material_list_key');
 
-  // Load source prices (exact match for from period)
-  let sourceRows;
+  // Load source prices as displayed on sheet: include both exact and fallback values.
+  // Missing rows (no price at all) are excluded from roll.
+  const sourceSheet = await getMonthlyPlantPriceSheet({
+    plant: normalizedPlant,
+    year: normalizedFromYear,
+    month: normalizedFromMonth
+  });
+
+  let sourceRows = (sourceSheet.rows || [])
+    .filter((row) => row && row.status !== 'missing' && Number.isFinite(Number(row.price)) && row.currency)
+    .map((row) => ({
+      material_list_key: row.material_list_key,
+      material_name: row.material_name,
+      price: Number(row.price),
+      currency: String(row.currency).trim().toUpperCase()
+    }));
+
   if (normalizedListKey) {
-    sourceRows = await db.all(
-      `SELECT material_list_key, material_name, price, currency
-       FROM rm_prices
-       WHERE plant = ? AND year = ? AND month = ? AND material_list_key = ?`,
-      [normalizedPlant, normalizedFromYear, normalizedFromMonth, normalizedListKey]
-    );
-  } else {
-    sourceRows = await db.all(
-      `SELECT material_list_key, material_name, price, currency
-       FROM rm_prices
-       WHERE plant = ? AND year = ? AND month = ?`,
-      [normalizedPlant, normalizedFromYear, normalizedFromMonth]
-    );
+    sourceRows = sourceRows.filter((row) => row.material_list_key === normalizedListKey);
   }
 
   let copied = 0;
@@ -803,6 +806,111 @@ async function rollPrices({ fromYear, fromMonth, toYear, toMonth, plant, materia
   };
 }
 
+async function listExactPricesForPeriod({ plant, year, month, materialListKey = null }) {
+  await ensureReady();
+
+  const normalizedPlant = normalizePlant(plant);
+  const normalizedYear = normalizeYear(year);
+  const normalizedMonth = normalizeMonth(month);
+  if (!normalizedPlant) throw new Error('Invalid plant');
+  if (!normalizedYear || !normalizedMonth) throw new Error('Invalid year/month');
+
+  const normalizedListKey = materialListKey ? normalizeMaterialKey(materialListKey) : null;
+  if (materialListKey && !normalizedListKey) throw new Error('Invalid material_list_key');
+
+  let rows;
+  if (normalizedListKey) {
+    rows = await db.all(
+      `SELECT id, material_list_key, material_name, plant, year, month, price, currency, price_source, created_at, updated_at
+       FROM rm_prices
+       WHERE plant = ? AND year = ? AND month = ? AND material_list_key = ?
+       ORDER BY material_list_key, lower(material_name)`,
+      [normalizedPlant, normalizedYear, normalizedMonth, normalizedListKey]
+    );
+  } else {
+    rows = await db.all(
+      `SELECT id, material_list_key, material_name, plant, year, month, price, currency, price_source, created_at, updated_at
+       FROM rm_prices
+       WHERE plant = ? AND year = ? AND month = ?
+       ORDER BY material_list_key, lower(material_name)`,
+      [normalizedPlant, normalizedYear, normalizedMonth]
+    );
+  }
+
+  return {
+    plant: normalizedPlant,
+    year: normalizedYear,
+    month: normalizedMonth,
+    total: Array.isArray(rows) ? rows.length : 0,
+    rows: rows || []
+  };
+}
+
+async function deleteExactPricesForPeriod({ plant, year, month, materialListKey = null }) {
+  await ensureReady();
+
+  const normalizedPlant = normalizePlant(plant);
+  const normalizedYear = normalizeYear(year);
+  const normalizedMonth = normalizeMonth(month);
+  if (!normalizedPlant) throw new Error('Invalid plant');
+  if (!normalizedYear || !normalizedMonth) throw new Error('Invalid year/month');
+
+  const normalizedListKey = materialListKey ? normalizeMaterialKey(materialListKey) : null;
+  if (materialListKey && !normalizedListKey) throw new Error('Invalid material_list_key');
+
+  let result;
+  if (normalizedListKey) {
+    result = await db.run(
+      `DELETE FROM rm_prices
+       WHERE plant = ? AND year = ? AND month = ? AND material_list_key = ?`,
+      [normalizedPlant, normalizedYear, normalizedMonth, normalizedListKey]
+    );
+  } else {
+    result = await db.run(
+      `DELETE FROM rm_prices
+       WHERE plant = ? AND year = ? AND month = ?`,
+      [normalizedPlant, normalizedYear, normalizedMonth]
+    );
+  }
+
+  return {
+    deleted: Number(result?.changes || 0),
+    plant: normalizedPlant,
+    year: normalizedYear,
+    month: normalizedMonth,
+    material_list_key: normalizedListKey || null
+  };
+}
+
+async function deleteExactPricesByIds(ids = []) {
+  await ensureReady();
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error('ids array is required');
+  }
+
+  const normalizedIds = Array.from(new Set(
+    ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  ));
+
+  if (!normalizedIds.length) {
+    throw new Error('No valid ids provided');
+  }
+
+  const placeholders = normalizedIds.map(() => '?').join(',');
+  const result = await db.run(
+    `DELETE FROM rm_prices WHERE id IN (${placeholders})`,
+    normalizedIds
+  );
+
+  return {
+    requested: normalizedIds.length,
+    deleted: Number(result?.changes || 0)
+  };
+}
+
 module.exports = {
   VALID_PLANTS,
   VALID_MATERIAL_KEYS,
@@ -821,5 +929,8 @@ module.exports = {
   upsertFormula,
   deleteFormula,
   calculatePolymerPrices,
-  rollPrices
+  rollPrices,
+  listExactPricesForPeriod,
+  deleteExactPricesForPeriod,
+  deleteExactPricesByIds
 };

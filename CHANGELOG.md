@@ -6,6 +6,18 @@ All notable changes to the Mini ERP system are documented here. For current feat
 
 ### Added
 
+#### RM Prices — Remove Prices page `/rm-prices/remove`
+- Added new frontend page for controlled deletion of exact monthly RM prices by filter: Plant + Year + Month + optional Category
+- Added row-level delete action (single record)
+- Added bulk delete options:
+  - Delete selected rows
+  - Delete all loaded rows for active filter
+- Added new API endpoints (RM Prices modify required):
+  - `GET /api/rm-prices/remove/list`
+  - `DELETE /api/rm-prices/remove`
+- Added route `GET /rm-prices/remove` serving `src/frontend/rm-prices-remove.html`
+- Added **Remove Prices** button on Raw Material Price Management page (visible only for users with RM Prices modify/manage access)
+
 #### Access Requests — Admin Notifications, Header Badge, and Denied Request Delete
 - Submitting `POST /api/auth/request-access` now triggers an email notification to active admin recipients (admin role or Admin group membership)
 - Added `GET /api/admin/access-requests/pending-count` for lightweight pending request badge checks in page headers
@@ -43,9 +55,10 @@ All notable changes to the Mini ERP system are documented here. For current feat
 - **Overwrite existing prices** checkbox — when unchecked, materials that already have an exact price in the target period are skipped; when checked, they are overwritten
 - **Copy Prices** button is enabled only when at least one source-priced material is visible; result box shows copied / skipped counts after completion
 - **Search** filter on material name works in combination with Category filter and is applied to the preview table in real time without re-fetching
-- New backend function `rollPrices()` in `src/backend/rm-prices.js` reads exact prices from the source period and upserts them into the target period (respecting `overwrite` flag)
+- New backend function `rollPrices()` in `src/backend/rm-prices.js` now copies all visible source values (both `priced` and `fallback`) into target period records (respecting `overwrite` flag)
 - New API endpoint `POST /api/rm-prices/roll` (requires `rm_prices:manage` permission)
 - New server route `GET /rm-prices/roll` serving `src/frontend/rm-prices-roll.html`
+- After successful roll, the page now auto-refreshes preview data so the Target column immediately shows newly rolled values
 
 ### Fixed
 
