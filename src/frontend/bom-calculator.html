@@ -935,6 +935,28 @@
       transition: all 0.2s;
       font-size: 0.95em;
     }
+
+    /* Edit / Copy mode banner */
+    #editModeBanner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      background: #1a56db;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 0.97em;
+    }
+    #editModeBanner .edit-banner-text { font-weight: 700; }
+    #editModeBanner .edit-banner-back {
+      color: #fff;
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 0.92em;
+      white-space: nowrap;
+    }
   </style>
 </head>
 
@@ -955,6 +977,12 @@
         <button class="action-btn btn-logout" onclick="auth.logout()">Logout</button>
       </div>
     </header>
+
+    <!-- Edit / Copy mode banner (hidden in normal new-recipe mode) -->
+    <div id="editModeBanner">
+      <span class="edit-banner-text" id="editModeBannerText"></span>
+      <span class="edit-banner-back" onclick="window.location.href='/recipe-edit-clone'">&#8592; Back to Recipe Browser</span>
+    </div>
 
     <!-- Toolbar for Save/Load Actions -->
     <div class="toolbar">
@@ -1663,6 +1691,9 @@
     let materialPriceMap = {};
     let materialAvailabilityMap = null;
     let latestCostPreview = null;
+
+    // Edit/Copy mode state (set when opened via ?editId=N or ?copyId=N from Recipe Browser)
+    let bomRecordEditMode = null; // null | { type:'edit', id:N, pdId:S } | { type:'copy', sourceId:N, pdId:S }
 
     function getResultsDisplayCurrency() {
       return document.getElementById('resultsCurrencySelect')?.value || 'USD';
@@ -4231,7 +4262,7 @@
       return data;
     }
 
-    function loadDataIntoForm(data) {
+    function loadDataIntoForm(data, silent = false) {
       if (!data) return;
 
       // Load Description section
@@ -4390,7 +4421,7 @@
         refreshAllCalculations();
       }, maxDelay);
       
-      alert('Data loaded successfully!');
+      if (!silent) alert('Data loaded successfully!');
     }
 
     function refreshAllCalculations() {
@@ -4684,9 +4715,180 @@
       } catch (_) { }
 
       auth.configureHeaderButtons();
+
+      // Edit/Copy mode: pre-fill from an existing BOM record if URL params present
+      const _urlP = new URLSearchParams(window.location.search);
+      const _editId = _urlP.get('editId');
+      const _copyId = _urlP.get('copyId');
+      if (_editId || _copyId) {
+        await initEditCopyMode(
+          _editId ? Number(_editId) : null,
+          _copyId ? Number(_copyId) : null
+        );
+      }
     });
 
+    // ==================== EDIT / COPY MODE (opened from Recipe Browser) ====================
+
+    function showEditModeBanner(mode, record) {
+      const banner = document.getElementById('editModeBanner');
+      const text = document.getElementById('editModeBannerText');
+      if (!banner || !text) return;
+      const pdLabel = record.pd_id ? ` — PD ID: ${record.pd_id}` : '';
+      const customer = record.customer ? ` | ${record.customer}` : '';
+      if (mode.type === 'edit') {
+        text.textContent = `✏ Editing existing recipe${pdLabel}${customer}`;
+      } else {
+        text.textContent = `📋 Copying recipe${pdLabel}${customer} — a new PD ID will be assigned on save`;
+      }
+      banner.style.display = 'flex';
+    }
+
+    function prefillFromRecord(record, beamConfig) {
+      // Convert DB record columns to the loadDataIntoForm() data structure
+      const n = (v) => (v != null ? String(v) : '');
+      const data = {
+        description: {
+          pdId:              n(record.pd_id),
+          sapId:             n(record.sap_id),
+          customer:          n(record.customer),
+          marketSegment:     n(record.market_segment),
+          application:       n(record.application),
+          smms:              n(record.smms),
+          monoBico:          n(record.mono_bico),
+          structure:         n(record.structure),
+          mainRawMat:        n(record.main_raw_mat),
+          bonding:           n(record.bonding),
+          bicoRatioDesc:     n(record.bico_ratio_desc),
+          treatment:         n(record.treatment),
+          color:             n(record.color),
+          cores:             n(record.cores),
+          line:              n(record.line),
+          slitWidth:         n(record.slit_width),
+          beltBW:            n(record.belt_bw),
+          mbGrams:           n(record.mb_grams),
+          lengthMeters:      n(record.length_meters),
+          rollDiameter:      n(record.roll_diameter),
+          sikoPercent:       n(record.siko_percent),
+          reproPercent:      n(record.repro_percent),
+          beltSpeed:         n(record.belt_speed),
+          maxUsableWidth:    n(record.max_usable_width),
+          usableWidth:       n(record.usable_width),
+          webLossPercent:    n(record.web_loss_percent),
+          otherScrapPercent: n(record.other_scrap_percent),
+          edgeTrimPercent:   n(record.edge_trim_percent),
+          totalScrapPercent: n(record.total_scrap_percent),
+          grossYieldPercent: n(record.gross_yield_percent),
+          sBeams:            n(record.s_beams),
+          mBeams:            n(record.m_beams),
+          sbThroughput:      n(record.sb_throughput),
+          mbThroughput:      n(record.mb_throughput),
+          totalThroughput:   n(record.total_throughput),
+          productionTime:    n(record.production_time),
+        },
+        productionTarget: {
+          targetProduction: n(record.target_production),
+          targetUnit:       record.target_unit || 'kg',
+          totalGSM:         n(record.customer_bw),
+        },
+        commentary: {
+          notes: record.notes || '',
+        },
+        beamConfiguration: {
+          gsm_1: n(beamConfig?.gsm_1),
+          gsm_2: n(beamConfig?.gsm_2),
+          gsm_3: n(beamConfig?.gsm_3),
+          gsm_4: n(beamConfig?.gsm_4),
+          gsm_5: n(beamConfig?.gsm_5),
+          gsm_6: n(beamConfig?.gsm_6),
+          gsm_7: n(beamConfig?.gsm_7),
+          gsm_8: n(beamConfig?.gsm_8),
+          bico_1_B: n(beamConfig?.bico_1_B),
+          bico_2_B: n(beamConfig?.bico_2_B),
+          bico_7_B: n(beamConfig?.bico_7_B),
+          bico_8_B: n(beamConfig?.bico_8_B),
+          // overconsumptionPercent: prefer value from beamConfig (stored as UI string e.g. "1"),
+          // fall back to record.overconsumption converted from decimal fraction (0.01 → "1")
+          overconsumptionPercent: beamConfig?.overconsumptionPercent != null && n(beamConfig.overconsumptionPercent) !== ''
+            ? n(beamConfig.overconsumptionPercent)
+            : (record.overconsumption != null ? n(Number(record.overconsumption) * 100) : ''),
+        },
+        materials: Array.isArray(beamConfig?.rows) ? beamConfig.rows : [],
+        surfactants: [],
+      };
+      loadDataIntoForm(data, true /* silent */);
+    }
+
+    async function initEditCopyMode(editId, copyId) {
+      const token = localStorage.getItem('authToken');
+      const id = editId || copyId;
+      try {
+        const resp = await fetch(`/api/bom/records/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!resp.ok) throw new Error(`Record not found (HTTP ${resp.status})`);
+        const data = await resp.json();
+        const record = data.record;
+
+        let beamConfig = null;
+        if (record.beam_configuration_json) {
+          try { beamConfig = JSON.parse(record.beam_configuration_json); } catch { /* ignore */ }
+        }
+
+        bomRecordEditMode = editId
+          ? { type: 'edit',  id: Number(editId),   pdId: record.pd_id }
+          : { type: 'copy',  sourceId: Number(copyId), pdId: record.pd_id };
+
+        showEditModeBanner(bomRecordEditMode, record);
+        prefillFromRecord(record, beamConfig);
+
+        // Copy mode: clear PD ID so the modal preview and saved record show the new auto-assigned ID
+        if (copyId) {
+          const pdIdEl = document.getElementById('pdId');
+          if (pdIdEl) pdIdEl.value = '';
+        }
+      } catch (err) {
+        alert(`Failed to load record for editing: ${err.message}`);
+      }
+    }
+
     // ==================== BOM RECORD SAVE ====================
+
+    function collectBeamConfigurationSnapshot() {
+      const g = (id) => (document.getElementById(id)?.value || '').trim();
+      const snapshot = {};
+
+      for (let i = 1; i <= 8; i++) {
+        snapshot[`gsm_${i}`] = g(`beamGSM_${i}`);
+      }
+
+      snapshot.bico_1_B = g('beamBico_1_B');
+      snapshot.bico_2_B = g('beamBico_2_B');
+      snapshot.bico_7_B = g('beamBico_7_B');
+      snapshot.bico_8_B = g('beamBico_8_B');
+      snapshot.overconsumptionPercent = g('overconsumptionPercent');
+
+      // Capture full beam matrix material rows (type, material name, 12 column percentages)
+      const allBeamRows = document.querySelectorAll('#beamTable tbody tr');
+      const beamMatrixRows = Array.from(allBeamRows).filter(
+        row => row.querySelectorAll('select.material-row-selector').length === 2
+      );
+      snapshot.rows = beamMatrixRows.map(row => {
+        const selects = row.querySelectorAll('select.material-row-selector');
+        const inputs = row.querySelectorAll('input.material-input:not(.calculated-field)');
+        return {
+          type: selects[0].value,
+          name: selects[1].value,
+          values: Array.from(inputs).map(inp => inp.value)
+        };
+      });
+
+      const scalarHasValue = Object.entries(snapshot)
+        .filter(([k]) => k !== 'rows')
+        .some(([, v]) => String(v || '').trim() !== '');
+      const rowsHaveValue = snapshot.rows.some(r => r.type || r.name || r.values.some(v => v));
+      return (scalarHasValue || rowsHaveValue) ? snapshot : null;
+    }
 
     function collectBomRecord() {
       const g = (id) => (document.getElementById(id)?.value || '').trim();
@@ -4753,7 +4955,8 @@
         }
       });
 
-      return { record, materials };
+      const beamConfiguration = collectBeamConfigurationSnapshot();
+      return { record, materials, beamConfiguration };
     }
 
     function openSaveBomRecordModal() {
@@ -4789,10 +4992,11 @@
       statusEl.textContent = '';
       btn.disabled = true;
 
+      const isEditMode = bomRecordEditMode && bomRecordEditMode.type === 'edit';
+      const isCopyMode = bomRecordEditMode && bomRecordEditMode.type === 'copy';
+
       try {
         refreshRequiredFieldColors();
-        
-        // PD ID will be auto-assigned by backend (no validation needed)
         
         const missingRequired = getMissingRedRequiredFields();
         if (missingRequired.length > 0) {
@@ -4801,7 +5005,7 @@
           return;
         }
 
-        const { record, materials } = collectBomRecord();
+        const { record, materials, beamConfiguration } = collectBomRecord();
 
         if (materials.length === 0) {
           statusEl.textContent = 'No calculation results found. Please run the calculation first.';
@@ -4809,14 +5013,39 @@
           return;
         }
 
-        const response = await fetch('/api/bom/records', {
-          method: 'POST',
+        // Validate recycled waste share against generated scrap:
+        // Siko (%) + Repro (%) must be <= Total Scrap (%).
+        const sikoPercent = Number(record.siko_percent ?? 0);
+        const reproPercent = Number(record.repro_percent ?? 0);
+        const totalScrapPercent = Number(record.total_scrap_percent ?? 0);
+        const recycledWastePercent = sikoPercent + reproPercent;
+
+        if (Number.isFinite(recycledWastePercent)
+          && Number.isFinite(totalScrapPercent)
+          && recycledWastePercent > totalScrapPercent + 0.0001) {
+          statusEl.textContent = `Validation error: Siko (%) + Repro (%) is ${recycledWastePercent.toFixed(2)}%, but Total Scrap (%) is ${totalScrapPercent.toFixed(2)}%. Please correct the values before saving.`;
+          btn.disabled = false;
+          return;
+        }
+
+        const apiUrl = isEditMode
+          ? `/api/bom/records/${bomRecordEditMode.id}`
+          : '/api/bom/records';
+        const apiMethod = isEditMode ? 'PUT' : 'POST';
+        const bodyPayload = isEditMode
+          ? { record, materials, beamConfiguration }
+          : {
+              record,
+              materials,
+              calculationSnapshot: latestCostPreview,
+              beamConfiguration,
+              sourceRecordId: isCopyMode ? bomRecordEditMode.sourceId : undefined
+            };
+
+        const response = await fetch(apiUrl, {
+          method: apiMethod,
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({
-            record,
-            materials,
-            calculationSnapshot: latestCostPreview
-          })
+          body: JSON.stringify(bodyPayload)
         });
 
         const data = await response.json();
@@ -4828,13 +5057,30 @@
         }
 
         closeSaveBomRecordModal();
+
+        // Edit / Copy mode: redirect back to Recipe Browser after save
+        if (isEditMode || isCopyMode) {
+          const pdLabel = isEditMode
+            ? (bomRecordEditMode.pdId ? ` PD ID: ${bomRecordEditMode.pdId}` : '')
+            : (data.pd_id ? ` PD ID: ${data.pd_id}` : '');
+          const msg = isEditMode
+            ? `Recipe${pdLabel} updated successfully.`
+            : `Recipe copied as${pdLabel}.`;
+          alert(msg);
+          window.location.href = '/recipe-edit-clone';
+          return;
+        }
+
+        // Normal new-recipe save
         const backBtn = document.getElementById('backToDashboardAfterSaveBtn');
         if (backBtn) {
           backBtn.style.display = '';
         }
         const pdSuffix = data.pd_id ? ` | PD ID: ${data.pd_id}` : '';
+        const silentReasons = ['smtp_not_configured', 'nodemailer_not_installed'];
         const emailInfo = data.emailSent
           ? ' | Email sent'
+          : silentReasons.includes(data.emailReason) ? ''
           : ` | Email not sent (${data.emailReason || 'unknown reason'})`;
         alert(`BOM record saved successfully (ID: ${data.id}${pdSuffix}${emailInfo}).`);
       } catch (err) {

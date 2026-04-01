@@ -643,11 +643,13 @@
           throw new Error(data.error || 'Failed to save decision.');
         }
 
+        const silentReasons = ['smtp_not_configured', 'nodemailer_not_installed'];
         const emailInfo = data?.result?.emailSent
           ? 'Email sent to author.'
+          : silentReasons.includes(data?.result?.emailReason) ? ''
           : `Email not sent (${data?.result?.emailReason || 'unknown reason'}).`;
 
-        setFeedback(`Decision saved. ${emailInfo}`, false);
+        setFeedback(emailInfo ? `Decision saved. ${emailInfo}` : 'Decision saved.', false);
         await loadPendingRecords();
 
         if (action === 'approve') {

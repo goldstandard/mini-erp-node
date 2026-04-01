@@ -288,26 +288,57 @@ Response shape:
   - Auto-assigned `pd_id` values start at `10000`, advance by `1`, reuse gaps left by deleted recipes, and ignore legacy recipe IDs below `10000`
   - New records are stored with `recipe_approved = "No"`
   - Optional immutable snapshot can be stored via `calculationSnapshot` in request body (`calculation_snapshot_json` in DB)
+  - Optional beam inputs stored via `beamConfiguration` in request body (`beam_configuration_json` in DB); `has_beam_configuration` flag is set to `1` when non-empty beam data is present
+  - `beamConfiguration` supports an extended schema with a `rows` array that persists the full beam material matrix alongside the scalar GSM / BICO / overconsumption fields
   - Server validates that total percentage of non-surfactant materials equals `100.00%` (surfactants are excluded from this check)
   - Submission email recipients are selected by recipe line region (`CZ` / `EG` / `RSA`) from the Admin Recipe Approval Region Matrix
   - If no matrix assignee is found for the region (or region cannot be resolved from line), server uses env fallback list (`RECIPE_APPROVAL_NOTIFY_TO`, `RECIPE_SUBMISSION_NOTIFY_TO`, `APPROVAL_NOTIFY_TO`)
-  - Response includes `emailSent` and `emailReason` fields for notification diagnostics
+  - Response includes `emailSent` and `emailReason` fields for notification diagnostics; `smtp_not_configured` / `nodemailer_not_installed` reasons are suppressed in the UI (expected non-error states)
   - Request body includes:
     - `record` object (description fields, throughput/scrap values, minimum batch size + unit, notes)
     - `materials` array (`material_label`, `material_name`, `percentage`)
     - optional `calculationSnapshot` object
+    - optional `beamConfiguration` object with scalar fields and optional `rows` array:
+      ```json
+      {
+        "gsm_1": "15", ..., "gsm_8": "0",
+        "bico_1_B": "0", "bico_2_B": "0", "bico_7_B": "0", "bico_8_B": "0",
+        "overconsumptionPercent": "1",
+        "rows": [
+          { "type": "SB", "name": "PPSB - Mosten NB 425", "values": ["42.5","42.5","0","0","0","0","0","0","42.5","42.5","0","0"] }
+        ]
+      }
+      ```
+      `values` has 12 entries for beam columns 1A, 1B, 2A, 2B, 3, 4, 5, 6, 7A, 7B, 8A, 8B
 
 - `GET /api/bom/records`
-  - Returns saved record list: `id`, `pd_id`, `customer`, `line`, `customer_bw`, `author`, `created_at`, `updated_at`, `created_by`
+  - Returns saved record list: `id`, `pd_id`, `customer`, `line`, `customer_bw`, `author`, `created_at`, `updated_at`, `created_by`, `has_beam_configuration`, `beam_configuration_json`
   - `created_at` is immutable creation timestamp; `updated_at` is refreshed on each edit
+  - `has_beam_configuration` is `1` for recipes saved with beam inputs, `0` otherwise — used by Recipe Edit/Clone to conditionally show the Beam Configuration editor panel
 
 - `GET /api/bom/records/:id`
   - Returns one full BOM record including child `materials`
+  - Used by BOM Calculator edit/copy mode (`?editId=N` / `?copyId=N`) to pre-fill all fields before user edits
 
 - `PUT /api/bom/records/:id`
   - Updates a saved BOM record and replaces its `materials` rows in a transaction
   - Uses the same non-surfactant `100.00%` percentage validation as create
   - Existing records keep their current `pd_id`; Edit mode does not permit changing an already stored PD ID
+  - Optional `beamConfiguration` field in request body (same extended schema with `rows` array as POST):
+    - Key absent → existing `beam_configuration_json` and `has_beam_configuration` in DB are preserved (backward-compatible edit for legacy records)
+    - Key present with non-empty values → beam data (including `rows`) is updated
+    - Key present as `null` or all-empty object → beam data is cleared
+  - Response: `{ success: true, id }` (PD ID accessible via `bomRecordEditMode.pdId` on the client side)
+
+### BOM Calculator Edit/Copy Mode
+
+- Opening `/bom-calculator?editId=N` pre-fills the BOM Calculator with an existing record and activates **Edit mode**
+- Opening `/bom-calculator?copyId=N` pre-fills the BOM Calculator with an existing record and activates **Copy mode** (a new PD ID is assigned on save)
+- A blue banner is shown at the top of the page indicating the current mode, PD ID, and customer; includes a back link to Recipe Edit/Clone
+- Pre-fill is silent (no alert); all description fields, beam GSM/BICO/overconsumption values, and the full beam material matrix are loaded
+- Saving in Edit mode issues `PUT /api/bom/records/:id`; saving in Copy mode issues `POST /api/bom/records` with `sourceRecordId`
+- After successful save in either mode, browser redirects to `/recipe-edit-clone`
+- Non-beam recipes continue to use the existing Recipe Edit/Clone modal (no change)
 
 - `DELETE /api/bom/records/:id`
   - Deletes the BOM record and its child `bom_record_materials` rows in a transaction

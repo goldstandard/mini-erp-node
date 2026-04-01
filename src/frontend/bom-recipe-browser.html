@@ -351,6 +351,73 @@
       padding: 7px 10px;
       font-size: 13px;
     }
+
+    .filter-item {
+      position: relative;
+    }
+
+    .rs-filter-dropdown {
+      position: relative;
+    }
+
+    .rs-filter-trigger {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 14px;
+      background: #fff;
+      text-align: left;
+      color: #333;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .rs-filter-trigger::after {
+      content: '▾';
+      font-size: 11px;
+      color: #667;
+      flex-shrink: 0;
+    }
+
+    .rs-filter-dropdown.open .rs-filter-trigger {
+      border-color: #667eea;
+      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+    }
+
+    .rs-filter-panel {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 30;
+      display: none;
+      background: #fff;
+      border: 1px solid #d7def0;
+      border-radius: 8px;
+      box-shadow: 0 10px 24px rgba(12, 39, 72, 0.2);
+      padding: 8px;
+    }
+
+    .rs-filter-dropdown.open .rs-filter-panel {
+      display: block;
+    }
+
+    .rs-filter-search {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 8px;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .rs-filter-panel select {
+      min-height: 180px;
+    }
   </style>
 </head>
 
@@ -408,20 +475,20 @@
           <div class="filter-section">
             <h3>Filters</h3>
             <div class="filter-row">
-              <div class="filter-item"><label for="rsFilterSapId">SAP ID:</label><select id="rsFilterSapId" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterPfnId">PD ID:</label><select id="rsFilterPfnId" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterCustomer">Customer:</label><select id="rsFilterCustomer" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterMarketSegment">Market Segment:</label><select id="rsFilterMarketSegment" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterApplication">Application:</label><select id="rsFilterApplication" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterSSMS">S/SMS:</label><select id="rsFilterSSMS" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterBonding">Bonding:</label><select id="rsFilterBonding" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterBasisWeight">Basis Weight:</label><select id="rsFilterBasisWeight" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterSlitWidth">Slit Width:</label><select id="rsFilterSlitWidth" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterTreatment">Treatment:</label><select id="rsFilterTreatment" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterAuthor">Author:</label><select id="rsFilterAuthor" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterLine">Line:</label><select id="rsFilterLine" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterCountry">Country:</label><select id="rsFilterCountry" multiple size="1"></select></div>
-              <div class="filter-item"><label for="rsFilterOverconsumption">Overconsumption:</label><select id="rsFilterOverconsumption" multiple size="1"></select></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterSapId">SAP ID:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterSapId"><button id="rsFilterTrigger-rsFilterSapId" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterSapId" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterSapId" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterPfnId">PD ID:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterPfnId"><button id="rsFilterTrigger-rsFilterPfnId" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterPfnId" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterPfnId" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterCustomer">Customer:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterCustomer"><button id="rsFilterTrigger-rsFilterCustomer" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterCustomer" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterCustomer" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterMarketSegment">Market Segment:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterMarketSegment"><button id="rsFilterTrigger-rsFilterMarketSegment" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterMarketSegment" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterMarketSegment" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterApplication">Application:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterApplication"><button id="rsFilterTrigger-rsFilterApplication" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterApplication" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterApplication" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterSSMS">S/SMS:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterSSMS"><button id="rsFilterTrigger-rsFilterSSMS" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterSSMS" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterSSMS" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterBonding">Bonding:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterBonding"><button id="rsFilterTrigger-rsFilterBonding" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterBonding" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterBonding" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterBasisWeight">Basis Weight:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterBasisWeight"><button id="rsFilterTrigger-rsFilterBasisWeight" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterBasisWeight" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterBasisWeight" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterSlitWidth">Slit Width:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterSlitWidth"><button id="rsFilterTrigger-rsFilterSlitWidth" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterSlitWidth" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterSlitWidth" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterTreatment">Treatment:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterTreatment"><button id="rsFilterTrigger-rsFilterTreatment" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterTreatment" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterTreatment" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterAuthor">Author:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterAuthor"><button id="rsFilterTrigger-rsFilterAuthor" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterAuthor" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterAuthor" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterLine">Line:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterLine"><button id="rsFilterTrigger-rsFilterLine" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterLine" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterLine" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterCountry">Country:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterCountry"><button id="rsFilterTrigger-rsFilterCountry" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterCountry" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterCountry" multiple size="8"></select></div></div></div>
+              <div class="filter-item"><label for="rsFilterTrigger-rsFilterOverconsumption">Overconsumption:</label><div class="rs-filter-dropdown" id="rsFilterDropdown-rsFilterOverconsumption"><button id="rsFilterTrigger-rsFilterOverconsumption" class="rs-filter-trigger" type="button">All</button><div class="rs-filter-panel"><input id="rsFilterSearch-rsFilterOverconsumption" class="rs-filter-search" type="text" placeholder="Search..." /><select id="rsFilterOverconsumption" multiple size="8"></select></div></div></div>
             </div>
 
             <div class="button-group">
@@ -500,6 +567,7 @@
     let recipeSummarySortColumn = null;
     let recipeSummarySortDirection = 'asc';
     let recipeSummaryScrollSyncBound = false;
+    let recipeSummaryFilterDropdownsBound = false;
 
     const recipeSummaryFilterMap = [
       { id: 'rsFilterSapId', query: 'sapId' },
@@ -863,25 +931,91 @@
       return Array.from(el.selectedOptions).map((opt) => opt.value).filter(Boolean);
     }
 
-    function attachExpandableMultiSelect(id, maxVisible = 12) {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.size = 1;
-      el.addEventListener('focus', () => {
-        const optionCount = Math.max(4, el.options.length);
-        el.size = Math.min(maxVisible, optionCount);
+    function closeRecipeSummaryFilterDropdowns() {
+      document.querySelectorAll('.rs-filter-dropdown.open').forEach((el) => {
+        el.classList.remove('open');
       });
-      el.addEventListener('blur', () => {
-        el.size = 1;
+    }
+
+    function applyRecipeSummaryFilterSearch(filterId) {
+      const search = document.getElementById(`rsFilterSearch-${filterId}`);
+      const select = document.getElementById(filterId);
+      if (!search || !select) return;
+
+      const query = String(search.value || '').trim().toLowerCase();
+      Array.from(select.options).forEach((opt) => {
+        const text = String(opt.textContent || opt.value || '').toLowerCase();
+        opt.hidden = query ? !text.includes(query) : false;
       });
-      el.addEventListener('mousedown', (event) => {
-        if (el.size === 1) {
+    }
+
+    function updateRecipeSummaryFilterTriggerLabel(filterId) {
+      const trigger = document.getElementById(`rsFilterTrigger-${filterId}`);
+      const select = document.getElementById(filterId);
+      if (!trigger || !select) return;
+
+      const selectedCount = Array.from(select.options).filter((opt) => opt.selected).length;
+      trigger.textContent = selectedCount ? `${selectedCount} selected` : 'All';
+    }
+
+    function clearRecipeSummaryFilterSelection(filterId) {
+      const select = document.getElementById(filterId);
+      if (!select) return;
+      Array.from(select.options).forEach((opt) => {
+        opt.selected = false;
+      });
+      updateRecipeSummaryFilterTriggerLabel(filterId);
+    }
+
+    function initRecipeSummaryFilterDropdowns() {
+      recipeSummaryFilterMap.forEach(({ id }) => {
+        const dropdown = document.getElementById(`rsFilterDropdown-${id}`);
+        const trigger = document.getElementById(`rsFilterTrigger-${id}`);
+        const search = document.getElementById(`rsFilterSearch-${id}`);
+        const select = document.getElementById(id);
+        if (!dropdown || !trigger || !search || !select) return;
+
+        trigger.addEventListener('click', (event) => {
           event.preventDefault();
-          const optionCount = Math.max(4, el.options.length);
-          el.size = Math.min(maxVisible, optionCount);
-          el.focus();
-        }
+          const isOpen = dropdown.classList.contains('open');
+          closeRecipeSummaryFilterDropdowns();
+          if (!isOpen) {
+            dropdown.classList.add('open');
+          }
+        });
+
+        search.addEventListener('input', () => {
+          applyRecipeSummaryFilterSearch(id);
+        });
+
+        search.addEventListener('focus', () => {
+          clearRecipeSummaryFilterSelection(id);
+        });
+
+        search.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            closeRecipeSummaryFilterDropdowns();
+            trigger.focus();
+          }
+        });
+
+        select.addEventListener('change', () => {
+          updateRecipeSummaryFilterTriggerLabel(id);
+        });
+
+        updateRecipeSummaryFilterTriggerLabel(id);
       });
+
+      if (!recipeSummaryFilterDropdownsBound) {
+        document.addEventListener('click', (event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          if (!target.closest('.rs-filter-dropdown')) {
+            closeRecipeSummaryFilterDropdowns();
+          }
+        });
+        recipeSummaryFilterDropdownsBound = true;
+      }
     }
 
     function setSelectOptions(id, values, formatter) {
@@ -929,7 +1063,10 @@
           currencySelect.value = 'USD';
         }
 
-        recipeSummaryFilterMap.forEach(({ id }) => attachExpandableMultiSelect(id));
+        recipeSummaryFilterMap.forEach(({ id }) => {
+          applyRecipeSummaryFilterSearch(id);
+          updateRecipeSummaryFilterTriggerLabel(id);
+        });
       } catch (err) {
         console.error('Error loading recipe summary metadata:', err);
       }
@@ -1139,12 +1276,18 @@
 
     function clearRecipeSummaryFilters() {
       recipeSummaryFilterMap.forEach(({ id }) => {
+        const searchEl = document.getElementById(`rsFilterSearch-${id}`);
         const el = document.getElementById(id);
         if (!el) return;
+        if (searchEl) searchEl.value = '';
         Array.from(el.options).forEach((opt) => {
           opt.selected = false;
+          opt.hidden = false;
         });
+        updateRecipeSummaryFilterTriggerLabel(id);
       });
+
+      closeRecipeSummaryFilterDropdowns();
 
       const currencySelect = document.getElementById('rsCurrencySelect');
       const viewToggle = document.getElementById('rsViewToggle');
@@ -1240,6 +1383,7 @@
       auth.configureHeaderButtons();
       enforceCompactMode();
       setupRecipeSummaryListeners();
+      initRecipeSummaryFilterDropdowns();
       setupRecipeSummaryTopScrollbar();
       loadRecipeSummaryMetadata().then(loadRecipeSummary);
     });

@@ -6,6 +6,43 @@ All notable changes to the Mini ERP system are documented here. For current feat
 
 ### Added
 
+#### Full Beam Matrix Edit/Copy via BOM Calculator
+- Beam recipes (records with `has_beam_configuration = 1`) opened in Edit or Copy mode from **Recipe Edit/Clone** now open directly in the **BOM Calculator** page in a new tab, with all data pre-filled, instead of the previous limited modal panel
+- URL parameter scheme: `/bom-calculator?editId=N` for edit mode, `/bom-calculator?copyId=N` for copy mode
+- BOM Calculator page detects these URL parameters on load and calls `initEditCopyMode()` to fetch and pre-fill the record
+- A blue info banner is shown at the top of BOM Calculator when in edit/copy mode, indicating the PD ID / customer and the mode; includes a **← Back to Recipe Browser** link
+- All recipe fields are pre-filled silently (no alert dialog): description fields, production target, GSM values, BICO A/B ratios, overconsumption %, and the full beam material matrix (up to 10 material rows × 12 percentage columns)
+- Live recalculation is available after pre-fill — user can adjust any value and recalculate before saving
+- Saving in edit mode issues `PUT /api/bom/records/:id`; saving in copy mode issues `POST /api/bom/records` with `sourceRecordId`; both redirect back to `/recipe-edit-clone` after successful save
+- `beam_configuration_json` schema extended with a `rows` array to persist the full beam material matrix:
+  ```json
+  {
+    "gsm_1": "15", "gsm_2": "15", ..., "gsm_8": "0",
+    "bico_1_B": "0", "bico_2_B": "0", "bico_7_B": "0", "bico_8_B": "0",
+    "overconsumptionPercent": "1",
+    "rows": [
+      { "type": "SB", "name": "PPSB - Mosten NB 425", "values": ["42.5","42.5","0","0","0","0","0","0","42.5","42.5","0","0"] }
+    ]
+  }
+  ```
+  — `values` array contains 12 entries corresponding to beam columns 1A, 1B, 2A, 2B, 3, 4, 5, 6, 7A, 7B, 8A, 8B
+- `normalizeBeamConfigurationSnapshot()` server helper extended to sanitize and persist the `rows` array alongside scalar beam fields; empty-row filtering prevents blank rows from being stored
+- Non-beam recipes (legacy records without `has_beam_configuration`) continue to open in the existing Recipe Edit/Clone modal without change
+
+#### Beam Configuration Persistence and Recipe Edit/Clone Panel
+- Beam Configuration inputs (beam GSM 1–8, BICO B ratios for beams 1/2/7/8, overconsumption %) from BOM Calculator are now persisted to the database when saving a new recipe
+- New columns added to `bom_records`:
+  - `beam_configuration_json TEXT` — full JSON snapshot of beam inputs and material matrix
+  - `has_beam_configuration INTEGER DEFAULT 0` — flag set to `1` when beam data is present
+- Idempotent `ALTER TABLE` migration adds both columns to existing databases on first startup after upgrade; backfill sets the flag for any rows that already contained beam JSON
+- `POST /api/bom/records` accepts an optional `beamConfiguration` object in the request body; missing or empty beam objects result in `has_beam_configuration = 0` and a `NULL` JSON column
+- `PUT /api/bom/records/:id` accepts an optional `beamConfiguration` key:
+  - Key absent from request body → existing beam data in DB is preserved (backward-compatible edit)
+  - Key present but `null` / all-empty → beam data is cleared
+- `GET /api/bom/records` list endpoint now returns `has_beam_configuration` and `beam_configuration_json` for every row (required by the Recipe Edit/Clone page to detect beam records without an additional detail fetch)
+- Recipe Edit/Clone filter dropdowns upgraded from `<select size="1">` expand-on-focus to custom dropdown-panel with inline search input (matching BOM Recipe Browser style)
+- `normalizeBeamConfigurationSnapshot()` server helper whitelists allowed JSON keys and returns `null` for empty payloads, preventing arbitrary data from being stored
+
 #### Admin Users — delete endpoint and full admin mutation audit coverage
 - Added `DELETE /api/admin/users/:userId` endpoint for permanent user deletion (admin only)
 - Added self-delete protection for admins (`You cannot delete your own account.`)
@@ -75,6 +112,14 @@ All notable changes to the Mini ERP system are documented here. For current feat
 - After successful roll, the page now auto-refreshes preview data so the Target column immediately shows newly rolled values
 
 ### Fixed
+
+#### SMTP — local development credentials and UI noise
+- Created `.env` file (gitignored) for local-development SMTP credentials; server loads this file automatically via `loadEnvFiles()` on every startup, so email sending works regardless of how the server is launched (not just via `run-local.cmd`)
+- Removed hardcoded SMTP credentials from `run-local.cmd` — credentials now live exclusively in `.env`
+- Frontend success alerts for recipe save (BOM Calculator, Recipe Edit/Clone) and approval decision (Recipe Approval) no longer show the `Email not sent (smtp_not_configured)` / `Email not sent (nodemailer_not_installed)` suffix — these are expected non-error states in environments without SMTP; genuine send failures (auth errors, connection timeouts) still surface in the UI
+
+#### BOM Recipe list missing beam flag
+- `GET /api/bom/records` SELECT was missing `has_beam_configuration` and `beam_configuration_json` columns; Recipe Edit/Clone therefore always received `undefined` for the beam flag even for newly saved recipes and consequently never showed the Beam Configuration panel — now fixed
 
 #### Environment loading and SMTP reliability (local + deployment)
 - Added startup env-file loader for `.env` and `.env.local` (without overriding existing process/App Settings values)
@@ -257,7 +302,7 @@ All notable changes to the Mini ERP system are documented here. For current feat
     - Calculation Results material composition percentages
     - Minimum batch size + unit
     - Commentary notes
-    - Beam Configuration per-column matrix is intentionally not persisted in this flow
+    - Beam Configuration inputs (GSM 1–8, BICO B ratios, overconsumption %) — see *Beam Configuration Persistence* entry for full details
 
 - **BOM list migration to database-backed storage**
   - Customer list moved from `customer-list.json` to `bom_customers`

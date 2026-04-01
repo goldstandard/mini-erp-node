@@ -44,6 +44,7 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
+      position: relative;
     }
 
     .filters label {
@@ -60,6 +61,73 @@
       font-size: 13px;
       background: #fff;
       min-height: 34px;
+    }
+
+    .filter-dropdown {
+      position: relative;
+    }
+
+    .filter-trigger {
+      width: 100%;
+      border: 1px solid #c7d7ea;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
+      background: #fff;
+      min-height: 34px;
+      text-align: left;
+      color: #18324a;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .filter-trigger::after {
+      content: '▾';
+      color: #5a7592;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .filter-dropdown.open .filter-trigger {
+      border-color: #86aeda;
+      box-shadow: 0 0 0 2px rgba(91, 139, 198, 0.15);
+    }
+
+    .filter-panel {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 30;
+      background: #fff;
+      border: 1px solid #c7d7ea;
+      border-radius: 10px;
+      box-shadow: 0 10px 24px rgba(18, 52, 84, 0.18);
+      padding: 8px;
+      display: none;
+    }
+
+    .filter-dropdown.open .filter-panel {
+      display: block;
+    }
+
+    .filters .filter-search {
+      width: 100%;
+      border: 1px solid #c7d7ea;
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 13px;
+      background: #fff;
+      min-height: 34px;
+      margin-bottom: 6px;
+    }
+
+    .filter-panel select {
+      border-radius: 8px;
+      min-height: 180px;
     }
 
     .actions {
@@ -203,8 +271,9 @@
 
     .modal.show { display: flex; }
 
-    .modal-content {
-      width: min(1300px, 96vw);
+    #editorModal .modal-content {
+      width: 85vw;
+      max-width: 85vw;
       max-height: 94vh;
       overflow: auto;
       background: #fff;
@@ -233,6 +302,12 @@
       grid-template-columns: repeat(5, minmax(170px, 1fr));
       gap: 8px;
       margin-bottom: 12px;
+    }
+
+    .beam-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(170px, 1fr));
+      gap: 8px;
     }
 
     .editor-field {
@@ -291,11 +366,13 @@
     @media (max-width: 1280px) {
       .filters { grid-template-columns: repeat(4, minmax(160px, 1fr)); }
       .editor-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
+      .beam-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
     }
 
     @media (max-width: 820px) {
       .filters { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
       .editor-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+      .beam-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
       .actions-cell { flex-direction: column; }
     }
   </style>
@@ -407,6 +484,25 @@
 
       <div class="editor-grid" id="editorGrid"></div>
 
+      <div id="beamConfigEditorPanel" class="panel hidden" style="margin: 0 0 10px 0; padding: 10px;">
+        <h2 style="margin-bottom:8px;">Beam Configuration</h2>
+        <div class="beam-grid" id="beamConfigGrid">
+          <div class="editor-field"><label>Beam 1 GSM</label><input id="beam_gsm_1" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 2 GSM</label><input id="beam_gsm_2" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 3 GSM</label><input id="beam_gsm_3" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 4 GSM</label><input id="beam_gsm_4" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 5 GSM</label><input id="beam_gsm_5" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 6 GSM</label><input id="beam_gsm_6" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 7 GSM</label><input id="beam_gsm_7" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 8 GSM</label><input id="beam_gsm_8" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 1 Bico B (%)</label><input id="beam_bico_1_b" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 2 Bico B (%)</label><input id="beam_bico_2_b" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 7 Bico B (%)</label><input id="beam_bico_7_b" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Beam 8 Bico B (%)</label><input id="beam_bico_8_b" type="number" step="0.01" /></div>
+          <div class="editor-field"><label>Overconsumption (%)</label><input id="beam_overconsumption_percent" type="number" step="0.01" /></div>
+        </div>
+      </div>
+
       <div class="panel" style="margin: 0; padding: 10px;">
         <h2 style="margin-bottom:8px;">BOM Materials</h2>
         <div class="materials-editor">
@@ -454,6 +550,7 @@
     let currentRecordId = null;
     let sourceRecordId = null;
     let originalPdId = '';
+    let editorHasBeamConfiguration = false;
 
     const FILTERS = [
       { id: 'sapId', label: 'SAP ID', key: 'sapIds' },
@@ -511,6 +608,12 @@
       return Number.isFinite(n) ? n.toFixed(digits) : '';
     }
 
+    function formatDecimalForInput(value, digits = 2) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '';
+      return n.toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+    }
+
     function formatDate(value) {
       if (!value) return '-';
       const d = new Date(value);
@@ -536,21 +639,103 @@
       const grid = document.getElementById('filterGrid');
       grid.innerHTML = FILTERS.map((f) => `
         <div class="item">
-          <label for="filter-${f.id}">${escapeHtml(f.label)}</label>
-          <select id="filter-${f.id}" multiple size="1"></select>
+          <label for="filter-trigger-${f.id}">${escapeHtml(f.label)}</label>
+          <div class="filter-dropdown" id="filter-dropdown-${f.id}">
+            <button id="filter-trigger-${f.id}" class="filter-trigger" type="button">All</button>
+            <div class="filter-panel">
+              <input id="filter-search-${f.id}" class="filter-search" type="text" placeholder="Search..." />
+              <select id="filter-${f.id}" multiple size="8"></select>
+            </div>
+          </div>
         </div>
       `).join('');
 
       FILTERS.forEach((f) => {
+        const dropdown = document.getElementById(`filter-dropdown-${f.id}`);
+        const trigger = document.getElementById(`filter-trigger-${f.id}`);
+        const search = document.getElementById(`filter-search-${f.id}`);
         const select = document.getElementById(`filter-${f.id}`);
-        if (!select) return;
-        select.addEventListener('focus', () => {
-          select.size = Math.min(10, Math.max(4, select.options.length));
+        if (!dropdown || !trigger || !search || !select) return;
+
+        trigger.addEventListener('click', (event) => {
+          event.preventDefault();
+          const isOpen = dropdown.classList.contains('open');
+          closeAllFilterDropdowns();
+          if (!isOpen) {
+            dropdown.classList.add('open');
+          }
         });
-        select.addEventListener('blur', () => {
-          select.size = 1;
+
+        search.addEventListener('input', () => {
+          applyFilterSearch(f.id);
+        });
+
+        search.addEventListener('focus', () => {
+          clearFilterSelection(f.id);
+        });
+
+        select.addEventListener('change', () => {
+          updateFilterTriggerLabel(f.id);
+        });
+
+        search.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            closeAllFilterDropdowns();
+            trigger.focus();
+          }
         });
       });
+
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (!target.closest('.filter-dropdown')) {
+          closeAllFilterDropdowns();
+        }
+      });
+    }
+
+    function closeAllFilterDropdowns() {
+      document.querySelectorAll('.filter-dropdown.open').forEach((el) => {
+        el.classList.remove('open');
+      });
+    }
+
+    function clearFilterSelection(filterId) {
+      const select = document.getElementById(`filter-${filterId}`);
+      if (!select) return;
+
+      Array.from(select.options).forEach((opt) => {
+        opt.selected = false;
+      });
+
+      updateFilterTriggerLabel(filterId);
+    }
+
+    function getVisibleOptionCount(select) {
+      if (!select) return 0;
+      return Array.from(select.options).filter((opt) => !opt.hidden).length;
+    }
+
+    function applyFilterSearch(filterId) {
+      const search = document.getElementById(`filter-search-${filterId}`);
+      const select = document.getElementById(`filter-${filterId}`);
+      if (!search || !select) return;
+
+      const q = String(search.value || '').trim().toLowerCase();
+      Array.from(select.options).forEach((opt) => {
+        const text = String(opt.textContent || opt.value || '').toLowerCase();
+        opt.hidden = q ? !text.includes(q) : false;
+      });
+    }
+
+    function updateFilterTriggerLabel(filterId) {
+      const trigger = document.getElementById(`filter-trigger-${filterId}`);
+      const select = document.getElementById(`filter-${filterId}`);
+      if (!trigger || !select) return;
+
+      const selected = Array.from(select.options).filter((opt) => opt.selected);
+      trigger.textContent = selected.length ? `${selected.length} selected` : 'All';
     }
 
     function setSelectValues(selectId, values, selected = '') {
@@ -567,6 +752,8 @@
       const src = metadata?.filters || {};
       FILTERS.forEach((f) => {
         setSelectValues(`filter-${f.id}`, src[f.key] || []);
+        applyFilterSearch(f.id);
+        updateFilterTriggerLabel(f.id);
       });
     }
 
@@ -872,11 +1059,15 @@
 
     function clearFilters() {
       FILTERS.forEach((f) => {
+        const searchEl = document.getElementById(`filter-search-${f.id}`);
         const el = document.getElementById(`filter-${f.id}`);
         if (!el) return;
+        if (searchEl) searchEl.value = '';
         Array.from(el.options).forEach((opt) => { opt.selected = false; });
-        el.size = 1;
+        applyFilterSearch(f.id);
+        updateFilterTriggerLabel(f.id);
       });
+      closeAllFilterDropdowns();
     }
 
     function buildEditorGrid() {
@@ -971,9 +1162,68 @@
       el.value = text;
     }
 
+    function setEditorDecimalValue(id, value, digits = 2) {
+      setEditorValue(id, formatDecimalForInput(value, digits));
+    }
+
     function toNumberOrNull(value) {
       const n = Number(value);
       return Number.isFinite(n) ? n : null;
+    }
+
+    function parseBeamConfigurationJson(record) {
+      const raw = record?.beam_configuration_json;
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function toggleBeamConfigurationEditor(show) {
+      editorHasBeamConfiguration = !!show;
+      const panel = document.getElementById('beamConfigEditorPanel');
+      if (!panel) return;
+      panel.classList.toggle('hidden', !editorHasBeamConfiguration);
+    }
+
+    function fillBeamConfigurationEditor(record) {
+      const beamConfig = parseBeamConfigurationJson(record) || {};
+
+      for (let i = 1; i <= 8; i++) {
+        setEditorDecimalValue(`beam_gsm_${i}`, beamConfig[`gsm_${i}`] ?? '');
+      }
+
+      setEditorDecimalValue('beam_bico_1_b', beamConfig.bico_1_B ?? '');
+      setEditorDecimalValue('beam_bico_2_b', beamConfig.bico_2_B ?? '');
+      setEditorDecimalValue('beam_bico_7_b', beamConfig.bico_7_B ?? '');
+      setEditorDecimalValue('beam_bico_8_b', beamConfig.bico_8_B ?? '');
+      setEditorDecimalValue('beam_overconsumption_percent', beamConfig.overconsumptionPercent ?? '');
+    }
+
+    function collectBeamConfigurationPayload() {
+      if (!editorHasBeamConfiguration) return null;
+
+      const payload = {};
+      for (let i = 1; i <= 8; i++) {
+        payload[`gsm_${i}`] = getEditorValue(`beam_gsm_${i}`);
+      }
+
+      payload.bico_1_B = getEditorValue('beam_bico_1_b');
+      payload.bico_2_B = getEditorValue('beam_bico_2_b');
+      payload.bico_7_B = getEditorValue('beam_bico_7_b');
+      payload.bico_8_B = getEditorValue('beam_bico_8_b');
+      payload.overconsumptionPercent = getEditorValue('beam_overconsumption_percent');
+
+      const hasValue = Object.values(payload).some((value) => String(value || '').trim() !== '');
+      return hasValue ? payload : null;
+    }
+
+    function isSurfactantLabel(label) {
+      const normalized = String(label || '').trim().toLowerCase();
+      return normalized === 'surfactant' || normalized === 'surfactants';
     }
 
     function addMaterialRow(material = {}) {
@@ -992,7 +1242,7 @@
       setSelectValuesOnElement(labelSelect, MATERIAL_LABEL_OPTIONS, material.material_label || 'Spunbond polymer');
 
       const pctInput = row.querySelector('.mat-pct');
-      pctInput.value = Number.isFinite(Number(material.percentage)) ? Number(material.percentage).toFixed(2) : '';
+      pctInput.value = formatDecimalForInput(material.percentage, 2);
       pctInput.addEventListener('input', updateMaterialsTotal);
 
       labelSelect.addEventListener('change', () => {
@@ -1045,10 +1295,12 @@
       const rowsEls = Array.from(document.querySelectorAll('#materialsBody .material-row'));
       let total = 0;
       rowsEls.forEach((row) => {
+        const label = row.querySelector('.mat-label')?.value || '';
+        if (isSurfactantLabel(label)) return;
         const pct = Number(row.querySelector('.mat-pct')?.value || 0);
         if (Number.isFinite(pct)) total += pct;
       });
-      totalsEl.textContent = `Total: ${total.toFixed(2)}%`;
+      totalsEl.textContent = `Total (excluding surfactants): ${formatDecimalForInput(total, 2)}%`;
       totalsEl.classList.toggle('bad', Math.abs(total - 100) > 0.01);
     }
 
@@ -1069,31 +1321,31 @@
       setEditorValue('ed_line', record.line || '');
       setEditorValue('ed_target_unit', record.target_unit || 'tons');
 
-      setEditorValue('ed_customer_bw', record.customer_bw ?? '');
-      setEditorValue('ed_belt_bw', record.belt_bw ?? '');
-      setEditorValue('ed_mb_grams', record.mb_grams ?? '');
-      setEditorValue('ed_belt_speed', record.belt_speed ?? '');
-      setEditorValue('ed_siko_percent', record.siko_percent ?? '');
-      setEditorValue('ed_repro_percent', record.repro_percent ?? '');
-      setEditorValue('ed_max_usable_width', record.max_usable_width ?? '');
-      setEditorValue('ed_usable_width', record.usable_width ?? '');
-      setEditorValue('ed_edge_trim_percent', record.edge_trim_percent ?? '');
-      setEditorValue('ed_web_loss_percent', record.web_loss_percent ?? '');
-      setEditorValue('ed_other_scrap_percent', record.other_scrap_percent ?? '');
-      setEditorValue('ed_total_scrap_percent', record.total_scrap_percent ?? '');
-      setEditorValue('ed_gross_yield_percent', record.gross_yield_percent ?? '');
+      setEditorDecimalValue('ed_customer_bw', record.customer_bw ?? '');
+      setEditorDecimalValue('ed_belt_bw', record.belt_bw ?? '');
+      setEditorDecimalValue('ed_mb_grams', record.mb_grams ?? '');
+      setEditorDecimalValue('ed_belt_speed', record.belt_speed ?? '');
+      setEditorDecimalValue('ed_siko_percent', record.siko_percent ?? '');
+      setEditorDecimalValue('ed_repro_percent', record.repro_percent ?? '');
+      setEditorDecimalValue('ed_max_usable_width', record.max_usable_width ?? '');
+      setEditorDecimalValue('ed_usable_width', record.usable_width ?? '');
+      setEditorDecimalValue('ed_edge_trim_percent', record.edge_trim_percent ?? '');
+      setEditorDecimalValue('ed_web_loss_percent', record.web_loss_percent ?? '');
+      setEditorDecimalValue('ed_other_scrap_percent', record.other_scrap_percent ?? '');
+      setEditorDecimalValue('ed_total_scrap_percent', record.total_scrap_percent ?? '');
+      setEditorDecimalValue('ed_gross_yield_percent', record.gross_yield_percent ?? '');
       setEditorValue('ed_s_beams', record.s_beams ?? '');
       setEditorValue('ed_m_beams', record.m_beams ?? '');
-      setEditorValue('ed_sb_throughput', record.sb_throughput ?? '');
-      setEditorValue('ed_mb_throughput', record.mb_throughput ?? '');
-      setEditorValue('ed_total_throughput', record.total_throughput ?? '');
-      setEditorValue('ed_production_time', record.production_time ?? '');
+      setEditorDecimalValue('ed_sb_throughput', record.sb_throughput ?? '');
+      setEditorDecimalValue('ed_mb_throughput', record.mb_throughput ?? '');
+      setEditorDecimalValue('ed_total_throughput', record.total_throughput ?? '');
+      setEditorDecimalValue('ed_production_time', record.production_time ?? '');
       setEditorValue('ed_cores', record.cores || '');
-      setEditorValue('ed_slit_width', record.slit_width ?? '');
-      setEditorValue('ed_length_meters', record.length_meters ?? '');
-      setEditorValue('ed_roll_diameter', record.roll_diameter ?? '');
-      setEditorValue('ed_target_production', record.target_production ?? '');
-      setEditorValue('ed_overconsumption', Number.isFinite(Number(record.overconsumption)) ? (Number(record.overconsumption) * 100).toFixed(2) : '');
+      setEditorDecimalValue('ed_slit_width', record.slit_width ?? '');
+      setEditorDecimalValue('ed_length_meters', record.length_meters ?? '');
+      setEditorDecimalValue('ed_roll_diameter', record.roll_diameter ?? '');
+      setEditorDecimalValue('ed_target_production', record.target_production ?? '');
+      setEditorDecimalValue('ed_overconsumption', Number.isFinite(Number(record.overconsumption)) ? (Number(record.overconsumption) * 100) : '');
       setEditorValue('ed_notes', record.notes || '');
 
       document.getElementById('materialsBody').innerHTML = '';
@@ -1172,7 +1424,8 @@
         };
       }).filter((m) => m.material_label || m.material_name || Number.isFinite(m.percentage));
 
-      return { record, materials: mats };
+      const beamConfiguration = collectBeamConfigurationPayload();
+      return { record, materials: mats, beamConfiguration };
     }
 
     function openEditor(mode, recordId) {
@@ -1187,6 +1440,19 @@
       sourceRecordId = Number(source.id);
 
       const rec = JSON.parse(JSON.stringify(source));
+      const sourceBeamFlag = Number(source.has_beam_configuration) === 1;
+      const sourceBeamJson = parseBeamConfigurationJson(source);
+      const useBeamEditor = sourceBeamFlag || !!sourceBeamJson;
+
+      // Beam recipes open in BOM Calculator for full matrix editing
+      if (useBeamEditor) {
+        const targetUrl = mode === 'edit'
+          ? `/bom-calculator?editId=${Number(source.id)}`
+          : `/bom-calculator?copyId=${Number(source.id)}`;
+        window.open(targetUrl, '_blank');
+        return;
+      }
+
       if (mode === 'copy') {
         currentRecordId = null;
         rec.id = null;
@@ -1203,7 +1469,9 @@
         : `Edit Recipe ID ${source.id}`;
 
       buildEditorGrid();
+      toggleBeamConfigurationEditor(useBeamEditor);
       fillEditor(rec);
+      fillBeamConfigurationEditor(rec);
       setStatus('', false, 'editorStatus');
       document.getElementById('editorModal').classList.add('show');
     }
@@ -1253,7 +1521,7 @@
       if (!canModify) return;
       setStatus('', false, 'editorStatus');
 
-      const { record, materials } = collectEditorPayload();
+      const { record, materials, beamConfiguration } = collectEditorPayload();
       if (!materials.length) {
         setStatus('At least one BOM material row is required.', true, 'editorStatus');
         return;
@@ -1261,10 +1529,10 @@
 
       // Validate total percentage of non-surfactant materials must equal 100%
       // (Surfactants evaporate during production, so they are excluded from percentage sum)
-      const nonSurfactants = materials.filter(m => m.material_label !== 'Surfactant');
+      const nonSurfactants = materials.filter((m) => !isSurfactantLabel(m.material_label));
       const total = nonSurfactants.reduce((sum, m) => sum + (Number(m.percentage) || 0), 0);
       if (Math.abs(total - 100) > 0.01) {
-        setStatus(`BOM total (excluding surfactants) must be 100.00%, current total is ${total.toFixed(2)}%.`, true, 'editorStatus');
+        setStatus(`BOM total (excluding surfactants) must be 100.00%, current total is ${formatNum(total, 2)}%.`, true, 'editorStatus');
         return;
       }
 
@@ -1280,6 +1548,7 @@
       const payload = {
         record,
         materials,
+        beamConfiguration,
         sourceRecordId: editorMode === 'copy' ? sourceRecordId : null
       };
 
@@ -1315,10 +1584,12 @@
         }
 
         const pdSuffix = data.pd_id ? ` | PD ID: ${data.pd_id}` : '';
+        const silentReasons = ['smtp_not_configured', 'nodemailer_not_installed'];
         const hasEmailInfo = Object.prototype.hasOwnProperty.call(data, 'emailSent');
         const emailSuffix = hasEmailInfo
           ? (data.emailSent
               ? ' | Email sent'
+              : silentReasons.includes(data.emailReason) ? ''
               : ` | Email not sent (${data.emailReason || 'unknown reason'})`)
           : '';
         setStatus(`Saved successfully (ID: ${data.id}${pdSuffix}${emailSuffix}).`, false, 'editorStatus');

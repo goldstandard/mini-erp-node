@@ -392,6 +392,62 @@ function normalizeCalculationSnapshot(snapshot) {
   };
 }
 
+function normalizeBeamConfigurationSnapshot(beamConfiguration) {
+  if (!beamConfiguration || typeof beamConfiguration !== "object" || Array.isArray(beamConfiguration)) {
+    return null;
+  }
+
+  const normalized = {};
+  const allowedKeys = new Set([
+    ...Array.from({ length: 8 }, (_, index) => `gsm_${index + 1}`),
+    "bico_1_B",
+    "bico_2_B",
+    "bico_7_B",
+    "bico_8_B",
+    "overconsumptionPercent"
+  ]);
+
+  for (const [key, value] of Object.entries(beamConfiguration)) {
+    if (!allowedKeys.has(key)) continue;
+    normalized[key] = value == null ? "" : String(value).trim();
+  }
+
+  // Normalize beam matrix material rows (optional, from full-matrix save mode)
+  if (Array.isArray(beamConfiguration.rows)) {
+    normalized.rows = beamConfiguration.rows
+      .filter(r => r && typeof r === "object")
+      .map(r => ({
+        type: String(r.type || "").trim(),
+        name: String(r.name || "").trim(),
+        values: Array.isArray(r.values)
+          ? r.values.map(v => String(v == null ? "" : v).trim())
+          : []
+      }));
+  }
+
+  if (!Object.keys(normalized).length) {
+    return null;
+  }
+
+  const scalarHasValue = Object.entries(normalized)
+    .filter(([k]) => k !== "rows")
+    .some(([, v]) => String(v || "").trim() !== "");
+  const rowsHaveValue = Array.isArray(normalized.rows) &&
+    normalized.rows.some(r => r.type || r.name || r.values.some(v => v));
+  return (scalarHasValue || rowsHaveValue) ? normalized : null;
+}
+
+function parseBeamConfiguration(rawBeamConfiguration) {
+  if (!rawBeamConfiguration) return null;
+  try {
+    const parsed = JSON.parse(rawBeamConfiguration);
+    // Return parsed as-is (already normalized when stored); only re-normalize scalars
+    return normalizeBeamConfigurationSnapshot(parsed);
+  } catch {
+    return null;
+  }
+}
+
 function normalizeRecipeDecisionInput(action) {
   const normalized = String(action || "").trim().toLowerCase();
   if (["approve", "approved"].includes(normalized)) {
@@ -1773,6 +1829,8 @@ async function ensureBomRecordStoreReady() {
           overconsumption REAL,
           notes TEXT,
           author TEXT,
+          beam_configuration_json TEXT,
+          has_beam_configuration INTEGER DEFAULT 0,
           recipe_approved TEXT DEFAULT 'Yes',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1810,6 +1868,39 @@ async function ensureBomRecordStoreReady() {
           console.error('[MIGRATION] Error adding calculation_snapshot_json column:', err.message);
         }
       };
+
+      // Migration: Add beam configuration payload if it doesn't exist
+      try {
+        await db.run('ALTER TABLE bom_records ADD COLUMN beam_configuration_json TEXT');
+        console.log('[MIGRATION] Added beam_configuration_json column to bom_records');
+      } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding beam_configuration_json column:', err.message);
+        }
+      }
+
+      // Migration: Add flag for records that carry Beam Configuration
+      try {
+        await db.run('ALTER TABLE bom_records ADD COLUMN has_beam_configuration INTEGER DEFAULT 0');
+        console.log('[MIGRATION] Added has_beam_configuration column to bom_records');
+      } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+          console.error('[MIGRATION] Error adding has_beam_configuration column:', err.message);
+        }
+      }
+
+      await db.run(`
+        UPDATE bom_records
+           SET has_beam_configuration = 1
+         WHERE has_beam_configuration IS NULL
+           AND beam_configuration_json IS NOT NULL
+           AND TRIM(beam_configuration_json) <> ''
+      `);
+
+      await db.run(`
+        UPDATE bom_records
+           SET has_beam_configuration = COALESCE(has_beam_configuration, 0)
+      `);
 
       // Migration: Add recipe_approved column if it doesn't exist
       try {
@@ -3820,7 +3911,7 @@ app.get("/api/bom/edit-clone/rows", auth.authMiddleware, requireRecipeEditCloneR
 app.post("/api/bom/records", auth.authMiddleware, requireBomRecordWrite, async (req, res) => {
   try {
     await ensureBomRecordStoreReady();
-    const { record, materials, calculationSnapshot, sourceRecordId } = req.body || {};
+    const { record, materials, calculationSnapshot, sourceRecordId, beamConfiguration } = req.body || {};
     if (!record || typeof record !== 'object') {
       return res.status(400).json({ error: 'Request body must include a record object.' });
     }
@@ -3861,6 +3952,8 @@ app.post("/api/bom/records", auth.authMiddleware, requireBomRecordWrite, async (
     try {
 
       const snapshotToStore = normalizeCalculationSnapshot(calculationSnapshot);
+      const normalizedBeamConfiguration = normalizeBeamConfigurationSnapshot(beamConfiguration);
+      const hasBeamConfiguration = normalizedBeamConfiguration ? 1 : 0;
 
       const result = await db.run(`
         INSERT INTO bom_records (
@@ -3872,9 +3965,9 @@ app.post("/api/bom/records", auth.authMiddleware, requireBomRecordWrite, async (
           other_scrap_percent, total_scrap_percent, gross_yield_percent,
           s_beams, m_beams, sb_throughput, mb_throughput, total_throughput, production_time,
           cores, slit_width, length_meters, roll_diameter,
-          target_production, target_unit, overconsumption, notes, author, created_by, recipe_approved, calculation_snapshot_json
-          , approval_decision
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          target_production, target_unit, overconsumption, notes, author, created_by, recipe_approved, calculation_snapshot_json,
+          beam_configuration_json, has_beam_configuration, approval_decision
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         recordId,
         record.sap_id || null, assignedPdId, record.customer || null,
@@ -3897,6 +3990,8 @@ app.post("/api/bom/records", auth.authMiddleware, requireBomRecordWrite, async (
         record.notes || null, req.user.name || 'Unknown', req.user.id,
         'No',
         snapshotToStore ? JSON.stringify(snapshotToStore) : null,
+        normalizedBeamConfiguration ? JSON.stringify(normalizedBeamConfiguration) : null,
+        hasBeamConfiguration,
         'Pending'
       ]);
 
@@ -3971,7 +4066,8 @@ app.get("/api/bom/records", auth.authMiddleware, async (req, res) => {
     await ensureBomRecordStoreReady();
     const rows = await db.all(`
       SELECT id, pd_id, customer, line, customer_bw, author,
-             created_at, updated_at, created_by
+             created_at, updated_at, created_by,
+             has_beam_configuration, beam_configuration_json
       FROM bom_records
       ORDER BY created_at DESC
     `);
@@ -4564,7 +4660,7 @@ app.put("/api/bom/records/:id", auth.authMiddleware, requireBomRecordWrite, asyn
     const id = parseInt(req.params.id, 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid record ID.' });
 
-    const { record, materials } = req.body || {};
+    const { record, materials, beamConfiguration } = req.body || {};
     if (!record || typeof record !== 'object') {
       return res.status(400).json({ error: 'Request body must include a record object.' });
     }
@@ -4572,7 +4668,7 @@ app.put("/api/bom/records/:id", auth.authMiddleware, requireBomRecordWrite, asyn
       return res.status(400).json({ error: 'Request body must include a materials array.' });
     }
 
-    const existing = await db.get('SELECT id, pd_id FROM bom_records WHERE id = ?', [id]);
+    const existing = await db.get('SELECT id, pd_id, has_beam_configuration, beam_configuration_json FROM bom_records WHERE id = ?', [id]);
     if (!existing) return res.status(404).json({ error: 'Record not found.' });
 
     let normalizedMaterials;
@@ -4582,6 +4678,12 @@ app.put("/api/bom/records/:id", auth.authMiddleware, requireBomRecordWrite, asyn
     } catch (validationErr) {
       return res.status(validationErr.statusCode || 400).json({ error: validationErr.message });
     }
+
+    const hasBeamPayload = Object.prototype.hasOwnProperty.call(req.body || {}, 'beamConfiguration');
+    const normalizedBeamConfiguration = hasBeamPayload
+      ? normalizeBeamConfigurationSnapshot(beamConfiguration)
+      : parseBeamConfiguration(existing.beam_configuration_json);
+    const hasBeamConfiguration = normalizedBeamConfiguration ? 1 : 0;
 
     const existingPd = normalizeText(existing.pd_id);
     const nextPd = normalizeText(record.pd_id);
@@ -4606,6 +4708,7 @@ app.put("/api/bom/records/:id", auth.authMiddleware, requireBomRecordWrite, asyn
           s_beams=?, m_beams=?, sb_throughput=?, mb_throughput=?, total_throughput=?, production_time=?,
           cores=?, slit_width=?, length_meters=?, roll_diameter=?,
           target_production=?, target_unit=?, overconsumption=?, notes=?,
+          beam_configuration_json=?, has_beam_configuration=?,
           recipe_approved='Yes', approval_decision='Approved', approval_comment=NULL,
           approval_reviewed_by=NULL, approval_reviewed_at=NULL,
           updated_at=CURRENT_TIMESTAMP
@@ -4628,7 +4731,10 @@ app.put("/api/bom/records/:id", auth.authMiddleware, requireBomRecordWrite, asyn
         record.roll_diameter || null, record.target_production || null,
         record.target_unit || null,
         Number.isFinite(Number(record.overconsumption)) ? Number(record.overconsumption) : null,
-        record.notes || null, id
+        record.notes || null,
+        normalizedBeamConfiguration ? JSON.stringify(normalizedBeamConfiguration) : null,
+        hasBeamConfiguration,
+        id
       ]);
 
       await db.run('DELETE FROM bom_record_materials WHERE record_id = ?', [id]);
