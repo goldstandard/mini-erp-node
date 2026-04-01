@@ -41,23 +41,6 @@ function getDB() {
       if (err) {
         console.error('❌ Database error:', err);
         reject(err);
-
-    async function deleteUser(userId) {
-      const user = await dbGet('SELECT id, email, name, role FROM users WHERE id = ?', [userId]);
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      await dbRun('DELETE FROM users WHERE id = ?', [userId]);
-
-      return {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        deleted: true
-      };
-    }
       } else {
         db.run('PRAGMA foreign_keys = ON', (err) => {
           if (err) reject(err);
@@ -889,6 +872,23 @@ async function getUsersInGroup(groupId) {
   );
 
   return users;
+}
+
+async function deleteUser(userId) {
+  const user = await dbGet('SELECT id, email, name, role FROM users WHERE id = ?', [userId]);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  await dbRun('DELETE FROM users WHERE id = ?', [userId]);
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    deleted: true
+  };
 }
 
 async function getAllUsers() {
