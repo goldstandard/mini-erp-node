@@ -178,6 +178,9 @@ All scripts in `scripts/` are considered part of this project. Some are recurrin
    - Maintenance cleanup for polymer index data.
 - `scripts/send-index-reminders.js`
    - Sends planned reminders for index publication workflow.
+- `scripts/backup-azure-db.ps1`
+   - Downloads a database snapshot from a deployed Azure environment via authenticated admin API (`/api/admin/db-download`).
+   - Stores snapshots under `backups/azure-db` with timestamp and prints SHA-256 checksum.
 
 ### Data Import and Backfill Utilities
 
@@ -230,6 +233,10 @@ All scripts in `scripts/` are considered part of this project. Some are recurrin
 
 - SQLite DB files are intentionally ignored by git (`data/*.db`, `data/*.db-wal`, `data/*.db-shm`).
 - On deployed environments, admins can download a live DB snapshot directly from Admin Access → Maintenance (`GET /api/admin/db-download`).
+- Optional scripted Azure snapshot download (from local workstation):
+   - `./scripts/backup-azure-db.ps1 -BaseUrl "https://<your-app>.azurewebsites.net" -Email "<admin-email>"`
+   - Script prompts for password securely when `-Password` is omitted.
+   - Optional output location: `-OutputDir "backups/azure-db"`
 - Export current local DB snapshot:
    - `npm run db:export`
    - Optional custom output path: `npm run db:export -- --out=backups/my-snapshot.db`

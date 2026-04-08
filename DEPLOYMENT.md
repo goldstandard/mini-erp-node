@@ -87,6 +87,15 @@ Recommended backup targets:
 - Full project zip
 - `data/mini_erp.db`
 - deployment configuration
+- remote Azure DB snapshot (before cutover/migration)
+
+Azure DB snapshot from deployed app (recommended before migration):
+
+1. Run the helper script from project root:
+   - `./scripts/backup-azure-db.ps1 -BaseUrl "https://<your-app>.azurewebsites.net" -Email "<admin-email>"`
+2. Enter admin password when prompted (or pass `-Password` if non-interactive execution is required).
+3. Verify script output includes `BACKUP_FILE`, `BACKUP_SIZE_BYTES`, and `BACKUP_SHA256`.
+4. Copy the resulting `.db` file from `backups/azure-db/` to a second secure storage location.
 
 Restore pattern:
 
