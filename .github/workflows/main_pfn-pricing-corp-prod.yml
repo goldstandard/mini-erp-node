@@ -41,7 +41,11 @@ jobs:
           echo "Commit: ${{ github.sha }}"
           echo "Branch: ${{ github.ref_name }}"
           node --version
-          npm --version
+          if command -v npm >/dev/null 2>&1; then
+            npm --version || echo "npm version check failed; continuing"
+          else
+            echo "npm not found on runner PATH; continuing"
+          fi
 
       - name: Validate required project files
         run: |
