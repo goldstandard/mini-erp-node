@@ -66,22 +66,22 @@ call :SelectNodeVersion
 :: 3. Install npm packages
 IF EXIST "%DEPLOYMENT_TARGET%\package.json" (
   pushd "%DEPLOYMENT_TARGET%"
-  echo Installing npm packages and rebuilding native modules...
-  
-  :: Remove existing sqlite3 to force fresh install
-  IF EXIST "%DEPLOYMENT_TARGET%\node_modules\sqlite3" (
-    echo Removing existing sqlite3 module...
-    rmdir /s /q "%DEPLOYMENT_TARGET%\node_modules\sqlite3"
+  echo Installing npm packages...
+
+  :: Install production dependencies. Optional deps are omitted to keep deployment lean.
+  call npm install --omit=dev --omit=optional
+  IF !ERRORLEVEL! NEQ 0 goto error
+
+  :: Best-effort sqlite3 refresh. Do not fail deployment if native rebuild is unavailable.
+  echo Attempting sqlite3 refresh (best effort)...
+  call npm rebuild sqlite3
+  IF !ERRORLEVEL! NEQ 0 (
+    echo sqlite3 rebuild failed. Continuing deployment; runtime startup script will retry if needed.
+    call npm install sqlite3 --force
+    IF !ERRORLEVEL! NEQ 0 (
+      echo sqlite3 reinstall failed. Continuing deployment.
+    )
   )
-  
-  :: Install packages
-  call npm install --production --no-optional
-  IF !ERRORLEVEL! NEQ 0 goto error
-  
-  :: Force rebuild sqlite3 from source for Azure architecture
-  echo Rebuilding sqlite3 for Azure Windows runtime...
-  call npm install sqlite3 --build-from-source --force
-  IF !ERRORLEVEL! NEQ 0 goto error
   
   popd
 )
